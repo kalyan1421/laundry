@@ -1,0 +1,77 @@
+// models/item_model.dart
+class ItemModel {
+  final String id;
+  final String name;
+  final double price;
+  final String category;
+  final String unit;
+  final bool isActive;
+  final DateTime updatedAt;
+  final String? imageUrl; // Added image URL field
+
+  ItemModel({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.category,
+    required this.unit,
+    required this.isActive,
+    required this.updatedAt,
+    this.imageUrl, // Optional image URL
+  });
+
+  // Create ItemModel from Firestore document
+  factory ItemModel.fromMap(String id, Map<String, dynamic> map) {
+    return ItemModel(
+      id: id,
+      name: map['name'] ?? '',
+      price: (map['price'] ?? 0.0).toDouble(),
+      category: map['category'] ?? '',
+      unit: map['unit'] ?? 'piece',
+      isActive: map['isActive'] ?? true,
+      updatedAt: map['updatedAt']?.toDate() ?? DateTime.now(),
+      imageUrl: map['imageUrl'], // Get image URL from Firestore
+    );
+  }
+
+  // Convert ItemModel to Map for Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'price': price,
+      'category': category,
+      'unit': unit,
+      'isActive': isActive,
+      'updatedAt': updatedAt,
+      if (imageUrl != null) 'imageUrl': imageUrl, // Include image URL if exists
+    };
+  }
+
+  // Create a copy of ItemModel with updated fields
+  ItemModel copyWith({
+    String? id,
+    String? name,
+    double? price,
+    String? category,
+    String? unit,
+    bool? isActive,
+    DateTime? updatedAt,
+    String? imageUrl,
+  }) {
+    return ItemModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      price: price ?? this.price,
+      category: category ?? this.category,
+      unit: unit ?? this.unit,
+      isActive: isActive ?? this.isActive,
+      updatedAt: updatedAt ?? this.updatedAt,
+      imageUrl: imageUrl ?? this.imageUrl,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'ItemModel(id: $id, name: $name, price: $price, category: $category, unit: $unit, isActive: $isActive, imageUrl: $imageUrl)';
+  }
+}
