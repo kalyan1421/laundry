@@ -6,6 +6,7 @@ import '../models/item_model.dart';
 import '../models/order_model.dart';
 import '../models/banner_model.dart';
 import '../models/offer_model.dart';
+import '../models/user_model.dart';
 
 class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -90,7 +91,7 @@ class DatabaseService {
         }
       }
       
-      data['updatedAt'] = DateTime.now();
+      data['updatedAt'] = Timestamp.now();
       await _firestore.collection('items').doc(itemId).update(data);
     } catch (e) {
       throw Exception('Failed to update item: $e');
@@ -122,12 +123,28 @@ class DatabaseService {
   Stream<List<OrderModel>> getAllOrders() {
     return _firestore
         .collection('orders')
-        .orderBy('createdAt', descending: true)
+        .orderBy('orderTimestamp', descending: true)
         .snapshots()
-        .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => OrderModel.fromMap(doc.id, doc.data()))
-          .toList();
+        .asyncMap((snapshot) async {
+      List<OrderModel> ordersWithCustomers = [];
+      for (var doc in snapshot.docs) {
+        OrderModel order = OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+        UserModel? customer;
+        if (order.userId.isNotEmpty) {
+          try {
+            DocumentSnapshot<Map<String, dynamic>> userDoc = 
+                await _firestore.collection('users').doc(order.userId).get();
+            if (userDoc.exists) {
+              customer = UserModel.fromFirestore(userDoc);
+            }
+          } catch (e) {
+            print('Error fetching user ${order.userId} for order ${order.id}: $e');
+            // Optionally, handle this error more gracefully, e.g., log to a more persistent store
+          }
+        }
+        ordersWithCustomers.add(order.copyWith(customerInfo: customer));
+      }
+      return ordersWithCustomers;
     });
   }
 
@@ -135,11 +152,11 @@ class DatabaseService {
     return _firestore
         .collection('orders')
         .where('assignedTo', isEqualTo: deliveryId)
-        .orderBy('createdAt', descending: true)
+        .orderBy('orderTimestamp', descending: true)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
-          .map((doc) => OrderModel.fromMap(doc.id, doc.data()))
+          .map((doc) => OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
           .toList();
     });
   }
@@ -147,7 +164,7 @@ class DatabaseService {
   Future<void> updateOrderStatus(String orderId, String status) async {
     await _firestore.collection('orders').doc(orderId).update({
       'status': status,
-      'updatedAt': DateTime.now(),
+      'updatedAt': Timestamp.now(),
     });
   }
 
@@ -176,6 +193,7 @@ class DatabaseService {
   }
 
   Future<void> updateBanner(String bannerId, Map<String, dynamic> data) async {
+    data['updatedAt'] = Timestamp.now();
     await _firestore.collection('banners').doc(bannerId).update(data);
   }
 
@@ -184,28 +202,42 @@ class DatabaseService {
   }
 
   // Offers Management
-  Stream<List<OfferModel>> getOffers() {
+  Stream<List<OfferModel>> getOffersStream() {
     return _firestore
         .collection('offers')
-        .where('isActive', isEqualTo: true)
+        .orderBy('validFrom', descending: true)
         .snapshots()
-        .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => OfferModel.fromMap(doc.id, doc.data()))
-          .toList();
-    });
+        .map((snapshot) => snapshot.docs
+            .map((doc) => OfferModel.fromFirestore(doc))
+            .toList());
   }
 
   Future<void> addOffer(OfferModel offer) async {
-    await _firestore.collection('offers').add(offer.toMap());
+    try {
+      await _firestore.collection('offers').add(offer.toJson());
+    } catch (e) {
+      print('Error adding offer in DatabaseService: $e');
+      throw e;
+    }
   }
 
-  Future<void> updateOffer(String offerId, Map<String, dynamic> data) async {
-    await _firestore.collection('offers').doc(offerId).update(data);
+  Future<void> updateOffer(String id, Map<String, dynamic> data) async {
+    try {
+      data['updatedAt'] = Timestamp.now();
+      await _firestore.collection('offers').doc(id).update(data);
+    } catch (e) {
+      print('Error updating offer in DatabaseService: $e');
+      throw e;
+    }
   }
 
-  Future<void> deleteOffer(String offerId) async {
-    await _firestore.collection('offers').doc(offerId).delete();
+  Future<void> deleteOffer(String id) async {
+    try {
+      await _firestore.collection('offers').doc(id).delete();
+    } catch (e) {
+      print('Error deleting offer in DatabaseService: $e');
+      throw e;
+    }
   }
 
   // Quick Order Notifications
@@ -228,7 +260,31 @@ class DatabaseService {
   Future<void> updateQuickOrderStatus(String notificationId, String status) async {
     await _firestore.collection('quickOrderNotifications').doc(notificationId).update({
       'status': status,
-      'updatedAt': DateTime.now(),
+      'updatedAt': Timestamp.now(),
     });
+  }
+
+  // User Management
+  Stream<List<UserModel>> getAllUsers() {
+    return _firestore
+        .collection('users')
+        // Optionally order them, e.g., by name or createdAt
+        .orderBy('createdAt', descending: true) 
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => UserModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+          .toList();
+    });
+  }
+
+  // Method to get order count for a specific user
+  Future<int> getUserOrderCount(String userId, {List<String>? statuses}) async {
+    Query query = _firestore.collection('orders').where('userId', isEqualTo: userId);
+    if (statuses != null && statuses.isNotEmpty) {
+      query = query.where('status', whereIn: statuses);
+    }
+    final snapshot = await query.get();
+    return snapshot.docs.length;
   }
 }

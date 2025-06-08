@@ -49,7 +49,7 @@ class AuthService {
       }
       
       // Check delivery_personnel collection
-      final deliveryDoc = await _firestore.collection('delivery_personnel').doc(user.uid).get();
+      final deliveryDoc = await _firestore.collection('delivery').doc(user.uid).get();
       if (deliveryDoc.exists) {
         final data = deliveryDoc.data();
         if (data != null) {

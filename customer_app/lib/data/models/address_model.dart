@@ -1,63 +1,60 @@
-
 // lib/data/models/address_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AddressModel {
-  final String id;
+  final String id; // Document ID from Firestore
   final String type; // home, work, other
   final String addressLine1;
-  final String addressLine2;
+  final String? addressLine2; // Made nullable as it might be optional
   final String city;
   final String state;
   final String pincode;
-  final String landmark;
+  final String? landmark; // Made nullable
   final double? latitude;
   final double? longitude;
   final bool isPrimary;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
+  final DateTime? createdAt; // Set by Firestore server timestamp
+  final DateTime? updatedAt; // Set by Firestore server timestamp
 
   AddressModel({
     required this.id,
     required this.type,
     required this.addressLine1,
-    required this.addressLine2,
+    this.addressLine2,
     required this.city,
     required this.state,
     required this.pincode,
-    required this.landmark,
+    this.landmark,
     this.latitude,
     this.longitude,
-    required this.isPrimary,
+    this.isPrimary = false, // Default to false if not provided
     this.createdAt,
     this.updatedAt,
   });
 
-  factory AddressModel.fromMap(Map<String, dynamic> map) {
+  // Corrected factory method to be used by AddressProvider
+  factory AddressModel.fromFirestore(Map<String, dynamic> data, String documentId) {
     return AddressModel(
-      id: map['id'] ?? '',
-      type: map['type'] ?? 'home',
-      addressLine1: map['addressLine1'] ?? '',
-      addressLine2: map['addressLine2'] ?? '',
-      city: map['city'] ?? '',
-      state: map['state'] ?? '',
-      pincode: map['pincode'] ?? '',
-      landmark: map['landmark'] ?? '',
-      latitude: map['latitude']?.toDouble(),
-      longitude: map['longitude']?.toDouble(),
-      isPrimary: map['isPrimary'] ?? false,
-      createdAt: map['createdAt'] != null 
-          ? (map['createdAt'] as Timestamp).toDate() 
-          : null,
-      updatedAt: map['updatedAt'] != null 
-          ? (map['updatedAt'] as Timestamp).toDate() 
-          : null,
+      id: documentId, // Use the document ID passed from Firestore
+      type: data['type'] as String? ?? 'home',
+      addressLine1: data['addressLine1'] as String? ?? '',
+      addressLine2: data['addressLine2'] as String?,
+      city: data['city'] as String? ?? '',
+      state: data['state'] as String? ?? '',
+      pincode: data['pincode'] as String? ?? '',
+      landmark: data['landmark'] as String?,
+      latitude: (data['latitude'] as num?)?.toDouble(),
+      longitude: (data['longitude'] as num?)?.toDouble(),
+      isPrimary: data['isPrimary'] as bool? ?? false,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
     );
   }
 
+  // Data sent to Firestore when creating or updating an address.
+  // id, createdAt, and updatedAt are handled by Firestore/Provider.
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
       'type': type,
       'addressLine1': addressLine1,
       'addressLine2': addressLine2,
@@ -68,7 +65,8 @@ class AddressModel {
       'latitude': latitude,
       'longitude': longitude,
       'isPrimary': isPrimary,
-      'updatedAt': FieldValue.serverTimestamp(),
+      // 'createdAt' and 'updatedAt' are set using FieldValue.serverTimestamp() in the provider.
+      // 'id' is the document ID and not stored as a field within the document.
     };
   }
 
@@ -76,8 +74,8 @@ class AddressModel {
     List<String> parts = [];
     
     if (addressLine1.isNotEmpty) parts.add(addressLine1);
-    if (addressLine2.isNotEmpty) parts.add(addressLine2);
-    if (landmark.isNotEmpty) parts.add('Near $landmark');
+    if (addressLine2 != null && addressLine2!.isNotEmpty) parts.add(addressLine2!);
+    if (landmark != null && landmark!.isNotEmpty) parts.add('Near $landmark');
     if (city.isNotEmpty) parts.add(city);
     if (state.isNotEmpty) parts.add(state);
     if (pincode.isNotEmpty) parts.add(pincode);
@@ -103,11 +101,13 @@ class AddressModel {
       case 'other':
         return 'Other';
       default:
+        if (type.isEmpty) return 'Other';
         return type.substring(0, 1).toUpperCase() + type.substring(1);
     }
   }
 
   AddressModel copyWith({
+    String? id, // id can also be copied if needed, though typically it's fixed
     String? type,
     String? addressLine1,
     String? addressLine2,
@@ -118,9 +118,11 @@ class AddressModel {
     double? latitude,
     double? longitude,
     bool? isPrimary,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return AddressModel(
-      id: id,
+      id: id ?? this.id,
       type: type ?? this.type,
       addressLine1: addressLine1 ?? this.addressLine1,
       addressLine2: addressLine2 ?? this.addressLine2,
@@ -131,7 +133,8 @@ class AddressModel {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       isPrimary: isPrimary ?? this.isPrimary,
-      createdAt: createdAt,
-      updatedAt: DateTime.now(),
+      createdAt: createdAt ?? this.createdAt, // Keep existing if not provided
+      updatedAt: updatedAt ?? this.updatedAt, // Keep existing if not provided
     );
-  }}
+  }
+}

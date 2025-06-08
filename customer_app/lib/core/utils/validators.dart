@@ -162,6 +162,20 @@ class Validators {
     return null;
   }
   
+  // Generic validator for non-empty fields
+  static String? validateGeneric(String? value, String fieldName) {
+    if (value == null || value.isEmpty) {
+      return '$fieldName is required';
+    }
+    if (value.trim().length < 2) {
+      return '$fieldName must be at least 2 characters';
+    }
+    if (value.trim().length > 100) {
+      return '$fieldName can be at most 100 characters';
+    }
+    return null;
+  }
+  
   // Password validation
   static String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {

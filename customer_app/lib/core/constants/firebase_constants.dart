@@ -3,7 +3,7 @@
 // lib/core/constants/firebase_constants.dart
 class FirebaseConstants {
   // Collection names
-  static const String usersCollection = 'users';
+  static const String usersCollection = 'customer';
   static const String itemsCollection = 'items';
   static const String ordersCollection = 'orders';
   static const String bannersCollection = 'banners';

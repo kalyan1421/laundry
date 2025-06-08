@@ -43,11 +43,11 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   void _populateFields() {
     final address = widget.address!;
     _addressLine1Controller.text = address.addressLine1;
-    _addressLine2Controller.text = address.addressLine2;
+    _addressLine2Controller.text = address.addressLine2!;
     _cityController.text = address.city;
     _stateController.text = address.state;
     _pincodeController.text = address.pincode;
-    _landmarkController.text = address.landmark;
+    _landmarkController.text = address.landmark!;
     selectedAddressType = address.type;
     isPrimary = address.isPrimary;
   }

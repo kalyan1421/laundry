@@ -5,8 +5,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../services/notification_service.dart';
 import '../../models/order_model.dart';
-import 'order_details.dart';
-import 'quick_order_notifications.dart';
+import './order_details.dart';
+import './quick_order_notifications.dart';
 
 class DeliveryHome extends StatefulWidget {
   const DeliveryHome({super.key});
@@ -94,34 +94,39 @@ class DeliveryDashboard extends StatelessWidget {
                 return const Center(child: CircularProgressIndicator());
               }
 
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return const Center(
-                  child: Text('No orders assigned to you'),
+                  child: Text('No orders assigned to you at the moment.'),
                 );
               }
 
+              final orders = snapshot.data!;
               return ListView.builder(
                 padding: const EdgeInsets.all(8),
-                itemCount: snapshot.data!.length,
+                itemCount: orders.length,
                 itemBuilder: (context, index) {
-                  final order = snapshot.data![index];
+                  final order = orders[index];
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 4),
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundColor: _getStatusColor(order.status),
                         child: Text(
-                          order.id.substring(0, 2).toUpperCase(),
-                          style: const TextStyle(color: Colors.white),
+                          order.orderNumber?.substring(0, 2).toUpperCase() ?? '??',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                       ),
-                      title: Text('Order #${order.id.substring(0, 8)}'),
+                      title: Text('Order #${order.orderNumber ?? order.id.substring(0,8)}'),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Customer: ${order.userName}'),
+                          Text('Customer: ${order.customer?.name ?? "N/A"}'),
                           Text('Status: ${order.status}'),
-                          Text('Amount: ₹${order.totalAmount}'),
+                          Text('Amount: ₹${order.totalAmount.toStringAsFixed(2)}'),
                         ],
                       ),
                       trailing: const Icon(Icons.arrow_forward_ios),
@@ -155,6 +160,7 @@ class DeliveryDashboard extends StatelessWidget {
             color: color,
           ),
         ),
+        const SizedBox(height: 4),
         Text(
           title,
           style: const TextStyle(
@@ -172,11 +178,19 @@ class DeliveryDashboard extends StatelessWidget {
         return Colors.orange;
       case 'assigned':
       case 'in_progress':
+      case 'processing':
         return Colors.blue;
+      case 'ready_for_pickup':
+        return Colors.lightBlueAccent;
+      case 'out_for_delivery':
+        return Colors.teal;
       case 'completed':
+      case 'delivered':
         return Colors.green;
       case 'cancelled':
         return Colors.red;
+      case 'on_hold':
+        return Colors.amber;
       default:
         return Colors.grey;
     }

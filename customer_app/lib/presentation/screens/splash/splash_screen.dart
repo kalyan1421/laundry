@@ -10,17 +10,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _navigateToOnboarding();
-  }
-
-  _navigateToOnboarding() {
-    Timer(const Duration(seconds: 3), () {
-      Navigator.pushReplacementNamed(context, '/onboarding');
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,57 +27,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: Colors.grey[100],
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Stack(
-                children: [
-                  // Iron body
-                  Positioned(
-                    bottom: 20,
-                    left: 20,
-                    right: 20,
-                    child: Container(
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF6B7B8A),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Container(
-                        margin: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF5A6B7A),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Iron handle
-                  Positioned(
-                    top: 25,
-                    left: 35,
-                    child: Container(
-                      width: 50,
-                      height: 25,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF6B7B8A),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  // Steam lines
-                  Positioned(
-                    top: 15,
-                    left: 25,
-                    child: Column(
-                      children: [
-                        _buildSteamLine(),
-                        const SizedBox(height: 3),
-                        _buildSteamLine(),
-                        const SizedBox(height: 3),
-                        _buildSteamLine(),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              child: Image.asset("assets/icons/icon.png", fit: BoxFit.cover),
             ),
             const SizedBox(height: 30),
             // App title

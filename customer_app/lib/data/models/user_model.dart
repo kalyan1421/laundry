@@ -3,65 +3,79 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserModel {
   final String uid;
+  final String? clientId;
   final String phoneNumber;
   final String name;
   final String email;
-  final String profileImageUrl;
+  final String? profileImageUrl;
   final List<Address> addresses;
   final bool isProfileComplete;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-  final DateTime? lastSignIn;
+  final Timestamp createdAt;
+  final Timestamp updatedAt;
+  final Timestamp? lastSignIn;
+  final String role;
+  final String? qrCodeUrl;
+  final int orderCount;
 
   UserModel({
     required this.uid,
+    this.clientId,
     required this.phoneNumber,
     required this.name,
     required this.email,
-    required this.profileImageUrl,
+    this.profileImageUrl,
     required this.addresses,
     required this.isProfileComplete,
-    this.createdAt,
-    this.updatedAt,
+    required this.createdAt,
+    required this.updatedAt,
     this.lastSignIn,
+    required this.role,
+    this.qrCodeUrl,
+    this.orderCount = 0,
   });
 
-  // Create UserModel from Firestore document
-  factory UserModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    
+  // Create UserModel from Firestore document, now taking addresses and orderCount separately
+  factory UserModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc, {
+    List<Address> addresses = const [], // Accept fetched addresses
+    int orderCount = 0, // Accept fetched order count
+  }) {
+    final data = doc.data();
+    if (data == null) throw Exception("User data not found in snapshot!");
+
     return UserModel(
       uid: doc.id,
-      phoneNumber: data['phoneNumber'] ?? '',
-      name: data['name'] ?? '',
-      email: data['email'] ?? '',
-      profileImageUrl: data['profileImageUrl'] ?? '',
-      addresses: (data['addresses'] as List<dynamic>?)
-          ?.map((address) => Address.fromMap(address as Map<String, dynamic>))
-          .toList() ?? [],
-      isProfileComplete: data['isProfileComplete'] ?? false,
-      createdAt: data['createdAt'] != null 
-          ? (data['createdAt'] as Timestamp).toDate() 
-          : null,
-      updatedAt: data['updatedAt'] != null 
-          ? (data['updatedAt'] as Timestamp).toDate() 
-          : null,
-      lastSignIn: data['lastSignIn'] != null 
-          ? (data['lastSignIn'] as Timestamp).toDate() 
-          : null,
+      clientId: data['clientId'] as String?,
+      phoneNumber: data['phoneNumber'] as String? ?? '',
+      name: data['name'] as String? ?? '',
+      email: data['email'] as String? ?? '',
+      profileImageUrl: data['profileImageUrl'] as String?,
+      addresses: addresses, // Use passed addresses
+      isProfileComplete: data['isProfileComplete'] as bool? ?? false,
+      createdAt: data['createdAt'] is Timestamp ? data['createdAt'] : Timestamp.now(),
+      updatedAt: data['updatedAt'] is Timestamp ? data['updatedAt'] : Timestamp.now(),
+      lastSignIn: data['lastSignIn'] as Timestamp?,
+      role: data['role'] as String? ?? 'customer',
+      qrCodeUrl: data['qrCodeUrl'] as String?,
+      orderCount: orderCount, // Use passed order count
     );
   }
 
   // Convert UserModel to Map for Firestore
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toFirestore() {
     return {
+      'uid': uid,
+      if (clientId != null) 'clientId': clientId,
       'phoneNumber': phoneNumber,
       'name': name,
       'email': email,
-      'profileImageUrl': profileImageUrl,
-      'addresses': addresses.map((address) => address.toMap()).toList(),
+      if (profileImageUrl != null) 'profileImageUrl': profileImageUrl,
       'isProfileComplete': isProfileComplete,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      if (lastSignIn != null) 'lastSignIn': lastSignIn,
+      'role': role,
+      if (qrCodeUrl != null) 'qrCodeUrl': qrCodeUrl,
     };
   }
 
@@ -72,18 +86,28 @@ class UserModel {
     String? profileImageUrl,
     List<Address>? addresses,
     bool? isProfileComplete,
+    Timestamp? createdAt,
+    Timestamp? updatedAt,
+    Timestamp? lastSignIn,
+    String? role,
+    String? qrCodeUrl,
+    int? orderCount,
   }) {
     return UserModel(
       uid: uid,
+      clientId: clientId,
       phoneNumber: phoneNumber,
       name: name ?? this.name,
       email: email ?? this.email,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       addresses: addresses ?? this.addresses,
       isProfileComplete: isProfileComplete ?? this.isProfileComplete,
-      createdAt: createdAt,
-      updatedAt: DateTime.now(),
-      lastSignIn: lastSignIn,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lastSignIn: lastSignIn ?? this.lastSignIn,
+      role: role ?? this.role,
+      qrCodeUrl: qrCodeUrl ?? this.qrCodeUrl,
+      orderCount: orderCount ?? this.orderCount,
     );
   }
 
@@ -123,6 +147,25 @@ class UserModel {
     return addresses.first;
   }
 
+  // Method to convert UserModel instance to a JSON map for logging or other uses
+  Map<String, dynamic> toJson() {
+    return {
+      'uid': uid,
+      'clientId': clientId,
+      'name': name,
+      'email': email,
+      'phoneNumber': phoneNumber,
+      'profileImageUrl': profileImageUrl,
+      'isProfileComplete': isProfileComplete,
+      'role': role,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      'lastSignIn': lastSignIn,
+      'qrCodeUrl': qrCodeUrl,
+      'orderCount': orderCount,
+    };
+  }
+
   @override
   String toString() {
     return 'UserModel(uid: $uid, name: $name, phoneNumber: $phoneNumber, email: $email)';
@@ -151,8 +194,8 @@ class Address {
   final double? latitude;
   final double? longitude;
   final bool isPrimary;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
+  final Timestamp? createdAt;
+  final Timestamp? updatedAt;
 
   Address({
     required this.id,
@@ -184,12 +227,8 @@ class Address {
       latitude: map['latitude']?.toDouble(),
       longitude: map['longitude']?.toDouble(),
       isPrimary: map['isPrimary'] ?? false,
-      createdAt: map['createdAt'] != null 
-          ? (map['createdAt'] as Timestamp).toDate() 
-          : null,
-      updatedAt: map['updatedAt'] != null 
-          ? (map['updatedAt'] as Timestamp).toDate() 
-          : null,
+      createdAt: map['createdAt'] is Timestamp ? map['createdAt'] : null,
+      updatedAt: map['updatedAt'] is Timestamp ? map['updatedAt'] : null,
     );
   }
 
@@ -207,7 +246,8 @@ class Address {
       'latitude': latitude,
       'longitude': longitude,
       'isPrimary': isPrimary,
-      'updatedAt': FieldValue.serverTimestamp(),
+      if (createdAt != null) 'createdAt': createdAt,
+      if (updatedAt != null) 'updatedAt': updatedAt,
     };
   }
 

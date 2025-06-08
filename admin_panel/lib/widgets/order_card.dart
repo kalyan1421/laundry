@@ -1,8 +1,8 @@
-
 // widgets/order_card.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/order_model.dart';
+import '../models/user_model.dart'; // Import UserModel if not already imported
 
 class OrderCard extends StatelessWidget {
   final OrderModel order;
@@ -41,8 +41,8 @@ class OrderCard extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Customer: ${order.userName}'),
-            Text('Date: ${DateFormat('dd/MM/yyyy HH:mm').format(order.createdAt)}'),
+            Text('Customer: ${order.customer?.name ?? "N/A"}'),
+            Text('Date: ${DateFormat('dd/MM/yyyy HH:mm').format(order.orderTimestamp.toDate())}'),
           ],
         ),
         children: [
@@ -57,8 +57,12 @@ class OrderCard extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                Text('Phone: ${order.userPhone}'),
-                Text('Payment: ${order.paymentMode}'),
+                Text('Phone: ${order.customer?.phoneNumber ?? "N/A"}'),
+                if (order.customer?.email != null && order.customer!.email.isNotEmpty)
+                  Text('Email: ${order.customer!.email}'),
+                if (order.customer?.clientId != null && order.customer!.clientId!.isNotEmpty)
+                  Text('Client ID: ${order.customer!.clientId}'),
+                Text('Payment: ${order.paymentMethod ?? "N/A"}'),
                 const SizedBox(height: 16),
 
                 // Order Items
@@ -72,8 +76,8 @@ class OrderCard extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('${item.itemName} x${item.quantity}'),
-                      Text('₹${item.price * item.quantity}'),
+                      Text('${item.name} x${item.quantity}'),
+                      Text('₹${item.pricePerPiece * item.quantity}'),
                     ],
                   ),
                 )),

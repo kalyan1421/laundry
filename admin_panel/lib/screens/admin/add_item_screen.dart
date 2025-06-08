@@ -164,6 +164,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
           unit: 'piece', // Fixed unit for ironing items
           isActive: _isActive,
           updatedAt: DateTime.now(),
+          sortOrder: 0, // Default sort order
         );
 
         final success = await itemProvider.addItem(newItem, imageFile: _selectedImage);

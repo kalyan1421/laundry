@@ -1,96 +1,103 @@
-// lib/core/routes/app_routes.dart
+import 'package:customer_app/presentation/providers/auth_provider.dart';
 import 'package:customer_app/presentation/screens/auth/login_screen.dart';
 import 'package:customer_app/presentation/screens/auth/otp_verification_screen.dart';
+import 'package:customer_app/presentation/screens/auth/profile_setup_screen.dart';
 import 'package:customer_app/presentation/screens/auth/welcome_screen.dart';
-import 'package:customer_app/presentation/screens/home/home_screen.dart';
-import 'package:customer_app/presentation/screens/splash/onboarding_screen.dart';
+import 'package:customer_app/presentation/screens/main/main_wrapper.dart';
+import 'package:customer_app/presentation/screens/profile/edit_profile_screen.dart';
+import 'package:customer_app/presentation/screens/profile/manage_addresses_screen.dart';
 import 'package:customer_app/presentation/screens/splash/splash_screen.dart';
+import 'package:customer_app/presentation/screens/address/add_address_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class AppRoutes {
-  static const String splash = '/splash';
-  static const String onboarding = '/onboarding';
+  static const String splash = '/';
   static const String login = '/login';
   static const String otpVerification = '/otp-verification';
+  static const String profileSetup = '/profile-setup';
+  static const String addAddress = '/add-address';
   static const String welcome = '/welcome';
   static const String home = '/home';
+  static const String orders = '/orders';
+  static const String trackOrder = '/track-order';
+  static const String profile = '/profile';
+
+  // New routes for profile section
+  static const String editProfile = '/edit-profile';
+  static const String manageAddresses = '/manage-addresses';
+
+  static Map<String, WidgetBuilder> get routes => {
+        login: (context) => const LoginScreen(),
+        otpVerification: (context) => OTPVerificationScreen(phoneNumber: ModalRoute.of(context)?.settings.arguments as String? ?? ''),
+        profileSetup: (context) => const ProfileSetupScreen(),
+        addAddress: (context) => const AddAddressScreen(),
+        welcome: (context) => const WelcomeScreen(),
+        home: (context) => const MainWrapper(),
+      };
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case splash:
-        return MaterialPageRoute(
-          builder: (context) => const SplashScreen(),
-          settings: settings,
-        );
-
-      case onboarding:
-        return MaterialPageRoute(
-          builder: (context) => const OnboardingScreen(),
-          settings: settings,
-        );
-
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
+      
       case login:
-        return MaterialPageRoute(
-          builder: (context) => const LoginScreen(),
-          settings: settings,
-        );
-
+        return MaterialPageRoute(builder: (_) => const LoginScreen());
+      
       case otpVerification:
-        // Extract phone number from arguments
-        final phoneNumber = settings.arguments as String?;
-        
-        if (phoneNumber == null || phoneNumber.isEmpty) {
-          // If no phone number provided, redirect to login
-          return MaterialPageRoute(
-            builder: (context) => const LoginScreen(),
-            settings: settings,
-          );
+        final args = settings.arguments;
+        String phoneNumber = '';
+        if (args is Map<String, dynamic>) {
+          phoneNumber = args['phoneNumber'] as String? ?? '';
         }
-        
         return MaterialPageRoute(
-          builder: (context) => OTPVerificationScreen(
+          builder: (_) => OTPVerificationScreen(
             phoneNumber: phoneNumber,
           ),
-          settings: settings,
         );
+      
+      case profileSetup:
+        return MaterialPageRoute(builder: (_) => const ProfileSetupScreen());
+      
+      case addAddress:
+        return MaterialPageRoute(builder: (_) => const AddAddressScreen());
 
       case welcome:
-        return MaterialPageRoute(
-          builder: (context) => const WelcomeScreen(),
-          settings: settings,
-        );
-
+        return MaterialPageRoute(builder: (_) => const WelcomeScreen());
+        
       case home:
-        return MaterialPageRoute(
-          builder: (context) => const HomeScreen(),
-          settings: settings,
-        );
+        return MaterialPageRoute(builder: (_) => const MainWrapper());
+      
+      case editProfile:
+        return MaterialPageRoute(builder: (_) => const EditProfileScreen());
+
+      case manageAddresses:
+        return MaterialPageRoute(builder: (_) => const ManageAddressesScreen());
 
       default:
+        print("Unhandled route: ${settings.name}");
         return MaterialPageRoute(
-          builder: (context) => const NotFoundScreen(),
-          settings: settings,
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: const Text("Error")),
+            body: Center(
+              child: Text('No route defined for ${settings.name}'),
+            ),
+          ),
         );
     }
   }
 
-  // Helper methods for navigation
+  // Helper method to navigate to OTP screen
   static void navigateToOTP(BuildContext context, String phoneNumber) {
     Navigator.pushNamed(
       context,
       otpVerification,
-      arguments: phoneNumber,
+      arguments: {'phoneNumber': phoneNumber},
     );
   }
+ 
 
-  static void navigateToLogin(BuildContext context) {
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      login,
-      (route) => false,
-    );
-  }
-
+  // Helper method to navigate to home and clear stack
   static void navigateToHome(BuildContext context) {
     Navigator.pushNamedAndRemoveUntil(
       context,
@@ -99,62 +106,54 @@ class AppRoutes {
     );
   }
 
+  // Helper method to navigate to profile setup
+  static void navigateToProfileSetup(BuildContext context) {
+    Navigator.pushReplacementNamed(context, profileSetup);
+  }
+
+  static void navigateToAddAddress(BuildContext context) {
+    Navigator.pushReplacementNamed(context, addAddress);
+  }
+
   static void navigateToWelcome(BuildContext context) {
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      welcome,
-      (route) => false,
-    );
+    Navigator.pushReplacementNamed(context, welcome);
   }
 }
 
-// 404 Screen for unknown routes
-class NotFoundScreen extends StatelessWidget {
-  const NotFoundScreen({Key? key}) : super(key: key);
+// Profile Completion Check Widget
+// This can be used to wrap screens that require complete profile
+
+class ProfileCompleteGuard extends StatelessWidget {
+  final Widget child;
+
+  const ProfileCompleteGuard({
+    Key? key,
+    required this.child,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Page Not Found'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 80,
-              color: Colors.grey[400],
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, _) {
+        if (!context.mounted) {
+          return const SizedBox.shrink();
+        }
+
+        if (authProvider.authStatus == AuthStatus.authenticated &&
+            !authProvider.isProfileComplete) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) {
+              Navigator.pushReplacementNamed(context, AppRoutes.profileSetup);
+            }
+          });
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Page Not Found',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2D3748),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'The page you are looking for does not exist.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Color(0xFF718096),
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                AppRoutes.navigateToHome(context);
-              },
-              child: const Text('Go Home'),
-            ),
-          ],
-        ),
-      ),
+          );
+        }
+        return child;
+      },
     );
   }
 }

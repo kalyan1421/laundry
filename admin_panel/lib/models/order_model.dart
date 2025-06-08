@@ -1,104 +1,123 @@
-
 // models/order_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import './user_model.dart'; // Assuming UserModel is in the same directory
 
 class OrderModel {
   final String id;
   final String userId;
-  final String userName;
-  final String userPhone;
+  final String? orderNumber;
   final List<OrderItem> items;
   final double totalAmount;
   final String status;
-  final String paymentMode;
-  final GeoPoint pickupLocation;
-  final GeoPoint deliveryLocation;
-  final String orderType; // 'normal', 'quick_delivery', 'quick_call'
+  final String? paymentMethod;
+  final String? deliveryAddress;
+  final String? pickupAddress;
+  final Timestamp orderTimestamp;
+  final String? serviceType;
   final String? assignedTo;
-  final DateTime createdAt;
+  final UserModel? customer; // Added customer details
 
   OrderModel({
     required this.id,
     required this.userId,
-    required this.userName,
-    required this.userPhone,
+    this.orderNumber,
     required this.items,
     required this.totalAmount,
     required this.status,
-    required this.paymentMode,
-    required this.pickupLocation,
-    required this.deliveryLocation,
-    required this.orderType,
+    this.paymentMethod,
+    this.deliveryAddress,
+    this.pickupAddress,
+    required this.orderTimestamp,
+    this.serviceType,
     this.assignedTo,
-    required this.createdAt,
+    this.customer, // Added to constructor
   });
+
+  factory OrderModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data()!;
+    return OrderModel(
+      id: doc.id,
+      userId: data['userId'] as String? ?? '',
+      orderNumber: data['orderNumber'] as String?,
+      items: (data['items'] as List<dynamic>?)
+              ?.map((itemData) => OrderItem.fromMap(itemData as Map<String, dynamic>))
+              .toList() ??
+          [],
+      totalAmount: (data['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      status: data['status'] as String? ?? 'Unknown',
+      paymentMethod: data['paymentMethod'] as String?,
+      deliveryAddress: data['deliveryAddress'] as String?,
+      pickupAddress: data['pickupAddress'] as String?,
+      orderTimestamp: data['orderTimestamp'] as Timestamp? ?? Timestamp.now(),
+      serviceType: data['serviceType'] as String?,
+      assignedTo: data['assignedTo'] as String?,
+      customer: null, // Customer will be populated by the service layer
+    );
+  }
+
+  OrderModel copyWith({UserModel? customerInfo}) {
+    return OrderModel(
+      id: id,
+      userId: userId,
+      orderNumber: orderNumber,
+      items: items,
+      totalAmount: totalAmount,
+      status: status,
+      paymentMethod: paymentMethod,
+      deliveryAddress: deliveryAddress,
+      pickupAddress: pickupAddress,
+      orderTimestamp: orderTimestamp,
+      serviceType: serviceType,
+      assignedTo: assignedTo,
+      customer: customerInfo ?? customer, // Use new customerInfo or keep existing
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
-      'userName': userName,
-      'userPhone': userPhone,
+      'orderNumber': orderNumber,
       'items': items.map((item) => item.toMap()).toList(),
       'totalAmount': totalAmount,
       'status': status,
-      'paymentMode': paymentMode,
-      'pickupLocation': pickupLocation,
-      'deliveryLocation': deliveryLocation,
-      'orderType': orderType,
-      'assignedTo': assignedTo,
-      'createdAt': createdAt,
+      'paymentMethod': paymentMethod,
+      'deliveryAddress': deliveryAddress,
+      'pickupAddress': pickupAddress,
+      'orderTimestamp': orderTimestamp,
+      'serviceType': serviceType,
+      if (assignedTo != null) 'assignedTo': assignedTo,
     };
-  }
-
-  factory OrderModel.fromMap(String id, Map<String, dynamic> map) {
-    return OrderModel(
-      id: id,
-      userId: map['userId'] ?? '',
-      userName: map['userName'] ?? '',
-      userPhone: map['userPhone'] ?? '',
-      items: (map['items'] as List<dynamic>?)
-          ?.map((item) => OrderItem.fromMap(item))
-          .toList() ?? [],
-      totalAmount: (map['totalAmount'] ?? 0.0).toDouble(),
-      status: map['status'] ?? 'pending',
-      paymentMode: map['paymentMode'] ?? 'cash',
-      pickupLocation: map['pickupLocation'] ?? const GeoPoint(0, 0),
-      deliveryLocation: map['deliveryLocation'] ?? const GeoPoint(0, 0),
-      orderType: map['orderType'] ?? 'normal',
-      assignedTo: map['assignedTo'],
-      createdAt: (map['createdAt']?.toDate()) ?? DateTime.now(),
-    );
   }
 }
 
 class OrderItem {
   final String itemId;
-  final String itemName;
+  final String name;
   final int quantity;
-  final double price;
+  final double pricePerPiece;
 
   OrderItem({
     required this.itemId,
-    required this.itemName,
+    required this.name,
     required this.quantity,
-    required this.price,
+    required this.pricePerPiece,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'itemId': itemId,
-      'itemName': itemName,
+      'name': name,
       'quantity': quantity,
-      'price': price,
+      'pricePerPiece': pricePerPiece,
     };
   }
 
   factory OrderItem.fromMap(Map<String, dynamic> map) {
     return OrderItem(
-      itemId: map['itemId'] ?? '',
-      itemName: map['itemName'] ?? '',
-      quantity: map['quantity'] ?? 0,
-      price: (map['price'] ?? 0.0).toDouble(),
+      itemId: map['itemId'] as String? ?? map['garmentId'] as String? ?? map['productId'] as String? ?? '',
+      name: map['name'] as String? ?? map['itemName'] as String? ?? 'Unknown Item',
+      quantity: (map['quantity'] as num?)?.toInt() ?? 0,
+      pricePerPiece: (map['pricePerPiece'] as num?)?.toDouble() ?? (map['price'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }

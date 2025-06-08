@@ -1,4 +1,3 @@
-
 // providers/order_provider.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -22,11 +21,11 @@ class OrderProvider extends ChangeNotifier {
   Stream<List<OrderModel>> getAllOrdersStream() {
     return _firestore
         .collection('orders')
-        .orderBy('createdAt', descending: true)
+        .orderBy('orderTimestamp', descending: true)
         .snapshots()
         .map((snapshot) {
       _allOrders = snapshot.docs
-          .map((doc) => OrderModel.fromMap(doc.id, doc.data()))
+          .map((doc) => OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
           .toList();
       return _allOrders;
     });
@@ -36,11 +35,11 @@ class OrderProvider extends ChangeNotifier {
     return _firestore
         .collection('orders')
         .where('assignedTo', isEqualTo: deliveryId)
-        .orderBy('createdAt', descending: true)
+        .orderBy('orderTimestamp', descending: true)
         .snapshots()
         .map((snapshot) {
       _deliveryOrders = snapshot.docs
-          .map((doc) => OrderModel.fromMap(doc.id, doc.data()))
+          .map((doc) => OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
           .toList();
       return _deliveryOrders;
     });

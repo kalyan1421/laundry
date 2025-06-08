@@ -5,6 +5,7 @@ import '../../providers/offer_provider.dart';
 import '../../models/offer_model.dart';
 import '../../widgets/custom_text_field.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ManageOffers extends StatelessWidget {
   const ManageOffers({super.key});
@@ -41,7 +42,7 @@ class ManageOffers extends StatelessWidget {
                     children: [
                       Text(offer.description),
                       Text(
-                        'Valid: ${DateFormat('dd/MM/yyyy').format(offer.validFrom)} - ${DateFormat('dd/MM/yyyy').format(offer.validTo)}',
+                        'Valid: ${DateFormat('dd/MM/yyyy').format(offer.validFrom.toDate())} - ${DateFormat('dd/MM/yyyy').format(offer.validTo.toDate())}',
                         style: const TextStyle(fontSize: 12),
                       ),
                     ],
@@ -59,7 +60,7 @@ class ManageOffers extends StatelessWidget {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          '${offer.discount}%',
+                          '\${offer.discountValue}\${offer.discountType == "percentage" ? "%" : " \${offer.discountType}"}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -70,14 +71,17 @@ class ManageOffers extends StatelessWidget {
                       Switch(
                         value: offer.isActive,
                         onChanged: (value) async {
-                          await offerProvider.updateOffer(offer.id, {
-                            'isActive': value,
-                          });
+                          if (offer.id != null) {
+                            await offerProvider.updateOffer(offer.id!, {
+                              'isActive': value,
+                              'updatedAt': Timestamp.now(),
+                            });
+                          }
                         },
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteOffer(context, offer.id),
+                        onPressed: offer.id == null ? null : () => _deleteOffer(context, offer.id!),
                       ),
                     ],
                   ),
@@ -88,6 +92,7 @@ class ManageOffers extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'add_offer_fab',
         onPressed: () => _showAddDialog(context),
         child: const Icon(Icons.add),
       ),
@@ -135,13 +140,17 @@ class ManageOffers extends StatelessWidget {
               ElevatedButton(
                 onPressed: () async {
                   final offer = OfferModel(
-                    id: '',
+                    id: null,
                     title: titleController.text,
                     description: descriptionController.text,
-                    discount: double.tryParse(discountController.text) ?? 0,
-                    validFrom: DateTime.now(),
-                    validTo: DateTime.now().add(const Duration(days: 30)),
+                    discountValue: double.tryParse(discountController.text) ?? 0,
+                    discountType: 'percentage',
+                    validFrom: Timestamp.fromDate(DateTime.now()),
+                    validTo: Timestamp.fromDate(DateTime.now().add(const Duration(days: 30))),
                     isActive: true,
+                    imageUrl: '',
+                    createdAt: Timestamp.now(),
+                    updatedAt: Timestamp.now(),
                   );
 
                   final offerProvider = Provider.of<OfferProvider>(
@@ -163,7 +172,7 @@ class ManageOffers extends StatelessWidget {
           ),
     );
   }
-}
+
   void _deleteOffer(BuildContext context, String offerId) async {
     final offerProvider = Provider.of<OfferProvider>(context, listen: false);
     await offerProvider.deleteOffer(offerId);
@@ -174,3 +183,4 @@ class ManageOffers extends StatelessWidget {
       );
     }
   }
+}

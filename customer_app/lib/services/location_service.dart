@@ -1,7 +1,6 @@
 // lib/services/location_service.dart
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../core/errors/app_exceptions.dart';
 import '../data/models/address_model.dart';
 

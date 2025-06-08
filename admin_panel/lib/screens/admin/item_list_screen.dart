@@ -52,6 +52,7 @@ class _ItemListScreenState extends State<ItemListScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'add_item_fab',
         onPressed: () {
           Navigator.push(
             context,

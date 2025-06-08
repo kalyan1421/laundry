@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import '../../providers/auth_provider.dart';
-import '../../widgets/common/custom_button.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final String phoneNumber;
@@ -13,25 +12,6 @@ class OTPVerificationScreen extends StatefulWidget {
     Key? key,
     required this.phoneNumber,
   }) : super(key: key);
-
-  // Static method to extract phone number from route arguments
-  static Widget fromRoute(BuildContext context) {
-    final phoneNumber = ModalRoute.of(context)?.settings.arguments as String?;
-    
-    if (phoneNumber == null) {
-      // If no phone number is provided, redirect to login
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacementNamed(context, '/login');
-      });
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-    
-    return OTPVerificationScreen(phoneNumber: phoneNumber);
-  }
 
   @override
   State<OTPVerificationScreen> createState() => _OTPVerificationScreenState();
@@ -46,63 +26,50 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   int _resendCooldown = 30;
   Timer? _timer;
   bool _isAutoVerifying = false;
+  bool _hasNavigated = false;
+  bool _isDisposed = false;
+  
+  // Store context-dependent values early
+  late final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey;
+  late final GlobalKey<NavigatorState> _navigatorKey;
 
   @override
   void initState() {
     super.initState();
+    _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+    _navigatorKey = GlobalKey<NavigatorState>();
     _startResendTimer();
-    
-    // Listen to auth state changes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
-      // Navigate to welcome/home screen if verification is successful
-      authProvider.addListener(_handleAuthStateChange);
-    });
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
+    
+    // Cancel timer first
+    _timer?.cancel();
+    _timer = null;
+    
+    // Dispose controllers and focus nodes
     for (var controller in _otpControllers) {
       controller.dispose();
     }
     for (var focusNode in _focusNodes) {
       focusNode.dispose();
     }
-    _timer?.cancel();
-    
-    // Remove listener
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    authProvider.removeListener(_handleAuthStateChange);
     
     super.dispose();
   }
 
-  void _handleAuthStateChange() {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  void _startResendTimer() {
+    _timer?.cancel();
+    _resendCooldown = 30;
     
-    if (authProvider.authStatus == AuthStatus.authenticated && 
-        authProvider.otpStatus == OTPStatus.verified) {
-      
-      // Clear OTP fields
-      for (var controller in _otpControllers) {
-        controller.clear();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_isDisposed) {
+        timer.cancel();
+        return;
       }
       
-      // Navigate based on user status
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (authProvider.isNewUser || !authProvider.isProfileComplete) {
-          Navigator.pushReplacementNamed(context, '/welcome');
-        } else {
-          Navigator.pushReplacementNamed(context, '/home');
-        }
-      });
-    }
-  }
-
-  void _startResendTimer() {
-    _resendCooldown = 30;
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
           if (_resendCooldown > 0) {
@@ -118,88 +85,145 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   }
 
   Future<void> _verifyOTP() async {
-    String otp = _otpControllers.map((controller) => controller.text).join();
+    if (_isDisposed || !mounted) return;
+    
+    String otp = '';
+    try {
+      otp = _otpControllers.map((controller) => controller.text).join();
+    } catch (e) {
+      print('Error collecting OTP: $e');
+      _showMessage('Error reading OTP. Please try again.', isError: true);
+      return;
+    }
     
     if (otp.length != 6) {
-      _showErrorSnackBar('Please enter complete OTP');
+      _showMessage('Please enter complete OTP', isError: true);
       return;
     }
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    // Remove focus from text fields
-    FocusScope.of(context).unfocus();
-    
     try {
+      // Get provider safely
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Remove focus from text fields
+      if (mounted) {
+        FocusScope.of(context).unfocus();
+      }
+      
       bool success = await authProvider.verifyOTP(otp);
       
-      if (!success && authProvider.errorMessage != null) {
-        _showErrorSnackBar(authProvider.errorMessage!);
-        // Clear OTP fields on error
+      // Check if widget is still mounted after async operation
+      if (_isDisposed || !mounted) return;
+      
+      if (success) {
+        _handleSuccessfulVerification(authProvider);
+      } else {
+        if (authProvider.errorMessage != null) {
+          _showMessage(authProvider.errorMessage!, isError: true);
+        }
         _clearOTPFields();
       }
     } catch (e) {
-      _showErrorSnackBar('Verification failed. Please try again.');
+      if (_isDisposed || !mounted) return;
+      print('Error in _verifyOTP: $e');
+      _showMessage('Verification failed. Please try again.', isError: true);
       _clearOTPFields();
     }
   }
 
+  void _handleSuccessfulVerification(AuthProvider authProvider) {
+    if (_isDisposed || !mounted || _hasNavigated) return;
+    
+    _hasNavigated = true;
+    
+    // Clear OTP fields
+    _clearOTPFields();
+    
+    // Navigate based on user status
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_isDisposed || !mounted) return;
+      
+      try {
+        if (authProvider.isNewUser || !authProvider.isProfileComplete) {
+          Navigator.pushReplacementNamed(context, '/profile-setup');
+        } else {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      } catch (e) {
+        print('Navigation error: $e');
+      }
+    });
+  }
+
   void _clearOTPFields() {
-    for (var controller in _otpControllers) {
-      controller.clear();
+    if (_isDisposed) return;
+    
+    try {
+      for (var controller in _otpControllers) {
+        controller.clear();
+      }
+      
+      if (_focusNodes.isNotEmpty && _focusNodes[0].canRequestFocus && mounted) {
+        _focusNodes[0].requestFocus();
+      }
+    } catch (e) {
+      print('Error clearing OTP fields: $e');
     }
-    _focusNodes[0].requestFocus();
   }
 
   Future<void> _resendOTP() async {
-    if (_resendCooldown > 0) return;
-    
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (_resendCooldown > 0 || _isDisposed || !mounted) return;
     
     try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
       // Extract phone number (remove +91)
       String phoneNumber = widget.phoneNumber.replaceFirst('+91', '');
       
-      await authProvider.resendOTP();
+      await authProvider.sendOTP(phoneNumber);
+      
+      if (_isDisposed || !mounted) return;
       
       if (authProvider.otpStatus == OTPStatus.sent) {
         _startResendTimer();
-        _showSuccessSnackBar('OTP sent successfully');
+        _showMessage('OTP sent successfully', isError: false);
         _clearOTPFields();
       } else if (authProvider.errorMessage != null) {
-        _showErrorSnackBar(authProvider.errorMessage!);
+        _showMessage(authProvider.errorMessage!, isError: true);
       }
     } catch (e) {
-      _showErrorSnackBar('Failed to resend OTP. Please try again.');
+      if (_isDisposed || !mounted) return;
+      _showMessage('Failed to resend OTP. Please try again.', isError: true);
     }
   }
 
   void _changeNumber() {
-    // Clear auth state and go back to login
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    authProvider.resetOTPState();
+    if (_isDisposed || !mounted) return;
     
-    Navigator.pop(context);
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      authProvider.resetOTPState();
+      Navigator.pop(context);
+    } catch (e) {
+      print('Error changing number: $e');
+    }
   }
 
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  void _showMessage(String message, {required bool isError}) {
+    if (_isDisposed || !mounted) return;
+    
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? Colors.red : Colors.green,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: isError ? 3 : 2),
+        ),
+      );
+    } catch (e) {
+      print('Error showing message: $e');
+    }
   }
 
   @override
@@ -215,7 +239,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
             color: Color(0xFF2D3748),
             size: 20,
           ),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (!_isDisposed && mounted) {
+              Navigator.pop(context);
+            }
+          },
         ),
         title: const Text(
           'Verify Your Number',
@@ -229,6 +257,16 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       ),
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
+          // Listen for auth state changes
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_isDisposed || !mounted || _hasNavigated) return;
+            
+            if (authProvider.authStatus == AuthStatus.authenticated && 
+                authProvider.otpStatus == OTPStatus.verified) {
+              _handleSuccessfulVerification(authProvider);
+            }
+          });
+
           return Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -327,7 +365,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
             controller: _otpControllers[index],
             focusNode: _focusNodes[index],
             textAlign: TextAlign.center,
-            enabled: !authProvider.isVerifying,
+            enabled: !authProvider.isVerifying && !_isDisposed,
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -362,28 +400,48 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
               contentPadding: const EdgeInsets.symmetric(vertical: 16),
             ),
             onChanged: (value) {
-              // Clear error when user starts typing
-              if (authProvider.errorMessage != null) {
-                authProvider.clearError();
-              }
+              if (_isDisposed || !mounted) return;
               
-              if (value.isNotEmpty && index < 5) {
-                _focusNodes[index + 1].requestFocus();
-              } else if (value.isEmpty && index > 0) {
-                _focusNodes[index - 1].requestFocus();
-              }
-              
-              // Auto verify when all fields are filled
-              String otp = _otpControllers.map((controller) => controller.text).join();
-              if (otp.length == 6 && !_isAutoVerifying) {
-                _isAutoVerifying = true;
-                Future.delayed(const Duration(milliseconds: 500), () {
-                  if (mounted) {
-                    _verifyOTP().then((_) {
-                      _isAutoVerifying = false;
-                    });
-                  }
-                });
+              try {
+                // Clear error when user starts typing
+                if (authProvider.errorMessage != null) {
+                  authProvider.clearError();
+                }
+                
+                // Handle focus navigation
+                if (value.isNotEmpty && index < 5) {
+                  _focusNodes[index + 1].requestFocus();
+                } else if (value.isEmpty && index > 0) {
+                  _focusNodes[index - 1].requestFocus();
+                }
+                
+                // Auto verify when all fields are filled
+                String otp = '';
+                try {
+                  otp = _otpControllers.map((controller) => controller.text).join();
+                } catch (e) {
+                  print('Error getting OTP: $e');
+                  return;
+                }
+                
+                if (otp.length == 6 && !_isAutoVerifying && !_isDisposed && mounted) {
+                  _isAutoVerifying = true;
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    if (!_isDisposed && mounted) {
+                      _verifyOTP().then((_) {
+                        if (!_isDisposed) {
+                          _isAutoVerifying = false;
+                        }
+                      }).catchError((e) {
+                        if (!_isDisposed) {
+                          _isAutoVerifying = false;
+                        }
+                      });
+                    }
+                  });
+                }
+              } catch (e) {
+                print('Error in onChanged: $e');
               }
             },
           ),
@@ -393,20 +451,51 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   }
 
   Widget _buildVerifyButton(AuthProvider authProvider) {
-    String otp = _otpControllers.map((controller) => controller.text).join();
+    String otp = '';
+    try {
+      otp = _otpControllers.map((controller) => controller.text).join();
+    } catch (e) {
+      print('Error getting OTP for button: $e');
+    }
+    
     bool isValid = otp.length == 6;
     bool isLoading = authProvider.isVerifying || _isAutoVerifying;
     
-    return CustomButton(
-      text: 'Verify Code',
-      onPressed: isValid && !isLoading ? _verifyOTP : null,
-      isLoading: isLoading,
-      backgroundColor: const Color(0xFF4A5568),
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: isValid && !isLoading && !_isDisposed ? _verifyOTP : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isValid && !isLoading
+              ? const Color(0xFF4A5568)
+              : const Color(0xFF4A5568).withOpacity(0.6),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : const Text(
+                'Verify Code',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+      ),
     );
   }
 
   Widget _buildResendSection(AuthProvider authProvider) {
-    bool canResend = _resendCooldown == 0 && !authProvider.isLoading;
+    bool canResend = _resendCooldown == 0 && !authProvider.isLoading && !_isDisposed;
     
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -422,7 +511,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
           onTap: canResend ? _resendOTP : null,
           child: Text(
             _resendCooldown > 0 
-                ? 'Resend 00:${_resendCooldown.toString().padLeft(2, '0')}'
+                ? 'Resend in 00:${_resendCooldown.toString().padLeft(2, '0')}'
                 : 'Resend',
             style: TextStyle(
               fontSize: 14,
@@ -439,7 +528,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
 
   Widget _buildChangeNumberButton() {
     return GestureDetector(
-      onTap: _changeNumber,
+      onTap: _isDisposed ? null : _changeNumber,
       child: const Text(
         'Change Number',
         style: TextStyle(

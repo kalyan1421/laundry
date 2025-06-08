@@ -43,7 +43,7 @@ class _ManageBannersState extends State<ManageBanners> {
     });
   }
 
-  void _showAddBannerDialog() {
+  void _showAddBannerDialog(BuildContext context) {
     _clearSelectedImage(); // Clear previous selection
     _mainTaglineController.clear();
     _subTaglineController.clear();
@@ -282,9 +282,11 @@ class _ManageBannersState extends State<ManageBanners> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddBannerDialog,
-        backgroundColor: Theme.of(context).primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
+        heroTag: 'add_banner_fab',
+        child: const Icon(Icons.add_photo_alternate_outlined),
+        onPressed: () {
+          _showAddBannerDialog(context);
+        },
       ),
     );
   }

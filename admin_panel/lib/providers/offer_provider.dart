@@ -1,4 +1,3 @@
-
 // providers/offer_provider.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -22,7 +21,7 @@ class OfferProvider extends ChangeNotifier {
         .snapshots()
         .map((snapshot) {
       _offers = snapshot.docs
-          .map((doc) => OfferModel.fromMap(doc.id, doc.data()))
+          .map((doc) => OfferModel.fromFirestore(doc))
           .toList();
       return _offers;
     });
@@ -30,7 +29,7 @@ class OfferProvider extends ChangeNotifier {
   
   Future<void> addOffer(OfferModel offer) async {
     try {
-      await _firestore.collection('offers').add(offer.toMap());
+      await _firestore.collection('offers').add(offer.toJson());
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -39,6 +38,7 @@ class OfferProvider extends ChangeNotifier {
   
   Future<void> updateOffer(String offerId, Map<String, dynamic> data) async {
     try {
+      data['updatedAt'] = Timestamp.now();
       await _firestore.collection('offers').doc(offerId).update(data);
     } catch (e) {
       _error = e.toString();

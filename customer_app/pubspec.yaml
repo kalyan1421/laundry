@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.2
+  sdk: '>=3.2.0 <4.0.0' # Updated SDK constraint
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -33,18 +33,33 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
-  firebase_core: ^3.13.1
-  firebase_auth: ^5.5.4
-  cloud_firestore: ^5.6.8
-  firebase_storage: ^12.4.6
-  provider: ^6.1.5
-  google_maps_flutter: ^2.12.2
-  geolocator: ^14.0.1
-  image_picker: ^1.1.2
-  cached_network_image: ^3.4.1
-  permission_handler: ^12.0.0+1
-  geocoding: ^4.0.0
+  cupertino_icons: ^1.0.6
+  provider: ^6.1.1 
+  intl: ^0.19.0 # For date/time formatting
+  uuid: ^4.3.3 # For generating unique IDs
+  cached_network_image: ^3.3.1 # For caching network images
+  flutter_carousel_widget: ^2.2.0 # For image carousels
+  flutter_svg: ^2.0.9 # For SVG images
+  # permission_handler: ^11.1.0 # For handling permissions
+  # image_picker: ^1.0.7 # For picking images
+  shimmer: ^3.0.0 # For loading animations
+  # flutter_launcher_icons: ^0.13.1 # For app icons
+
+  # Firebase
+  firebase_core: ^2.25.4
+  firebase_auth: ^4.17.4
+  cloud_firestore: ^4.15.4
+  firebase_storage: ^11.6.0 # Added firebase_storage
+  # firebase_messaging: ^14.7.15 # For push notifications
+
+  # Location & Maps
+  geolocator: ^11.0.0 # For getting current location
+  google_maps_flutter: ^2.5.3 # For Google Maps
+  geocoding: ^2.1.1 # Uncommented geocoding
+  qr_flutter: ^4.1.0
+  carousel_slider: ^5.0.0
+  url_launcher: ^6.2.6 # Added url_launcher
+  timelines_plus: ^1.0.7 # Replaced timelines with timelines_plus
 
 dev_dependencies:
   flutter_test:
@@ -55,7 +70,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^3.0.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -67,9 +82,13 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
-
   # To add assets to your application, add an assets section, like this:
   # assets:
+  assets:
+    - assets/images/
+    - assets/images/banners/ironing_bg.png
+    - assets/icons/
+    - assets/fonts/
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 
@@ -84,7 +103,15 @@ flutter:
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
   # example:
-  # fonts:
+  fonts:
+    - family: SF Pro Display
+      fonts:
+        - asset: assets/fonts/SFPRODISPLAYREGULAR.otf
+          weight: 400 # Normal/Regular
+        - asset: assets/fonts/SFPRODISPLAYMEDIUM.otf
+          weight: 500 # Medium
+        - asset: assets/fonts/SFPRODISPLAYBOLD.otf
+          weight: 700 # Bold
   #   - family: Schyler
   #     fonts:
   #       - asset: fonts/Schyler-Regular.ttf

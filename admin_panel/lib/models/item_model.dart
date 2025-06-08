@@ -8,6 +8,7 @@ class ItemModel {
   final bool isActive;
   final DateTime updatedAt;
   final String? imageUrl; // Added image URL field
+  final int sortOrder;
 
   ItemModel({
     required this.id,
@@ -18,6 +19,7 @@ class ItemModel {
     required this.isActive,
     required this.updatedAt,
     this.imageUrl, // Optional image URL
+    this.sortOrder = 0,
   });
 
   // Create ItemModel from Firestore document
@@ -31,6 +33,7 @@ class ItemModel {
       isActive: map['isActive'] ?? true,
       updatedAt: map['updatedAt']?.toDate() ?? DateTime.now(),
       imageUrl: map['imageUrl'], // Get image URL from Firestore
+      sortOrder: map['sortOrder'] ?? 0,
     );
   }
 
@@ -43,6 +46,7 @@ class ItemModel {
       'unit': unit,
       'isActive': isActive,
       'updatedAt': updatedAt,
+      'sortOrder': sortOrder,
       if (imageUrl != null) 'imageUrl': imageUrl, // Include image URL if exists
     };
   }
@@ -57,6 +61,7 @@ class ItemModel {
     bool? isActive,
     DateTime? updatedAt,
     String? imageUrl,
+    int? sortOrder,
   }) {
     return ItemModel(
       id: id ?? this.id,
@@ -67,11 +72,12 @@ class ItemModel {
       isActive: isActive ?? this.isActive,
       updatedAt: updatedAt ?? this.updatedAt,
       imageUrl: imageUrl ?? this.imageUrl,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 
   @override
   String toString() {
-    return 'ItemModel(id: $id, name: $name, price: $price, category: $category, unit: $unit, isActive: $isActive, imageUrl: $imageUrl)';
+    return 'ItemModel(id: $id, name: $name, price: $price, category: $category, unit: $unit, isActive: $isActive, imageUrl: $imageUrl, sortOrder: $sortOrder)';
   }
 }

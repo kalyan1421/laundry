@@ -1,8 +1,9 @@
 // lib/screens/auth/login_screen.dart
 import 'package:customer_app/core/utils/validators.dart';
 import 'package:customer_app/core/routes/app_routes.dart';
-import 'package:customer_app/presentation/screens/auth/otp_verification_screen.dart';
-import 'package:customer_app/presentation/screens/home/home_screen.dart';
+import 'package:customer_app/core/theme/app_typography.dart';
+import 'package:customer_app/core/constants/font_constants.dart';
+import 'package:customer_app/core/utils/text_utils.dart';
 import 'package:flutter/material.dart' hide TextButton;
 import 'package:flutter/material.dart' as material show TextButton;
 import 'package:flutter/services.dart';
@@ -26,14 +27,14 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    
+
     // Listen to auth state changes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Clear any previous errors
       authProvider.clearError();
-      
+
       // Reset OTP state when coming to login screen
       authProvider.resetOTPState();
     });
@@ -48,34 +49,40 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _sendOTP() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
+
     // Remove focus from text field
     FocusScope.of(context).unfocus();
-    
+
     try {
       await authProvider.sendOTP(_phoneController.text.trim());
-       AppRoutes.navigateToOTP(context, _phoneController.text.trim());
-        // Navigator.push(context, MaterialPageRoute(builder: (context) =>  HomeScreen()));
-      // Navigate to OTP screen if OTP was sent successfully
-      if (authProvider.otpStatus == OTPStatus.sent) {
+
+      // Check if OTP was sent successfully and navigate
+      if (mounted && authProvider.otpStatus == OTPStatus.sent) {
         // Create the full phone number with country code
         final fullPhoneNumber = '+91${_phoneController.text.trim()}';
-        print(authProvider.otpStatus.toString());
+
         // Navigate using the route helper
-        // AppRoutes.navigateToOTP(context, fullPhoneNumber);
+        AppRoutes.navigateToOTP(context, fullPhoneNumber);
       }
     } catch (e) {
       // Error handling is managed by the provider
+      print('Error sending OTP: $e');
+      
       // Show snackbar for additional feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.errorMessage ?? 'Failed to send OTP'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              authProvider.errorMessage ?? 'Failed to send OTP',
+              style: AppTypography.bodyMedium.copyWith(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -84,18 +91,34 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.error_outline, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Error'),
+              const Icon(Icons.error_outline, color: Colors.red),
+              const SizedBox(width: 8),
+              Text(
+                'Error',
+                style: AppTypography.headlineSmall.copyWith(
+                  color: const Color(0xFF2D3748),
+                ),
+              ),
             ],
           ),
-          content: Text(message),
+          content: Text(
+            message,
+            style: AppTypography.bodyMedium.copyWith(
+              color: const Color(0xFF4A5568),
+            ),
+          ),
           actions: [
             material.TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
+              child: Text(
+                'OK',
+                style: AppTypography.labelLarge.copyWith(
+                  color: const Color(0xFF4299E1),
+                  fontWeight: FontConstants.semibold,
+                ),
+              ),
             ),
           ],
         );
@@ -110,47 +133,64 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Consumer<AuthProvider>(
           builder: (context, authProvider, child) {
-            // Show error dialog if there's an error
-            if (authProvider.errorMessage != null) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (authProvider.errorMessage!.isNotEmpty) {
-                  _showErrorDialog(authProvider.errorMessage!);
-                  authProvider.clearError();
-                }
-              });
-            }
+            // Listen for OTP status changes for navigation
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (authProvider.otpStatus == OTPStatus.sent && 
+                  _phoneController.text.isNotEmpty) {
+                final fullPhoneNumber = '+91${_phoneController.text.trim()}';
+                AppRoutes.navigateToOTP(context, fullPhoneNumber);
+              }
+              
+              // Show error dialog if there's an error (but avoid during navigation)
+              if (authProvider.errorMessage != null && 
+                  authProvider.errorMessage!.isNotEmpty &&
+                  authProvider.otpStatus != OTPStatus.sent) {
+                _showErrorDialog(authProvider.errorMessage!);
+                authProvider.clearError();
+              }
+            });
 
-            return Padding(
+            return SingleChildScrollView( // Fixed: Added scroll view to prevent overflow
               padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    const SizedBox(height: 60),
-                    
-                    // Logo and welcome text
-                    _buildHeader(),
-                    
-                    const SizedBox(height: 80),
-                    
-                    // Phone number input
-                    _buildPhoneInput(authProvider),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Continue button
-                    _buildContinueButton(authProvider),
-                    
-                    const SizedBox(height: 40),
-                    
-                    // Social login section
-                    _buildSocialLogin(),
-                    
-                    const Spacer(),
-                    
-                    // Already have account
-                    _buildFooter(),
-                  ],
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height - 
+                           MediaQuery.of(context).padding.top - 48,
+                ),
+                child: IntrinsicHeight(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 20), // Reduced from 40
+
+                        // Logo and welcome text
+                        _buildHeader(),
+
+                        const SizedBox(height: 16), // Reduced from 20
+
+                        // Phone number input
+                        _buildPhoneInput(authProvider),
+
+                        const SizedBox(height: 40), // Reduced from 60
+
+                        // Continue button
+                        _buildContinueButton(authProvider),
+
+                        const SizedBox(height: 24), // Reduced from 35
+
+                        // Social login section
+                        _buildSocialLogin(),
+
+                        const Spacer(),
+
+                        // Already have account
+                        _buildFooter(),
+                        
+                        const SizedBox(height: 16), // Add bottom spacing
+                      ],
+                    ),
+                  ),
                 ),
               ),
             );
@@ -163,76 +203,22 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        // Iron icon
+        // Iron icon - Reduced size
         Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Stack(
-            children: [
-              // Iron body
-              Positioned(
-                bottom: 15,
-                left: 15,
-                right: 15,
-                child: Container(
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6B7B8A),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              // Iron handle
-              Positioned(
-                top: 20,
-                left: 25,
-                child: Container(
-                  width: 30,
-                  height: 15,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6B7B8A),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              // Steam lines
-              Positioned(
-                top: 12,
-                left: 20,
-                child: Column(
-                  children: [
-                    _buildSteamLine(),
-                    const SizedBox(height: 2),
-                    _buildSteamLine(),
-                    const SizedBox(height: 2),
-                    _buildSteamLine(),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          width: 200, // Reduced from 250
+          height: 200, // Reduced from 250
+          child: Image.asset("assets/icons/icon.png"),
         ),
-        const SizedBox(height: 24),
-        const Text(
-          'Welcome to CLOUD IRONING',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF2D3748),
-          ),
-        ),
+
+        const SizedBox(height: 8),
+
+        // App title with SF Pro Display
+        AppText.appTitle('Welcome to CLOUD IRONING'),
+
         const SizedBox(height: 6),
-        const Text(
-          'Fresh Ironing, delivered to your doorstep',
-          style: TextStyle(
-            fontSize: 14,
-            color: Color(0xFF718096),
-          ),
-        ),
+
+        // Subtitle with SF Pro Display
+        AppText.subtitle('Fresh Ironing, delivered to your doorstep'),
       ],
     );
   }
@@ -246,9 +232,11 @@ class _LoginScreenState extends State<LoginScreen> {
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: _phoneFocusNode.hasFocus 
-                  ? const Color(0xFF4299E1) 
-                  : Colors.grey[300]!,
+              color:
+                  _phoneFocusNode.hasFocus
+                      ? const Color(0xFF4299E1)
+                      : Colors.grey[300]!,
+              width: _phoneFocusNode.hasFocus ? 2 : 1,
             ),
           ),
           child: Row(
@@ -256,7 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // Country code
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16, 
+                  horizontal: 16,
                   vertical: 16,
                 ),
                 decoration: BoxDecoration(
@@ -266,12 +254,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     bottomLeft: Radius.circular(8),
                   ),
                 ),
-                child: const Text(
+                child: Text(
                   '+91',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF2D3748),
+                  style: AppTypography.bodyLarge.copyWith(
+                    fontWeight: FontConstants.medium,
+                    color: const Color(0xFF2D3748),
                   ),
                 ),
               ),
@@ -286,20 +273,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(10),
                   ],
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+                  style: AppTypography.bodyLarge.copyWith(
+                    fontWeight: FontConstants.medium,
+                    color: const Color(0xFF2D3748),
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: '9876 543210',
-                    hintStyle: TextStyle(
-                      color: Color(0xFFA0AEC0),
-                      fontWeight: FontWeight.normal,
+                    hintStyle: AppTypography.bodyLarge.copyWith(
+                      color: const Color(0xFFA0AEC0),
+                      fontWeight: FontConstants.regular,
                     ),
                     border: InputBorder.none,
                     errorBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 16, 
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
                       vertical: 16,
                     ),
                   ),
@@ -321,14 +308,26 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-        
+
         // Show loading indicator below input when sending
         if (authProvider.otpStatus == OTPStatus.sending)
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
-            child: InlineLoadingWidget(
-              message: 'Sending OTP...',
-              size: 16,
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Sending OTP...',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: const Color(0xFF718096),
+                  ),
+                ),
+              ],
             ),
           ),
       ],
@@ -337,76 +336,82 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildContinueButton(AuthProvider authProvider) {
     bool isValid = _phoneController.text.length == 10;
-    bool isLoading = authProvider.isLoading || authProvider.otpStatus == OTPStatus.sending;
-    
-    return CustomButton(
-      text: 'Continue',
-      onPressed: isValid && !isLoading ? _sendOTP : null,
-      isLoading: isLoading,
-      backgroundColor: const Color(0xFF4A5568),
+    bool isLoading =
+        authProvider.isLoading || authProvider.otpStatus == OTPStatus.sending;
+
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: isValid && !isLoading ? _sendOTP : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor:
+              isValid && !isLoading
+                  ? const Color(0xFF0F3057)
+                  : const Color(0xFF0F3057).withOpacity(0.6), // Fixed opacity issue
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child:
+            isLoading
+                ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+                : Text(
+                  'Continue',
+                  style: AppTypography.button.copyWith(color: Colors.white),
+                ),
+      ),
     );
   }
 
   Widget _buildSocialLogin() {
     return Column(
       children: [
-        const Text(
+        Text(
           'or login with',
-          style: TextStyle(
-            color: Color(0xFF718096),
-            fontSize: 14,
+          style: AppTypography.bodyMedium.copyWith(
+            color: const Color(0xFF718096),
           ),
         ),
         const SizedBox(height: 24),
+
         // Social login buttons
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // More options button
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.more_horiz,
-                color: Color(0xFF718096),
-              ),
-            ),
-            const SizedBox(width: 16),
-            // Google login button
-            GestureDetector(
-              onTap: () {
-                // TODO: Implement Google Sign In
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Google Sign In coming soon!'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-              child: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(8),
+        GestureDetector(
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Google Sign In coming soon!',
+                  style: AppTypography.bodyMedium.copyWith(color: Colors.white),
                 ),
-                child: const Center(
-                  child: Text(
-                    'G',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4285F4),
-                    ),
-                  ),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          },
+          child: Container(
+            width: double.infinity,
+            height: 50,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                'G',
+                style: AppTypography.headlineSmall.copyWith(
+                  fontWeight: FontConstants.bold,
+                  color: const Color(0xFF4285F4),
                 ),
               ),
             ),
-          ],
+          ),
         ),
       ],
     );
@@ -416,44 +421,34 @@ class _LoginScreenState extends State<LoginScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text(
+        Text(
           'Already have account? ',
-          style: TextStyle(
-            color: Color(0xFF718096),
-            fontSize: 14,
+          style: AppTypography.bodyMedium.copyWith(
+            color: const Color(0xFF718096),
           ),
         ),
         GestureDetector(
           onTap: () {
             // Handle existing user login
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Just enter your phone number to login!'),
+              SnackBar(
+                content: Text(
+                  'Just enter your phone number to login!',
+                  style: AppTypography.bodyMedium.copyWith(color: Colors.white),
+                ),
                 behavior: SnackBarBehavior.floating,
               ),
             );
           },
-          child: const Text(
+          child: Text(
             'Login',
-            style: TextStyle(
-              color: Color(0xFF4299E1),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+            style: AppTypography.bodyMedium.copyWith(
+              color: const Color(0xFF4299E1),
+              fontWeight: FontConstants.medium,
             ),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSteamLine() {
-    return Container(
-      width: 10,
-      height: 1.5,
-      decoration: BoxDecoration(
-        color: Colors.grey[400],
-        borderRadius: BorderRadius.circular(1),
-      ),
     );
   }
 }

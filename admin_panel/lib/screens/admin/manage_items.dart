@@ -1,4 +1,3 @@
-
 // screens/admin/manage_items.dart
 import 'package:admin_panel/screens/admin/add_item_screen.dart';
 import 'package:flutter/material.dart';
@@ -71,6 +70,7 @@ class _ManageItemsState extends State<ManageItems> {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'add_new_item_fab',
         onPressed: () {
           Navigator.push(
             context,
