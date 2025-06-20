@@ -16,11 +16,11 @@ class DesktopServicesSection extends StatelessWidget {
           // Section Title with decorative border
           _buildSectionTitle(context),
           const SizedBox(height: 60),
-          
+
           // Service Workflow Cards
           _buildServiceWorkflow(context),
           const SizedBox(height: 80),
-          
+
           // Service Categories
           _buildServiceCategories(context),
         ],
@@ -31,13 +31,16 @@ class DesktopServicesSection extends StatelessWidget {
   Widget _buildSectionTitle(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.rotationY(3.1416),
+            child: Image.asset('images/air_symbol.png', width: 50, height: 50),
+          ),
           const SizedBox(width: 16),
           Text(
             'What We Offer',
@@ -47,6 +50,7 @@ class DesktopServicesSection extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
+          Image.asset('images/air_symbol.png', width: 50, height: 50),
         ],
       ),
     );
@@ -71,7 +75,7 @@ class DesktopServicesSection extends StatelessWidget {
       },
       {
         'title': 'Delivery',
-        'image': 'assets/images/delivery.jpeg',
+        'image': 'assets/images/hero_ironing.jpg',
         'fallbackIcon': Icons.delivery_dining,
       },
     ];
@@ -87,36 +91,40 @@ class DesktopServicesSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
-        children: services.asMap().entries.map((entry) {
-          int index = entry.key;
-          Map<String, dynamic> service = entry.value;
-          
-          return Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildWorkflowCard(context, service),
+        children:
+            services.asMap().entries.map((entry) {
+              int index = entry.key;
+              Map<String, dynamic> service = entry.value;
+
+              return Expanded(
+                child: Row(
+                  children: [
+                    Expanded(child: _buildWorkflowCard(context, service)),
+                    if (index <
+                        services.length - 1) // Don't add arrow after last item
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Icon(
+                          Icons.arrow_forward,
+                          color: AppTheme.primaryBlue,
+                          size: 24,
+                        ),
+                      ),
+                  ],
                 ),
-                if (index < services.length - 1) // Don't add arrow after last item
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Icon(
-                      Icons.arrow_forward,
-                      color: AppTheme.primaryBlue,
-                      size: 24,
-                    ),
-                  ),
-              ],
-            ),
-          );
-        }).toList(),
+              );
+            }).toList(),
       ),
     );
   }
 
-  Widget _buildWorkflowCard(BuildContext context, Map<String, dynamic> service) {
+  Widget _buildWorkflowCard(
+    BuildContext context,
+    Map<String, dynamic> service,
+  ) {
     return Container(
-      height: 200,
+      height: 250,
+
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
@@ -128,55 +136,37 @@ class DesktopServicesSection extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: Stack(
+        child: Column(
           children: [
-            // Background Image
-            Positioned.fill(
-              child: Image.asset(
-                service['image'] as String,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: AppTheme.primaryBlue.withOpacity(0.1),
-                    child: Icon(
-                      service['fallbackIcon'] as IconData,
-                      size: 80,
-                      color: AppTheme.primaryBlue.withOpacity(0.5),
-                    ),
-                  );
-                },
-              ),
-            ),
-            
-            // Overlay
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.7),
-                    ],
-                    stops: const [0.5, 1.0],
+            Image.asset(
+              service['image'] as String,
+              width: double.infinity,
+              height: 200,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: AppTheme.primaryBlue.withOpacity(0.1),
+                  child: Icon(
+                    service['fallbackIcon'] as IconData,
+                    size: 80,
+                    color: AppTheme.primaryBlue.withOpacity(0.5),
                   ),
-                ),
-              ),
+                );
+              },
             ),
-            
-            // Title
-            Positioned(
-              bottom: 20,
-              left: 0,
-              right: 0,
-              child: Text(
-                service['title'] as String,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: AppTheme.primaryBlue,
-                  fontWeight: FontWeight.bold,
+            Expanded(
+              child: Container(
+                color: AppTheme.white,
+                width: double.infinity,
+
+                child: Text(
+                  service['title'] as String,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: AppTheme.primaryBlue,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
               ),
             ),
           ],
@@ -206,12 +196,14 @@ class DesktopServicesSection extends StatelessWidget {
               'Ironing Services',
               [
                 {
-                  'image': 'assets/images/steam_ironing.png', // Image instead of icon
+                  'image':
+                      'assets/images/steam_ironing.png', // Image instead of icon
                   'fallbackIcon': Icons.iron,
-                  'text': 'Steam Ironing',
+                  'text': 'Steam Ironing for all types of clothes',
                 },
                 {
-                  'image': 'assets/images/traditional_wear.png', // Image instead of icon
+                  'image':
+                      'assets/images/traditional_wear.png', // Image instead of icon
                   'fallbackIcon': Icons.checkroom,
                   'text': 'Saree/Traditional Wear Ironing',
                 },
@@ -219,7 +211,7 @@ class DesktopServicesSection extends StatelessWidget {
               AppTheme.primaryBlue,
             ),
           ),
-          
+
           // Vertical Divider
           Container(
             width: 2,
@@ -227,27 +219,23 @@ class DesktopServicesSection extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 40),
             color: AppTheme.primaryBlue,
           ),
-          
+
           // Allied Services
           Expanded(
-            child: _buildServiceCategory(
-              context,
-              'Allied',
-              'Services',
-              [
-                {
-                  'image': 'assets/images/bed_sheets.png', // Image instead of icon
-                  'fallbackIcon': Icons.bed,
-                  'text': 'Bed Sheets And Pillow Cover Washing And Ironing',
-                },
-                {
-                  'image': 'assets/images/stain_removal.png', // Image instead of icon
-                  'fallbackIcon': Icons.cleaning_services,
-                  'text': 'Stain Removal Services On Clothes',
-                },
-              ],
-              AppTheme.primaryBlue,
-            ),
+            child: _buildServiceCategory(context, 'Allied', 'Services', [
+              {
+                'image':
+                    'assets/images/bed_sheets.png', // Image instead of icon
+                'fallbackIcon': Icons.bed,
+                'text': 'Bed Sheets And Pillow Cover Washing And Ironing',
+              },
+              {
+                'image':
+                    'assets/images/stain_removal.png', // Image instead of icon
+                'fallbackIcon': Icons.cleaning_services,
+                'text': 'Stain Removal Services On Clothes',
+              },
+            ], AppTheme.primaryBlue),
           ),
         ],
       ),
@@ -279,8 +267,8 @@ class DesktopServicesSection extends StatelessWidget {
               TextSpan(
                 text: title2,
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  color: AppTheme.textDark, 
-                  fontSize: 20, 
+                  color: AppTheme.textDark,
+                  fontSize: 20,
                   fontFamily: AppTheme.primaryFont,
                   fontWeight: FontWeight.w600,
                 ),
@@ -288,15 +276,13 @@ class DesktopServicesSection extends StatelessWidget {
             ],
           ),
         ),
-        
+
         const SizedBox(height: 40),
-        
+
         // Services List
-        ...services.map((service) => _buildServiceItem(
-          context,
-          service,
-          color,
-        )).toList(),
+        ...services
+            .map((service) => _buildServiceItem(context, service, color))
+            .toList(),
       ],
     );
   }
@@ -318,13 +304,12 @@ class DesktopServicesSection extends StatelessWidget {
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: color,
-                width: 2,
-              ),
+              border: Border.all(color: color, width: 2),
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(10), // Slightly smaller to account for border
+              borderRadius: BorderRadius.circular(
+                10,
+              ), // Slightly smaller to account for border
               child: Image.asset(
                 service['image'] as String,
                 width: 56, // Accounting for border
@@ -341,9 +326,9 @@ class DesktopServicesSection extends StatelessWidget {
               ),
             ),
           ),
-          
+
           const SizedBox(width: 20),
-          
+
           // Service Text
           Expanded(
             child: Padding(

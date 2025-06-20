@@ -16,19 +16,19 @@ class DesktopSpecialServicesSection extends StatelessWidget {
           // Section Title
           _buildSectionTitle(context),
           const SizedBox(height: 60),
-          
+
           // Special Services Cards
           _buildSpecialServiceCard(
             context,
             'Perfumed',
             'Ironing',
-            'Elevate Your Laundry Experience With Our Perfumed Ironing Service. We Infuse Your Clothes With A Delicate, Long-Lasting Fragrance, Leaving Them Fresh And Beautifully Scented. Choose From Our Selection Of Premium, Garment-Safe Perfumes For A Truly Luxurious Finish.',
-            'assets/images/perfumed_ironing.jpeg',
+            'Elevate Your Ironing Experience With Our Perfumed Ironing Service. We Infuse Your Clothes With A Delicate, Long-Lasting Fragrance, Leaving Them Fresh And Beautifully Scented. Choose From Our Selection Of Premium, Garment-Safe Perfumes For A Truly Luxurious Finish.',
+            'images/perfumed-ironoing.png',
             Icons.local_florist,
             isImageLeft: true,
           ),
           const SizedBox(height: 60),
-          
+
           _buildSpecialServiceCard(
             context,
             'Stiff And Starch',
@@ -39,7 +39,7 @@ class DesktopSpecialServicesSection extends StatelessWidget {
             isImageLeft: false,
           ),
           const SizedBox(height: 60),
-          
+
           _buildSpecialServiceCard(
             context,
             'Instant',
@@ -85,16 +85,16 @@ class DesktopSpecialServicesSection extends StatelessWidget {
     String title2,
     String description,
     String imagePath,
-    IconData fallbackIcon,
-    {required bool isImageLeft}
-  ) {
+    IconData fallbackIcon, {
+    required bool isImageLeft,
+  }) {
     // Image Widget
     Widget imageWidget = Container(
       width: 320,
       height: 240,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-      
+
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.9),
@@ -104,7 +104,9 @@ class DesktopSpecialServicesSection extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(17), // Slightly smaller to account for border
+        borderRadius: BorderRadius.circular(
+          17,
+        ), // Slightly smaller to account for border
         child: Image.asset(
           imagePath,
           fit: BoxFit.cover,
@@ -114,11 +116,7 @@ class DesktopSpecialServicesSection extends StatelessWidget {
                 color: AppTheme.primaryBlue.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(17),
               ),
-              child: Icon(
-                fallbackIcon,
-                size: 80,
-                color: AppTheme.primaryBlue,
-              ),
+              child: Icon(fallbackIcon, size: 80, color: AppTheme.primaryBlue),
             );
           },
         ),
@@ -128,9 +126,7 @@ class DesktopSpecialServicesSection extends StatelessWidget {
     // Content Widget
     Widget contentWidget = Expanded(
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: isImageLeft ? 40.0 : 40.0,
-        ),
+        padding: EdgeInsets.symmetric(horizontal: isImageLeft ? 40.0 : 40.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -161,7 +157,7 @@ class DesktopSpecialServicesSection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // Description
             Text(
               description,
@@ -184,15 +180,10 @@ class DesktopSpecialServicesSection extends StatelessWidget {
       width: double.infinity,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
-        children: isImageLeft
-            ? [
-                imageWidget,
-                contentWidget,
-              ]
-            : [
-                contentWidget,
-                imageWidget,
-              ],
+        children:
+            isImageLeft
+                ? [imageWidget, contentWidget]
+                : [contentWidget, imageWidget],
       ),
     );
   }
@@ -237,17 +228,17 @@ class MobileSpecialServicesSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 40),
-          
+
           // Mobile Cards (Stacked vertically)
           _buildMobileServiceCard(
             context,
             'Perfumed Ironing',
-            'Elevate Your Laundry Experience With Our Perfumed Ironing Service. We Infuse Your Clothes With A Delicate, Long-Lasting Fragrance, Leaving Them Fresh And Beautifully Scented. Choose From Our Selection Of Premium, Garment-Safe Perfumes For A Truly Luxurious Finish.',
+            'Elevate Your Ironing Experience With Our Perfumed Ironing Service. We Infuse Your Clothes With A Delicate, Long-Lasting Fragrance, Leaving Them Fresh And Beautifully Scented. Choose From Our Selection Of Premium, Garment-Safe Perfumes For A Truly Luxurious Finish.',
             'assets/images/perfumed_ironing.jpeg',
             Icons.local_florist,
           ),
           const SizedBox(height: 24),
-          
+
           _buildMobileServiceCard(
             context,
             'Stiff And Starch Ironing',
@@ -256,7 +247,7 @@ class MobileSpecialServicesSection extends StatelessWidget {
             Icons.straighten,
           ),
           const SizedBox(height: 24),
-          
+
           _buildMobileServiceCard(
             context,
             'Instant Ironing',
@@ -278,9 +269,7 @@ class MobileSpecialServicesSection extends StatelessWidget {
   ) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: AppTheme.white,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -319,7 +308,7 @@ class MobileSpecialServicesSection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Title
             Text(
               title,
@@ -332,7 +321,7 @@ class MobileSpecialServicesSection extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            
+
             // Description
             Text(
               description,

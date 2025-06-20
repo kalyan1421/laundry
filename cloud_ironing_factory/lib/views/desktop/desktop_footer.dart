@@ -26,19 +26,20 @@ class DesktopFooter extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(  decoration: BoxDecoration(
-                          color: AppTheme.white,
-                          border: Border.all(color: AppTheme.white),
-                          borderRadius: BorderRadius.circular(12),
-                        ),  
+                        Container(
+                          decoration: BoxDecoration(
+                            color: AppTheme.white,
+                            border: Border.all(color: AppTheme.white),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           width: 50,
                           height: 50,
                           child: Image.asset(
                             'assets/images/logo.png',
-                            fit: BoxFit.cover,
+                            fit: BoxFit.contain,
                           ),
                         ),
-                       
+
                         const SizedBox(width: 16),
                         Flexible(
                           child: Column(
@@ -77,7 +78,7 @@ class DesktopFooter extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // Quick Links
               Expanded(
                 flex: 2,
@@ -100,7 +101,7 @@ class DesktopFooter extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // Contact Info
               Expanded(
                 flex: 3,
@@ -120,7 +121,10 @@ class DesktopFooter extends StatelessWidget {
                     const SizedBox(height: 12),
                     _buildContactInfo(Icons.phone, '+91 9566654788'),
                     const SizedBox(height: 12),
-                    _buildContactInfo(Icons.email, 'cloudironingfactory@gmail.com'),
+                    _buildContactInfo(
+                      Icons.email,
+                      'cloudironingfactory@gmail.com',
+                    ),
                     const SizedBox(height: 12),
                     _buildContactInfo(
                       Icons.location_on,
@@ -129,7 +133,7 @@ class DesktopFooter extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // Download App
               Expanded(
                 flex: 2,
@@ -167,21 +171,18 @@ class DesktopFooter extends StatelessWidget {
                     const SizedBox(height: 12),
                     const Text(
                       'Scan to download',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          
+
           const SizedBox(height: 40),
           const Divider(color: Colors.white30),
           const SizedBox(height: 20),
-          
+
           // Bottom Bar - Made responsive with Wrap
           Wrap(
             alignment: WrapAlignment.spaceBetween,
@@ -190,10 +191,7 @@ class DesktopFooter extends StatelessWidget {
             children: [
               const Text(
                 '© 2024 Cloud Ironing Factory. All rights reserved.',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 14),
               ),
               const SizedBox(width: 20), // Provide some spacing
               Row(
@@ -225,10 +223,7 @@ class DesktopFooter extends StatelessWidget {
           cursor: SystemMouseCursors.click,
           child: Text(
             text,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
         ),
       ),
@@ -265,11 +260,7 @@ class DesktopFooter extends StatelessWidget {
           border: Border.all(color: Colors.white30),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Icon(
-          icon,
-          color: AppTheme.white,
-          size: 20,
-        ),
+        child: Icon(icon, color: AppTheme.white, size: 20),
       ),
     );
   }

@@ -14,16 +14,16 @@ class MobileWhyChooseUsSection extends StatelessWidget {
           children: [
             // Header Section
             _buildHeader(),
-            
+
             // Main Content Section
             _buildMainContent(),
-            
+
             // Why Choose Us Section
             _buildWhyChooseUs(),
-            
+
             // Core Values Section
             _buildCoreValues(),
-            
+
             // Call to Action Section
             _buildCallToAction(),
           ],
@@ -59,7 +59,7 @@ class MobileWhyChooseUsSection extends StatelessWidget {
             },
           ),
           const SizedBox(height: 15),
-          
+
           const Text(
             'Cloud Ironing Factory Private Limited',
             style: TextStyle(
@@ -70,9 +70,9 @@ class MobileWhyChooseUsSection extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           Text(
             'Elevating The Art Of Garment Care',
             style: TextStyle(
@@ -113,14 +113,15 @@ class MobileWhyChooseUsSection extends StatelessWidget {
                   ),
                 ),
                 const TextSpan(
-                  text: '? Cloud Ironing Factory Is Here To Reclaim Your Time And Elevate Your Wardrobe. We\'re Not Just Ironing; We\'re Crafting Perfectly Pressed Garments That Empower You To Look And Feel Your Best.',
+                  text:
+                      '? Cloud Ironing Factory Is Here To Reclaim Your Time And Elevate Your Wardrobe. We\'re Not Just Ironing; We\'re Crafting Perfectly Pressed Garments That Empower You To Look And Feel Your Best.',
                 ),
               ],
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Promise Section
           const Text(
             'Our Promise: Beyond Ironing, It\'s About Excellence',
@@ -132,9 +133,9 @@ class MobileWhyChooseUsSection extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Image
           Container(
             height: 200,
@@ -155,29 +156,25 @@ class MobileWhyChooseUsSection extends StatelessWidget {
                       borderRadius: BorderRadius.circular(15),
                     ),
                     child: Center(
-                      child: Icon(
-                        Icons.iron,
-                        size: 60,
-                        color: AppTheme.white,
-                      ),
+                      child: Icon(Icons.iron, size: 60, color: AppTheme.white),
                     ),
                   );
                 },
               ),
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Features
           _buildFeatureItem(
             'Uncompromising Quality, Unbeatable Value:',
             'We Deliver Flawlessly Honest Garments Using Meticulous Techniques And State-Of-The-Art Equipment, All At Prices That Respect Your Budget. Expect Exceptional Results Without The Premium Price Tag.',
             AppTheme.primaryBlue,
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           _buildFeatureItem(
             'Dedicated To Exceeding Expectations:',
             'Our Commitment Extends Beyond Simply Ironing Clothes; We Are Dedicated To Exceeding Expectations By Delivering Quality Beyond The Price.',
@@ -203,12 +200,12 @@ class MobileWhyChooseUsSection extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Image
           Container(
-            height: 180,
+            height: 200,
             width: double.infinity,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(15),
@@ -218,7 +215,7 @@ class MobileWhyChooseUsSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(15),
               child: Image.asset(
                 'assets/images/Rectangle_2.jpg',
-                fit: BoxFit.contain,
+                fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     decoration: BoxDecoration(
@@ -237,26 +234,26 @@ class MobileWhyChooseUsSection extends StatelessWidget {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Features
           _buildFeatureItem(
             'Convenience Redefined:',
             'Our Seamless Door-To-Door Pickup And Drop-Off Service Eliminates The Hassle Of Traditional Ironing. Schedule Your Service With Ease And Let Us Handle The Rest.',
             AppTheme.primaryBlue,
           ),
-          
+
           const SizedBox(height: 15),
-          
+
           _buildFeatureItem(
             'Master Craftspeople:',
             'Our Highly Skilled Team Comprises Ironing Artisans Who Treat Each Garment With The Utmost Care And Precision. They Understand Fabrics, Employ Specialized Techniques, And Deliver Impeccable Results Every Time.',
             AppTheme.primaryBlue,
           ),
-          
+
           const SizedBox(height: 15),
-          
+
           _buildFeatureItem(
             'Driven By Innovation:',
             'We\'re Not Satisfied With The Status Quo. We\'re Constantly Innovating To Improve Our Processes, Enhance Our Services, And Deliver The Best Possible Customer Experience.',
@@ -282,47 +279,20 @@ class MobileWhyChooseUsSection extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-          
+
           const SizedBox(height: 24),
-          
-          // Features
-          _buildFeatureItem(
-            'Customer Obsession:',
-            'Your Satisfaction Is Our North Star. We Listen To Your Needs, Anticipate Your Expectations, And Strive To Create A Truly Exceptional Experience.',
-            AppTheme.primaryBlue,
-          ),
-          
-          const SizedBox(height: 20),
-          
-          _buildFeatureItem(
-            'Precision & Perfection:',
-            'We\'re Obsessed With Details. Every Crease, Every Fold, Every Garment Is Inspected To Ensure It Meets Our Rigorous Standards Of Perfection.',
-            AppTheme.primaryBlue,
-          ),
-          
-          const SizedBox(height: 20),
-          
-          _buildFeatureItem(
-            'Integrity & Transparency:',
-            'We Believe In Honest Communication And Transparent Pricing. You Can Trust Us To Deliver On Our Promises, Every Time.',
-            AppTheme.primaryBlue,
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Image
           Container(
-            height: 200,
+            height: 350,
             width: double.infinity,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(15),
-              color: AppTheme.primaryBlue,
+              color: AppTheme.white,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(15),
               child: Image.asset(
                 'assets/images/Rectangle_3.jpeg',
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     decoration: BoxDecoration(
@@ -341,6 +311,33 @@ class MobileWhyChooseUsSection extends StatelessWidget {
               ),
             ),
           ),
+
+          // Features
+          _buildFeatureItem(
+            'Customer Obsession:',
+            'Your Satisfaction Is Our North Star. We Listen To Your Needs, Anticipate Your Expectations, And Strive To Create A Truly Exceptional Experience.',
+            AppTheme.primaryBlue,
+          ),
+
+          const SizedBox(height: 20),
+
+          _buildFeatureItem(
+            'Precision & Perfection:',
+            'We\'re Obsessed With Details. Every Crease, Every Fold, Every Garment Is Inspected To Ensure It Meets Our Rigorous Standards Of Perfection.',
+            AppTheme.primaryBlue,
+          ),
+
+          const SizedBox(height: 20),
+
+          _buildFeatureItem(
+            'Integrity & Transparency:',
+            'We Believe In Honest Communication And Transparent Pricing. You Can Trust Us To Deliver On Our Promises, Every Time.',
+            AppTheme.primaryBlue,
+          ),
+
+          const SizedBox(height: 24),
+
+          // Image
         ],
       ),
     );
@@ -368,21 +365,17 @@ class MobileWhyChooseUsSection extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           const Text(
             'Cloud Ironing Factory Is More Than Just An Ironing Service; We\'re A Team Dedicated To Simplify Your Life While Helping You Present Your Best Self. Experience The Cloud Ironing Difference.',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.black87,
-              height: 1.5,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.black87, height: 1.5),
             textAlign: TextAlign.center,
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           const Text(
             'Get Started Today And Discover The Joy Of Effortlessly Impeccable Garments!',
             style: TextStyle(
@@ -393,9 +386,9 @@ class MobileWhyChooseUsSection extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           ElevatedButton(
             onPressed: () {
               // Handle book service action
@@ -410,13 +403,10 @@ class MobileWhyChooseUsSection extends StatelessWidget {
             ),
             child: const Text(
               'Book A Service',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
-          
+
           const SizedBox(height: 20),
         ],
       ),

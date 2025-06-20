@@ -15,12 +15,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<OnboardingData> _onboardingData = [
     OnboardingData(
       title: "Professional Ironing Service",
-      subtitle: "Get your clothes professionally ironed with our expert service",
+      subtitle:
+          "Get your clothes professionally ironed with our expert service",
       illustration: _buildIllustration1(),
     ),
     OnboardingData(
       title: "Schedule Pickups and Deliveries with Just a Tap",
-      subtitle: "Our delivery personnel will pick up and deliver your laundry at your convenience",
+      subtitle:
+          "Our delivery personnel will pick up and deliver your ironing at your convenience",
       illustration: _buildIllustration2(),
     ),
   ];
@@ -121,8 +123,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         width: _currentPage == index ? 24 : 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: _currentPage == index 
-                              ? const Color(0xFF4299E1) 
+                          color: _currentPage == index
+                              ? const Color(0xFF4299E1)
                               : Colors.grey[300],
                           borderRadius: BorderRadius.circular(4),
                         ),
@@ -153,8 +155,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         elevation: 0,
                       ),
                       child: Text(
-                        _currentPage == _onboardingData.length - 1 
-                            ? 'Next' 
+                        _currentPage == _onboardingData.length - 1
+                            ? 'Next'
                             : 'Next',
                         style: const TextStyle(
                           color: Colors.white,
