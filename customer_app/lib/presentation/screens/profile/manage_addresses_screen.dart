@@ -55,6 +55,80 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
     }
   }
 
+  Future<void> _testCoordinateSaving() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.userModel == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User not authenticated')),
+      );
+      return;
+    }
+
+    try {
+      // Test coordinates - San Francisco coordinates
+      const double testLat = 37.7749;
+      const double testLng = -122.4194;
+      
+      print('🧪 TEST: Saving test coordinates...');
+      print('🧪 TEST: Latitude: $testLat (Type: ${testLat.runtimeType})');
+      print('🧪 TEST: Longitude: $testLng (Type: ${testLng.runtimeType})');
+
+      final testAddressData = {
+        'type': 'test',
+        'addressLine1': 'Test Address Line 1',
+        'addressLine2': 'Test Address Line 2',
+        'city': 'Test City',
+        'state': 'Test State',
+        'pincode': '123456',
+        'landmark': 'Test Landmark',
+        'latitude': testLat,
+        'longitude': testLng,
+        'isPrimary': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'isTestData': true, // Flag to identify test data
+      };
+
+      print('🧪 TEST: Saving to Firestore...');
+      final docRef = await FirebaseFirestore.instance
+          .collection('customer')
+          .doc(authProvider.userModel!.uid)
+          .collection('addresses')
+          .add(testAddressData);
+
+      print('🧪 TEST: Document saved with ID: ${docRef.id}');
+
+      // Verify the saved data
+      final savedDoc = await docRef.get();
+      if (savedDoc.exists) {
+        final savedData = savedDoc.data() as Map<String, dynamic>;
+        print('🧪 TEST: Verification - Saved latitude: ${savedData['latitude']} (Type: ${savedData['latitude'].runtimeType})');
+        print('🧪 TEST: Verification - Saved longitude: ${savedData['longitude']} (Type: ${savedData['longitude'].runtimeType})');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Test coordinates saved successfully!\nLat: ${savedData['latitude']}\nLng: ${savedData['longitude']}'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      } else {
+        print('🧪 TEST: ERROR - Document not found after saving');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Document not found after saving')),
+        );
+      }
+
+      // Refresh the address list
+      _loadAddresses();
+
+    } catch (e) {
+      print('🧪 TEST: ERROR - Exception: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving test coordinates: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,6 +137,10 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: _testCoordinateSaving,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadAddresses,
@@ -153,6 +231,23 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
                       'PRIMARY',
                       style: AppTextTheme.bodySmall.copyWith(
                         color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+                if (addressData['isTestData'] == true) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'TEST',
+                      style: AppTextTheme.bodySmall.copyWith(
+                        color: Colors.orange,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

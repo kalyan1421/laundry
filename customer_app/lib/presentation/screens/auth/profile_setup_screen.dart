@@ -101,6 +101,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         timeLimit: const Duration(seconds: 15),
       );
 
+      _logger.i('GPS Position obtained:');
+      _logger.i('Latitude: ${position.latitude} (Type: ${position.latitude.runtimeType})');
+      _logger.i('Longitude: ${position.longitude} (Type: ${position.longitude.runtimeType})');
+      _logger.i('Accuracy: ${position.accuracy} meters');
+      _logger.i('Timestamp: ${position.timestamp}');
+
       // Get detailed address from coordinates
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
@@ -124,6 +130,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         
         setState(() {
           _currentPosition = position;
+          
+          _logger.i('Position set in state:');
+          _logger.i('_currentPosition.latitude: ${_currentPosition?.latitude}');
+          _logger.i('_currentPosition.longitude: ${_currentPosition?.longitude}');
           
           // Create a comprehensive address string for display
           List<String> addressParts = [];
@@ -256,6 +266,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     // Check if location is available
     if (_currentPosition == null) {
       _showSnackBar('Please enable location services to continue', isError: true);
+      return;
+    }
+
+    // Additional validation for coordinates
+    if (_currentPosition!.latitude == 0.0 && _currentPosition!.longitude == 0.0) {
+      _showSnackBar('Invalid location detected. Please try getting location again.', isError: true);
+      return;
+    }
+
+    // Validate coordinate ranges
+    if (_currentPosition!.latitude < -90 || _currentPosition!.latitude > 90) {
+      _showSnackBar('Invalid latitude detected. Please try getting location again.', isError: true);
+      return;
+    }
+
+    if (_currentPosition!.longitude < -180 || _currentPosition!.longitude > 180) {
+      _showSnackBar('Invalid longitude detected. Please try getting location again.', isError: true);
       return;
     }
 
