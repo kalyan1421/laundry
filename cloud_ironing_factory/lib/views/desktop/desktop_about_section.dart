@@ -28,9 +28,9 @@ class DesktopAboutSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 Text(
-                  'Cloud Ironing Factory is a premium laundry and ironing service provider specializing in quality, fast turnaround times, top-notch customer service, and convenient pick-up and drop-off options. We\'ve got everything from your everyday clothes to your special occasion garments covered.\n\nOur experienced team uses state-of-the-art equipment and eco-friendly processes to ensure your clothes look their absolute best. We understand that your time is valuable, which is why we offer flexible scheduling and reliable door-to-door service.',
+                  'Cloud Ironing Factory is a premium ironing service provider specializing in quality, fast turnaround times, top-notch customer service, and convenient pick-up and drop-off options. We\'ve got everything from your everyday clothes to your special occasion garments covered.\n\nOur experienced team uses state-of-the-art equipment and eco-friendly processes to ensure your clothes look their absolute best. We understand that your time is valuable, which is why we offer flexible scheduling and reliable door-to-door service.',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: AppTheme.textGrey,
                     height: 1.8,
@@ -38,36 +38,36 @@ class DesktopAboutSection extends StatelessWidget {
                   textAlign: TextAlign.justify,
                 ),
                 const SizedBox(height: 40),
-                
+
                 ElevatedButton(
                   onPressed: () {
                     // Handle book service
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryBlue,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 20,
+                    ),
                   ),
                   child: const Text(
                     'Book a Service',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
             ),
           ),
-          
+
           const SizedBox(width: 60),
-          
+
           // Right Image
           Expanded(
             flex: 4,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: Image.asset(
-                'assets/images/about_us.png',
+                'assets/images/about us.jpeg',
                 height: 400,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
@@ -82,11 +82,7 @@ class DesktopAboutSection extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: const [
-                        Icon(
-                          Icons.business,
-                          size: 80,
-                          color: AppTheme.white,
-                        ),
+                        Icon(Icons.business, size: 80, color: AppTheme.white),
                         SizedBox(height: 16),
                         Text(
                           'Professional Team',
@@ -99,10 +95,7 @@ class DesktopAboutSection extends StatelessWidget {
                         SizedBox(height: 8),
                         Text(
                           'Expert Ironing Services',
-                          style: TextStyle(
-                            color: AppTheme.white,
-                            fontSize: 16,
-                          ),
+                          style: TextStyle(color: AppTheme.white, fontSize: 16),
                         ),
                       ],
                     ),

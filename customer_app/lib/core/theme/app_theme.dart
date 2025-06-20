@@ -16,25 +16,25 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      
+
       // Color Scheme based on Design System
       colorScheme: const ColorScheme.light(
         brightness: Brightness.light,
-        primary: AppColors.primary,          // Deep Navy Blue
-        onPrimary: AppColors.textOnPrimary,  // White
-        secondary: AppColors.secondary,      // Light Blue
+        primary: AppColors.primary, // Deep Navy Blue
+        onPrimary: AppColors.textOnPrimary, // White
+        secondary: AppColors.secondary, // Light Blue
         onSecondary: AppColors.textOnSecondary, // Deep Navy Blue
-        tertiary: AppColors.accent,          // Bright Azure
-        onTertiary: AppColors.textOnAccent,  // White
-        error: AppColors.error,              // Soft Coral
-        onError: AppColors.textOnError,      // White
-        surface: AppColors.surface,          // White
-        onSurface: AppColors.textSecondary,  // Dark Gray
+        tertiary: AppColors.accent, // Bright Azure
+        onTertiary: AppColors.textOnAccent, // White
+        error: AppColors.error, // Soft Coral
+        onError: AppColors.textOnError, // White
+        surface: AppColors.surface, // White
+        onSurface: AppColors.textSecondary, // Dark Gray
         surfaceVariant: AppColors.surfaceVariant, // Light Gray
         onSurfaceVariant: AppColors.textTertiary, // Warm Gray
-        background: AppColors.background,    // White
+        background: AppColors.background, // White
         onBackground: AppColors.textSecondary, // Dark Gray
-        outline: AppColors.border,           // Medium Gray
+        outline: AppColors.border, // Medium Gray
         outlineVariant: AppColors.borderLight, // Light Gray
         shadow: AppColors.darkGray,
         scrim: AppColors.scrim,
@@ -42,7 +42,7 @@ class AppTheme {
         onInverseSurface: AppColors.white,
         inversePrimary: AppColors.secondary,
       ),
-      
+
       // Typography using SF Pro Display
       fontFamily: 'SF Pro Display',
       textTheme: TextTheme(
@@ -50,28 +50,28 @@ class AppTheme {
         displayLarge: AppTextTheme.displayLarge,
         displayMedium: AppTextTheme.displayMedium,
         displaySmall: AppTextTheme.displaySmall,
-        
+
         // Headline styles (H1, H2, H3)
-        headlineLarge: AppTextTheme.heading1,    // 22px Bold
-        headlineMedium: AppTextTheme.heading2,   // 20px Bold
-        headlineSmall: AppTextTheme.heading3,    // 18px SemiBold
-        
+        headlineLarge: AppTextTheme.heading1, // 22px Bold
+        headlineMedium: AppTextTheme.heading2, // 20px Bold
+        headlineSmall: AppTextTheme.heading3, // 18px SemiBold
+
         // Title styles
         titleLarge: AppTextTheme.titleLarge,
         titleMedium: AppTextTheme.titleMedium,
         titleSmall: AppTextTheme.titleSmall,
-        
+
         // Body styles (16px, 14px)
-        bodyLarge: AppTextTheme.bodyText,        // 16px Regular
-        bodyMedium: AppTextTheme.bodyTextSmall,  // 14px Regular
-        bodySmall: AppTextTheme.captionSmall,    // 12px Regular
-        
+        bodyLarge: AppTextTheme.bodyText, // 16px Regular
+        bodyMedium: AppTextTheme.bodyTextSmall, // 14px Regular
+        bodySmall: AppTextTheme.captionSmall, // 12px Regular
+
         // Label styles (14px captions, buttons)
-        labelLarge: AppTextTheme.label,          // 14px Medium
-        labelMedium: AppTextTheme.caption,       // 14px Regular
-        labelSmall: AppTextTheme.captionSmall,   // 12px Regular
+        labelLarge: AppTextTheme.label, // 14px Medium
+        labelMedium: AppTextTheme.caption, // 14px Regular
+        labelSmall: AppTextTheme.captionSmall, // 12px Regular
       ),
-      
+
       // App Bar Theme
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.white,
@@ -94,24 +94,24 @@ class AppTheme {
           statusBarBrightness: Brightness.light,
         ),
       ),
-      
+
       // Button Themes
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: AppButtonStyles.primary,
       ),
-      
+
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: AppButtonStyles.outlinePrimary,
       ),
-      
+
       textButtonTheme: TextButtonThemeData(
         style: AppButtonStyles.textPrimary,
       ),
-      
+
       filledButtonTheme: FilledButtonThemeData(
         style: AppButtonStyles.accent,
       ),
-      
+
       // Input Decoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -121,7 +121,7 @@ class AppTheme {
         errorStyle: AppTextTheme.captionSmall.copyWith(
           color: AppColors.error,
         ),
-        
+
         // Border styles
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -165,15 +165,15 @@ class AppTheme {
             width: 1,
           ),
         ),
-        
+
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
         ),
       ),
-      
+
       // Card Theme
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.surface,
         shadowColor: AppColors.border,
         elevation: 2,
@@ -185,7 +185,7 @@ class AppTheme {
           vertical: 8,
         ),
       ),
-      
+
       // Bottom Navigation Bar Theme
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.white,
@@ -204,9 +204,9 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
-      
+
       // Tab Bar Theme
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.warmGray,
         labelStyle: AppTextTheme.label,
@@ -218,7 +218,7 @@ class AppTheme {
           ),
         ),
       ),
-      
+
       // Floating Action Button Theme
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.accent,
@@ -228,7 +228,7 @@ class AppTheme {
         hoverElevation: 8,
         shape: CircleBorder(),
       ),
-      
+
       // Chip Theme
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.surfaceVariant,
@@ -247,9 +247,9 @@ class AppTheme {
           borderRadius: BorderRadius.circular(20),
         ),
       ),
-      
+
       // Dialog Theme
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: AppColors.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 8,
@@ -260,7 +260,7 @@ class AppTheme {
         titleTextStyle: AppTextTheme.heading3,
         contentTextStyle: AppTextTheme.bodyText,
       ),
-      
+
       // Bottom Sheet Theme
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.surface,
@@ -272,7 +272,7 @@ class AppTheme {
           ),
         ),
       ),
-      
+
       // Snack Bar Theme
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.darkGray,
@@ -285,26 +285,26 @@ class AppTheme {
         ),
         behavior: SnackBarBehavior.floating,
       ),
-      
+
       // Divider Theme
       dividerTheme: const DividerThemeData(
         color: AppColors.divider,
         thickness: 1,
         space: 1,
       ),
-      
+
       // Icon Theme
       iconTheme: const IconThemeData(
         color: AppColors.primary,
         size: 24,
       ),
-      
+
       // Primary Icon Theme
       primaryIconTheme: const IconThemeData(
         color: AppColors.textOnPrimary,
         size: 24,
       ),
-      
+
       // Switch Theme
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -320,7 +320,7 @@ class AppTheme {
           return AppColors.lightGray;
         }),
       ),
-      
+
       // Checkbox Theme
       checkboxTheme: CheckboxThemeData(
         checkColor: WidgetStateProperty.all(AppColors.textOnAccent),
@@ -338,7 +338,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(4),
         ),
       ),
-      
+
       // Radio Theme
       radioTheme: RadioThemeData(
         fillColor: WidgetStateProperty.resolveWith((states) {
@@ -348,7 +348,7 @@ class AppTheme {
           return AppColors.border;
         }),
       ),
-      
+
       // Slider Theme
       sliderTheme: const SliderThemeData(
         activeTrackColor: AppColors.accent,
@@ -356,7 +356,7 @@ class AppTheme {
         thumbColor: AppColors.accent,
         overlayColor: Color(0x1F00A8E8), // Accent with low opacity
       ),
-      
+
       // Progress Indicator Theme
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: AppColors.accent,
@@ -375,7 +375,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      
+
       colorScheme: const ColorScheme.dark(
         brightness: Brightness.dark,
         primary: AppColors.accent,
@@ -392,16 +392,17 @@ class AppTheme {
         onBackground: AppColors.white,
         outline: AppColors.warmGray,
       ),
-      
+
       fontFamily: 'SF Pro Display',
-      
+
       // Use same text theme but with appropriate colors for dark mode
       textTheme: TextTheme(
         headlineLarge: AppTextTheme.heading1.copyWith(color: AppColors.white),
         headlineMedium: AppTextTheme.heading2.copyWith(color: AppColors.white),
         headlineSmall: AppTextTheme.heading3.copyWith(color: AppColors.white),
         bodyLarge: AppTextTheme.bodyText.copyWith(color: AppColors.white),
-        bodyMedium: AppTextTheme.bodyTextSmall.copyWith(color: AppColors.lightGray),
+        bodyMedium:
+            AppTextTheme.bodyTextSmall.copyWith(color: AppColors.lightGray),
         labelLarge: AppTextTheme.label.copyWith(color: AppColors.white),
       ),
     );

@@ -185,28 +185,24 @@ $name
         child: Column(
           children: [
             // Header with background image and title
-            Image.asset('assets/images/contact_bg.png', fit: BoxFit.cover,  ),
-           
-            
+            Image.asset('assets/images/contact_bg.png', fit: BoxFit.cover),
+
             // Main Content
             Container(
               color: AppTheme.lightBackground,
-              padding: const EdgeInsets.symmetric(horizontal: 80.0, vertical: 80.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 80.0,
+                vertical: 80.0,
+              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Left - Contact Info
-                  Expanded(
-                    flex: 5,
-                    child: _buildContactInfo(context),
-                  ),
+                  Expanded(flex: 5, child: _buildContactInfo(context)),
                   const SizedBox(width: 80),
-                  
+
                   // Right - Contact Form
-                  Expanded(
-                    flex: 7,
-                    child: _buildContactForm(context),
-                  ),
+                  Expanded(flex: 7, child: _buildContactForm(context)),
                 ],
               ),
             ),
@@ -229,8 +225,8 @@ $name
             fontSize: 28,
           ),
         ),
-        const SizedBox(height: 40),
-        
+        // const SizedBox(height: 40),
+
         // Map placeholder
         Container(
           width: 300,
@@ -248,63 +244,132 @@ $name
               errorBuilder: (context, error, stackTrace) {
                 return Container(
                   color: Colors.grey.shade200,
-                  child: Icon(
-                    Icons.map,
-                    size: 40,
-                    color: AppTheme.primaryBlue,
-                  ),
+                  child: Icon(Icons.map, size: 40, color: AppTheme.primaryBlue),
                 );
               },
             ),
           ),
         ),
         const SizedBox(height: 32),
-        
+
         // Phone
-        _buildClickableContactItem(Icons.phone, '9566654788', () => _makePhoneCall('9566654788')),
-        const SizedBox(height: 24),
-        _buildClickableContactItem(Icons.phone, '6382654316', () => _makePhoneCall('6382654316')),
-        const SizedBox(height: 24),
-        // Email
-        _buildClickableContactItem(Icons.email, 'cloudironingfactory@gmail.com', () => _sendEmail('cloudironingfactory@gmail.com')),
-        const SizedBox(height: 24),
-        
-        // Website
-        _buildClickableContactItem(Icons.language, 'www.cloudironingfactory.com', () => _openWebsite('https://cloudironingfactory.com')),
-        const SizedBox(height: 24),
-        
-        // Book a Pickup Button
-        Center(
-          child: ElevatedButton.icon(
-            onPressed: () => _bookPickup(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryBlue,
-              foregroundColor: AppTheme.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
-              ),
-            ),
-            icon: Icon(Icons.calendar_today, size: 20),
-            label: Text(
-              'Book a Pickup',
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Call Us',
               style: TextStyle(
-                fontSize: 16,
+                color: AppTheme.textDark,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 fontFamily: AppTheme.primaryFont,
               ),
             ),
-          ),
+            _buildClickableContactItem(
+              Icons.phone,
+              '9566654788',
+              () => _makePhoneCall('9566654788'),
+            ),
+            _buildClickableContactItem(
+              Icons.phone,
+              '6382654316',
+              () => _makePhoneCall('6382654316'),
+            ),
+          ],
         ),
-        const SizedBox(height: 24),
-        
+        // const SizedBox(height: 24),
+
+        // const SizedBox(height: 24),
+        // Email
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Mail Us',
+              style: TextStyle(
+                color: AppTheme.textDark,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: AppTheme.primaryFont,
+              ),
+            ),
+            _buildClickableContactItem(
+              Icons.email,
+              'cloudironingfactory@gmail.com',
+              () => _sendEmail('cloudironingfactory@gmail.com'),
+            ),
+          ],
+        ),
+        // const SizedBox(height: 24),
+
+        // Website
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Website',
+              style: TextStyle(
+                color: AppTheme.textDark,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: AppTheme.primaryFont,
+              ),
+            ),
+            _buildClickableContactItem(
+              Icons.language,
+              'www.cloudironingfactory.com',
+              () => _openWebsite('https://cloudironingfactory.com'),
+            ),
+          ],
+        ),
+        // const SizedBox(height: 24),
+
+        // Book a Pickup Button
+        // Center(
+        //   child: ElevatedButton.icon(
+        //     onPressed: () => _bookPickup(),
+        //     style: ElevatedButton.styleFrom(
+        //       backgroundColor: AppTheme.primaryBlue,
+        //       foregroundColor: AppTheme.white,
+        //       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        //       shape: RoundedRectangleBorder(
+        //         borderRadius: BorderRadius.circular(25),
+        //       ),
+        //     ),
+        //     icon: Icon(Icons.calendar_today, size: 20),
+        //     label: Text(
+        //       'Book a Pickup',
+        //       style: TextStyle(
+        //         fontSize: 16,
+        //         fontWeight: FontWeight.bold,
+        //         fontFamily: AppTheme.primaryFont,
+        //       ),
+        //     ),
+        //   ),
+        // ),
+        // const SizedBox(height: 24),
+
         // Registered Address
-        _buildContactItem(
-          Icons.location_on,
-          'Registered Address: Tulip A5, Majestic Orchid, Ben Foundation, Jaswanth Nagar, Mogappair West, Chennai - 600037.',
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Registered Address',
+              style: TextStyle(
+                color: AppTheme.textDark,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: AppTheme.primaryFont,
+              ),
+            ),
+            _buildContactItem(
+              Icons.location_on,
+              'Registered Address: Tulip A5, Majestic Orchid, Ben Foundation, Jaswanth Nagar, Mogappair West, Chennai - 600037.',
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        
+        // const SizedBox(height: 16),
+
         // Administrative Office Address
         _buildContactItem(
           Icons.business,
@@ -315,44 +380,51 @@ $name
   }
 
   Widget _buildContactItem(IconData icon, String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppTheme.primaryBlue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryBlue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: AppTheme.primaryBlue, size: 20),
           ),
-          child: Icon(icon, color: AppTheme.primaryBlue, size: 20),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 4.0),
-            child: Text(
-              text,
-              style: TextStyle(
-                color: AppTheme.textDark,
-                fontSize: 14,
-                height: 1.5,
-                fontFamily: AppTheme.primaryFont,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: AppTheme.textDark,
+                  fontSize: 14,
+                  height: 1.5,
+                  fontFamily: AppTheme.primaryFont,
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildClickableContactItem(IconData icon, String text, VoidCallback onTap) {
+  Widget _buildClickableContactItem(
+    IconData icon,
+    String text,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.all(8),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(8),
@@ -392,6 +464,7 @@ $name
 
   Widget _buildContactForm(BuildContext context) {
     return Container(
+      // height: double.infinity,
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
         color: AppTheme.primaryBlue,
@@ -425,7 +498,7 @@ $name
                   ),
                 ),
                 const SizedBox(width: 16),
-                
+
                 // Email Field
                 Expanded(
                   child: _buildTextField(
@@ -436,7 +509,9 @@ $name
                       if (value == null || value.isEmpty) {
                         return 'Please enter your email';
                       }
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      if (!RegExp(
+                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                      ).hasMatch(value)) {
                         return 'Please enter a valid email';
                       }
                       return null;
@@ -446,7 +521,7 @@ $name
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // Subject Field
             _buildTextField(
               controller: _subjectController,
@@ -459,7 +534,7 @@ $name
               },
             ),
             const SizedBox(height: 16),
-            
+
             // Message Field
             _buildTextField(
               controller: _messageController,
@@ -473,7 +548,7 @@ $name
               },
             ),
             const SizedBox(height: 24),
-            
+
             // Submit Button
             Align(
               alignment: Alignment.centerRight,
@@ -486,7 +561,10 @@ $name
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.white,
                   foregroundColor: AppTheme.primaryBlue,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25),
                   ),
@@ -620,7 +698,7 @@ $name
                 ],
               ),
             ),
-            
+
             // Center - Company Info
             Expanded(
               flex: 2,
@@ -637,31 +715,40 @@ $name
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Navigation Links
                   _buildFooterLink('Home'),
                   _buildFooterLink('About'),
                   _buildFooterLink('Services'),
                   _buildFooterLink('Contact Us'),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   // Contact Info
                   _buildFooterContactItem(Icons.phone, '+91 9566654788'),
                   // _buildFooterContactItem(Icons.whatsapp, '+91 9566677166'),
                   _buildFooterContactItem(Icons.phone, '+91 6382654316'),
-                  _buildFooterContactItem(Icons.email, 'cloudironingfactory@gmail.com'),
-                  
+                  _buildFooterContactItem(
+                    Icons.email,
+                    'cloudironingfactory@gmail.com',
+                  ),
+
                   const SizedBox(height: 16),
-                  
+
                   // Addresses
-                  _buildFooterContactItem(Icons.location_on, 'Registered Address: Tulip A5, Majestic Orchid, Ben Foundation, Jaswanth Nagar, Mogappair West, Chennai - 600037.'),
+                  _buildFooterContactItem(
+                    Icons.location_on,
+                    'Registered Address: Tulip A5, Majestic Orchid, Ben Foundation, Jaswanth Nagar, Mogappair West, Chennai - 600037.',
+                  ),
                   const SizedBox(height: 8),
-                  _buildFooterContactItem(Icons.business, 'Administrative Office Address: B-10, Mogappair West Industrial Estate, Reddypalayam Road, 3rd Street Mogappair West Estate, Chennai - 600037'),
+                  _buildFooterContactItem(
+                    Icons.business,
+                    'Administrative Office Address: B-10, Mogappair West Industrial Estate, Reddypalayam Road, 3rd Street Mogappair West Estate, Chennai - 600037',
+                  ),
                 ],
               ),
             ),
-            
+
             // Right - QR Code and Download App
             Expanded(
               flex: 2,
@@ -678,7 +765,7 @@ $name
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // QR Code
                   Container(
                     width: 120,

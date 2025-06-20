@@ -5,10 +5,7 @@ import '../../theme/app_theme.dart';
 class MobileHeader extends StatefulWidget {
   final Function(double) onNavigate;
 
-  const MobileHeader({
-    Key? key,
-    required this.onNavigate,
-  }) : super(key: key);
+  const MobileHeader({Key? key, required this.onNavigate}) : super(key: key);
 
   @override
   State<MobileHeader> createState() => _MobileHeaderState();
@@ -108,10 +105,10 @@ class _MobileHeaderState extends State<MobileHeader> {
                   const Divider(height: 1, color: AppTheme.lightBackground),
                   _navLink(context, 'Services', 2000.0),
                   const Divider(height: 1, color: AppTheme.lightBackground),
-                  _navLink(context, 'Contact Us', 300.0),
-                  
+                  _navLink(context, 'Contact Us', 2300.0),
+
                   const SizedBox(height: 16),
-                  
+
                   // Social Icons Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -121,9 +118,9 @@ class _MobileHeaderState extends State<MobileHeader> {
                       _socialIcon(Icons.email),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // CTA Button
                   SizedBox(
                     width: double.infinity,
@@ -137,7 +134,10 @@ class _MobileHeaderState extends State<MobileHeader> {
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryBlue,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(25),
                         ),
@@ -191,11 +191,7 @@ class _MobileHeaderState extends State<MobileHeader> {
         color: AppTheme.primaryBlue.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(
-        icon,
-        color: AppTheme.darkBlue,
-        size: 20,
-      ),
+      child: Icon(icon, color: AppTheme.darkBlue, size: 20),
     );
   }
 }

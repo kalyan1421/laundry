@@ -1,5 +1,5 @@
 // views/mobile/mobile_home_view.dart
-import 'package:cloud_ironing_factory/widgets/mobile/mobile_header.dart';   
+import 'package:cloud_ironing_factory/widgets/mobile/mobile_header.dart';
 import 'package:cloud_ironing_factory/views/mobile/mobile_about_section.dart';
 import 'package:cloud_ironing_factory/views/mobile/mobile_about_section_2.dart';
 import 'package:cloud_ironing_factory/views/mobile/mobile_contact_section.dart';
@@ -19,7 +19,7 @@ class MobileHomeView extends StatefulWidget {
 
 class _MobileHomeViewState extends State<MobileHomeView> {
   final ScrollController _scrollController = ScrollController();
-  
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -43,7 +43,7 @@ class _MobileHomeViewState extends State<MobileHomeView> {
           SingleChildScrollView(
             controller: _scrollController,
             child: Column(
-              children: const [
+              children: [
                 SizedBox(height: 80), // Space for fixed header
                 MobileHeroSection(),
                 MobileAboutSection(),
@@ -56,15 +56,13 @@ class _MobileHomeViewState extends State<MobileHomeView> {
               ],
             ),
           ),
-          
+
           // Fixed Header
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: MobileHeader(
-              onNavigate: _scrollToSection,
-            ),
+            child: MobileHeader(onNavigate: _scrollToSection),
           ),
         ],
       ),
