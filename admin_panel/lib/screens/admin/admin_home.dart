@@ -10,6 +10,7 @@ import 'manage_items.dart';
 import 'manage_banners.dart';
 import 'all_orders.dart';
 import 'admin_delivery_signup_screen.dart';
+import 'admin_token_debug_screen.dart';
 import 'package:intl/intl.dart';
 
 class AdminHome extends StatefulWidget {
@@ -24,25 +25,25 @@ class _AdminHomeState extends State<AdminHome> {
 
   static final List<Widget> _pages = <Widget>[
     const AdminDashboard(),
+    const AllOrders(),
     const ManageClientsScreen(roleFilter: 'customer', pageTitle: 'Customers'),
     const ManageClientsScreen(roleFilter: 'delivery', pageTitle: 'Delivery Staff'),
     const ManageClientsScreen(roleFilter: 'admin', pageTitle: 'Administrators'),
     const ManageItems(),
     const ManageBanners(),
     const OffersListScreen(),
-    const AllOrders(),
     const AddDeliveryPartnerScreen(),
   ];
 
   static final List<String> _titles = <String>[
     'Dashboard',
+    'All Orders',
     'Customers',
     'Delivery Staff',
     'Administrators',
     'Manage Items',
     'Manage Banners',
     'Special Offers',
-    'All Orders',
     'Add Delivery Partner',
   ];
 
@@ -62,11 +63,52 @@ class _AdminHomeState extends State<AdminHome> {
         title: Text(_titles[_selectedIndex]),
         backgroundColor: Theme.of(context).primaryColor,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () async {
-              await authProvider.signOut();
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) async {
+              if (value == 'refresh_notifications') {
+                try {
+                  await authProvider.refreshFCMToken();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Notification token refreshed successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to refresh notification token: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } else if (value == 'logout') {
+                await authProvider.signOut();
+              }
             },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'refresh_notifications',
+                child: Row(
+                  children: [
+                    Icon(Icons.notifications_active),
+                    SizedBox(width: 8),
+                    Text('Refresh Notifications'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout),
+                    SizedBox(width: 8),
+                    Text('Sign Out'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -92,13 +134,27 @@ class _AdminHomeState extends State<AdminHome> {
               ),
             ),
             _buildDrawerItem(Icons.dashboard_rounded, 'Dashboard', 0),
-            _buildDrawerItem(Icons.people_alt_rounded, 'Customers', 1),
-            _buildDrawerItem(Icons.delivery_dining_rounded, 'Delivery Staff', 2),
-            _buildDrawerItem(Icons.admin_panel_settings_rounded, 'Administrators', 3),
-            _buildDrawerItem(Icons.inventory_2_rounded, 'Manage Items', 4),
-            _buildDrawerItem(Icons.photo_library_rounded, 'Manage Banners', 5),
-            _buildDrawerItem(Icons.local_offer_rounded, 'Special Offers', 6),
-            _buildDrawerItem(Icons.receipt_long_rounded, 'All Orders', 7),
+            _buildDrawerItem(Icons.shopping_cart_rounded, 'All Orders', 1),
+            _buildDrawerItem(Icons.people_alt_rounded, 'Customers', 2),
+            _buildDrawerItem(Icons.delivery_dining_rounded, 'Delivery Staff', 3),
+            _buildDrawerItem(Icons.admin_panel_settings_rounded, 'Administrators', 4),
+            _buildDrawerItem(Icons.inventory_2_rounded, 'Manage Items', 5),
+            _buildDrawerItem(Icons.photo_library_rounded, 'Manage Banners', 6),
+            _buildDrawerItem(Icons.local_offer_rounded, 'Special Offers', 7),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.notifications_active),
+              title: const Text('Notification Tokens'),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AdminTokenDebugScreen(),
+                  ),
+                );
+              },
+            ),
+            // _buildDrawerItem(Icons.receipt_long_rounded, 'All Orders', 7),
             _buildDrawerItem(Icons.person_add_alt_1_rounded, 'Add Delivery Partner', 8),
             const Divider(),
             ListTile(

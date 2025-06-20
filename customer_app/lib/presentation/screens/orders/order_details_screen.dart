@@ -41,11 +41,13 @@ class OrderDetailsScreen extends StatelessWidget {
             _buildDetailRow('Time Slot:', order.pickupTimeSlot),
             const SizedBox(height: 20),
 
-            _buildSectionTitle('Delivery Details'),
-            _buildDetailRow('Address:', order.deliveryAddress),
-            _buildDetailRow('Date:', DateFormat('EEE, MMM d, yyyy').format(order.deliveryDate.toDate())),
-            _buildDetailRow('Time Slot:', order.deliveryTimeSlot),
-            const SizedBox(height: 20),
+            if (order.deliveryDate != null && order.deliveryTimeSlot != null) ...[
+              _buildSectionTitle('Delivery Details'),
+              _buildDetailRow('Address:', order.deliveryAddress),
+              _buildDetailRow('Date:', DateFormat('EEE, MMM d, yyyy').format(order.deliveryDate!.toDate())),
+              _buildDetailRow('Time Slot:', order.deliveryTimeSlot!),
+              const SizedBox(height: 20),
+            ],
             
             if (order.specialInstructions != null && order.specialInstructions!.isNotEmpty)
               Column(

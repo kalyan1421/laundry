@@ -2,9 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/order_model.dart';
+import '../services/order_service.dart';
 
 class OrderProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final OrderService _orderService = OrderService();
   
   List<OrderModel> _allOrders = [];
   List<OrderModel> _deliveryOrders = [];
@@ -19,30 +21,62 @@ class OrderProvider extends ChangeNotifier {
   String? get error => _error;
   
   Stream<List<OrderModel>> getAllOrdersStream() {
-    return _firestore
-        .collection('orders')
-        .orderBy('orderTimestamp', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      _allOrders = snapshot.docs
-          .map((doc) => OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
-          .toList();
-      return _allOrders;
+    // Try ordering by different timestamp fields, fallback to no ordering
+    Query query = _firestore.collection('orders');
+    
+    // Try to order by available timestamp fields
+    try {
+      query = query.orderBy('orderTimestamp', descending: true);
+    } catch (e) {
+      print('Warning: Could not order by orderTimestamp, trying createdAt: $e');
+      try {
+        query = query.orderBy('createdAt', descending: true);
+      } catch (e2) {
+        print('Warning: Could not order by any timestamp field: $e2');
+      }
+    }
+    
+    return query.snapshots().asyncMap((snapshot) async {
+      List<OrderModel> orders = [];
+      
+      for (QueryDocumentSnapshot doc in snapshot.docs) {
+        try {
+          OrderModel order = OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+          
+          // Fetch customer information if customerId exists
+          if (order.customerId != null) {
+            OrderModel? orderWithCustomer = await _orderService.getOrderWithCustomerInfo(doc.id);
+            if (orderWithCustomer != null) {
+              order = orderWithCustomer;
+            }
+          }
+          
+          orders.add(order);
+        } catch (e) {
+          print('Error processing order ${doc.id}: $e');
+        }
+             }
+       
+       // Sort orders manually by timestamp (most recent first)
+       orders.sort((a, b) {
+         DateTime aTime = a.createdAt?.toDate() ?? a.orderTimestamp.toDate();
+         DateTime bTime = b.createdAt?.toDate() ?? b.orderTimestamp.toDate();
+         return bTime.compareTo(aTime);
+       });
+       
+       _allOrders = orders;
+       return _allOrders;
     });
   }
   
+  // Enhanced delivery orders stream with customer information
   Stream<List<OrderModel>> getDeliveryOrdersStream(String deliveryId) {
-    return _firestore
-        .collection('orders')
-        .where('assignedTo', isEqualTo: deliveryId)
-        .orderBy('orderTimestamp', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      _deliveryOrders = snapshot.docs
-          .map((doc) => OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
-          .toList();
-      return _deliveryOrders;
-    });
+    return _orderService.getOrdersForDeliveryPartner(deliveryId);
+  }
+  
+  // Get single order with customer information
+  Future<OrderModel?> getOrderWithCustomerInfo(String orderId) async {
+    return await _orderService.getOrderWithCustomerInfo(orderId);
   }
   
   Stream<List<Map<String, dynamic>>> getQuickOrderNotificationsStream() {
@@ -62,12 +96,13 @@ class OrderProvider extends ChangeNotifier {
     });
   }
   
-  Future<void> updateOrderStatus(String orderId, String status) async {
+  Future<void> updateOrderStatus(String orderId, String status, {String? notes}) async {
     try {
-      await _firestore.collection('orders').doc(orderId).update({
-        'status': status,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await _orderService.updateOrderStatus(
+        orderId: orderId,
+        newStatus: status,
+        notes: notes,
+      );
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -77,13 +112,69 @@ class OrderProvider extends ChangeNotifier {
   Future<void> assignOrder(String orderId, String deliveryPersonId) async {
     try {
       await _firestore.collection('orders').doc(orderId).update({
-        'assignedTo': deliveryPersonId,
+        'assignedDeliveryPerson': deliveryPersonId, // Fixed field name
         'status': 'assigned',
+        'assignedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        'statusHistory': FieldValue.arrayUnion([
+          {
+            'status': 'assigned',
+            'timestamp': Timestamp.now(), // Fixed: Use Timestamp.now() instead of FieldValue.serverTimestamp()
+            'assignedTo': deliveryPersonId,
+          }
+        ]),
       });
     } catch (e) {
       _error = e.toString();
       notifyListeners();
+    }
+  }
+  
+  // Accept order by delivery partner
+  Future<bool> acceptOrder(String orderId, String deliveryPartnerId, {String? notes}) async {
+    try {
+      return await _orderService.acceptOrderByDeliveryPartner(
+        orderId: orderId,
+        deliveryPartnerId: deliveryPartnerId,
+        notes: notes,
+      );
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+  
+  // Reject order by delivery partner
+  Future<bool> rejectOrder(String orderId, String deliveryPartnerId, String reason) async {
+    try {
+      return await _orderService.rejectOrderByDeliveryPartner(
+        orderId: orderId,
+        deliveryPartnerId: deliveryPartnerId,
+        reason: reason,
+      );
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+  
+  // Get delivery partner statistics
+  Future<Map<String, int>> getDeliveryPartnerStats(String deliveryPartnerId) async {
+    try {
+      return await _orderService.getDeliveryPartnerOrderStats(deliveryPartnerId);
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return {
+        'total': 0,
+        'pending': 0,
+        'accepted': 0,
+        'in_progress': 0,
+        'completed': 0,
+        'cancelled': 0,
+      };
     }
   }
   
@@ -97,5 +188,11 @@ class OrderProvider extends ChangeNotifier {
       _error = e.toString();
       notifyListeners();
     }
+  }
+  
+  // Clear error
+  void clearError() {
+    _error = null;
+    notifyListeners();
   }
 }

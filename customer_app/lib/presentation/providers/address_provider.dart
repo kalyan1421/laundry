@@ -5,7 +5,7 @@ import 'package:uuid/uuid.dart'; // For generating unique address IDs
 
 class AddressProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final String _usersCollection = 'users';
+  final String _usersCollection = 'customer';
   final String _addressesSubcollection = 'addresses';
 
   bool _isLoading = false;

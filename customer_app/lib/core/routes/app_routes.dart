@@ -6,10 +6,19 @@ import 'package:customer_app/presentation/screens/auth/welcome_screen.dart';
 import 'package:customer_app/presentation/screens/main/main_wrapper.dart';
 import 'package:customer_app/presentation/screens/profile/edit_profile_screen.dart';
 import 'package:customer_app/presentation/screens/profile/manage_addresses_screen.dart';
+import 'package:customer_app/presentation/screens/profile/payment_methods_screen.dart';
+import 'package:customer_app/presentation/screens/profile/notification_preferences_screen.dart';
+import 'package:customer_app/presentation/screens/profile/ironing_preferences_screen.dart';
+import 'package:customer_app/presentation/screens/profile/help_screen.dart';
+import 'package:customer_app/presentation/screens/profile/settings_screen.dart';
+import 'package:customer_app/presentation/screens/profile/saved_items_screen.dart';
 import 'package:customer_app/presentation/screens/splash/splash_screen.dart';
 import 'package:customer_app/presentation/screens/address/add_address_screen.dart';
+import 'package:customer_app/presentation/screens/home/allied_services_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+
 
 class AppRoutes {
   static const String splash = '/';
@@ -26,7 +35,14 @@ class AppRoutes {
   // New routes for profile section
   static const String editProfile = '/edit-profile';
   static const String manageAddresses = '/manage-addresses';
-
+  static const String addAddressScreen = '/add-address-screen';
+  static const String alliedServices = '/allied-services';
+  static const String paymentMethods = '/payment-methods';
+  static const String notificationPreferences = '/notification-preferences';
+  static const String ironingPreferences = '/ironing-preferences';
+  static const String helpSupport = '/help-support';
+  static const String appSettings = '/app-settings';
+  static const String savedItems = '/saved-items';
   static Map<String, WidgetBuilder> get routes => {
         login: (context) => const LoginScreen(),
         otpVerification: (context) => OTPVerificationScreen(phoneNumber: ModalRoute.of(context)?.settings.arguments as String? ?? ''),
@@ -71,8 +87,31 @@ class AppRoutes {
       case editProfile:
         return MaterialPageRoute(builder: (_) => const EditProfileScreen());
 
+      case addAddressScreen:
+        return MaterialPageRoute(builder: (_) => const AddAddressScreen());
       case manageAddresses:
         return MaterialPageRoute(builder: (_) => const ManageAddressesScreen());
+      
+      case alliedServices:
+        return MaterialPageRoute(builder: (_) => const AlliedServicesScreen());
+      
+      case paymentMethods:
+        return MaterialPageRoute(builder: (_) => const PaymentMethodsScreen());
+      
+      case notificationPreferences:
+        return MaterialPageRoute(builder: (_) => const NotificationPreferencesScreen());
+      
+      case ironingPreferences:
+        return MaterialPageRoute(builder: (_) => const IroningPreferencesScreen());
+      
+      case helpSupport:
+        return MaterialPageRoute(builder: (_) => const HelpScreen());
+      
+      case appSettings:
+        return MaterialPageRoute(builder: (_) => const SettingsScreen());
+      
+      case savedItems:
+        return MaterialPageRoute(builder: (_) => const SavedItemsScreen());
 
       default:
         print("Unhandled route: ${settings.name}");

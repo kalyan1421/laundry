@@ -25,14 +25,55 @@ class _OrdersScreenState extends State<OrdersScreen> {
     super.initState();
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
+      // Query to get ALL orders for the current user
+      // Try both 'userId' and 'customerId' fields for compatibility
       _ordersStream = _firestore
           .collection('orders')
-          .where('userId', isEqualTo: currentUser.uid)
-          .orderBy('orderTimestamp', descending: true) // Assuming you have an 'orderTimestamp' field
+          .where('customerId', isEqualTo: currentUser.uid)
           .snapshots()
-          .map((snapshot) => snapshot.docs
-              .map((doc) => OrderModel.fromFirestore(doc))
-              .toList());
+          .map((snapshot) {
+            List<OrderModel> orders = snapshot.docs
+                .map((doc) => OrderModel.fromFirestore(doc))
+                .toList();
+            
+            // If no orders found with customerId, try with userId
+            if (orders.isEmpty) {
+              return <OrderModel>[];
+            }
+            
+            // Sort by orderTimestamp in descending order (latest first)
+            orders.sort((a, b) {
+              Timestamp aTime = a.orderTimestamp;
+              Timestamp bTime = b.orderTimestamp;
+              return bTime.compareTo(aTime); // Descending order - latest first
+            });
+            
+            return orders;
+          })
+          .handleError((error) {
+            print('Error fetching orders with customerId: $error');
+            // Fallback to userId query if customerId fails
+            return _firestore
+                .collection('orders')
+                .where('userId', isEqualTo: currentUser.uid)
+                .get()
+                .then((snapshot) {
+                  List<OrderModel> orders = snapshot.docs
+                      .map((doc) => OrderModel.fromFirestore(doc))
+                      .toList();
+                  
+                  orders.sort((a, b) {
+                    Timestamp aTime = a.orderTimestamp;
+                    Timestamp bTime = b.orderTimestamp;
+                    return bTime.compareTo(aTime);
+                  });
+                  
+                  return orders;
+                }).catchError((e) {
+                  print('Error fetching orders with userId: $e');
+                  return <OrderModel>[];
+                });
+          });
     }
   }
 

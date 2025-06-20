@@ -1,0 +1,44 @@
+// Add these rules to your Firestore security rules
+// Rules for otp_throttle collection (server-side rate limiting)
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Existing rules...
+    
+    // OTP Throttle Collection - for server-side rate limiting
+    match /otp_throttle/{phoneNumber} {
+      // Allow read and write for the specific phone number owner
+      // This is a basic implementation - you might want to add more restrictions
+      allow read, write: if request.auth != null 
+        && request.auth.token.phone_number == phoneNumber;
+      
+      // Allow system/admin access (you can remove this if not needed)
+      allow read, write: if request.auth != null 
+        && request.auth.token.admin == true;
+      
+      // For initial creation during OTP request (before user is authenticated)
+      allow create: if request.auth == null 
+        && resource == null
+        && request.resource.data.phoneNumber is string
+        && request.resource.data.attemptCount is number
+        && request.resource.data.attemptCount <= 10; // Limit initial attempts
+        
+      // Allow update for throttle tracking
+      allow update: if request.auth == null
+        && resource != null
+        && request.resource.data.phoneNumber == resource.data.phoneNumber
+        && request.resource.data.attemptCount <= 10; // Prevent abuse
+    }
+  }
+}
+
+// Alternative simpler rules (if you want to allow public read/write with basic validation):
+/*
+match /otp_throttle/{phoneNumber} {
+  allow read, write: if request.resource.data.phoneNumber == phoneNumber
+    && request.resource.data.attemptCount is number
+    && request.resource.data.attemptCount <= 10;
+}
+*/ 

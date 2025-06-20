@@ -1,115 +1,104 @@
 // screens/main/main_wrapper.dart
-import 'package:customer_app/core/routes/app_routes.dart';
-import 'package:customer_app/presentation/screens/profile/edit_profile_screen.dart';
+import 'package:customer_app/presentation/providers/auth_provider.dart';
+import 'package:customer_app/presentation/screens/home/home_screen.dart';
+import 'package:customer_app/presentation/screens/orders/orders_screen.dart';
+import 'package:customer_app/presentation/screens/track/track_order_screen.dart';
+import 'package:customer_app/presentation/screens/profile/profile_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:customer_app/presentation/screens/orders/order_tracking_screen.dart';
+
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
-import '../auth/profile_setup_screen.dart';
+import 'package:customer_app/core/routes/app_routes.dart';
+
 import 'bottom_navigation.dart';
-import '../home/home_screen.dart';
-import '../orders/orders_screen.dart';
-import '../profile/profile_screen.dart';
 
 class MainWrapper extends StatefulWidget {
-  const MainWrapper({Key? key}) : super(key: key);
+  const MainWrapper({super.key});
 
   @override
   State<MainWrapper> createState() => _MainWrapperState();
 }
 
 class _MainWrapperState extends State<MainWrapper> {
-  int _selectedIndex = 0;
-
-  // Define screen titles for the AppBar
-  static const List<String> _screenTitles = [
-    'Cloud Ironing', // For HomeScreen
-    'My Orders',     // For OrdersScreen
-    'Track Order',   // For TrackOrderScreen
-    'My Profile',    // For ProfileScreen
-  ];
+  int _currentIndex = 0;
+  final Logger _logger = Logger();
 
   final List<Widget> _screens = [
     const HomeScreen(),
     const OrdersScreen(),
-    const TrackOrdersScreen(),
+    const TrackOrderScreen(),
     const ProfileScreen(),
   ];
+  
+  final List<String> _screenTitles = [
+    'Home',
+    'My Orders',
+    'Track Order',
+    'Profile',
+  ];
 
-  void _onItemTapped(int index) {
+
+  void _onTap(int index) {
     setState(() {
-      _selectedIndex = index;
+      _currentIndex = index;
     });
   }
 
   @override
+  void initState() {
+    super.initState();
+    _checkUserProfile();
+  }
+
+  void _checkUserProfile() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    _logger.d(
+        'Checking user profile. Profile complete: ${authProvider.isProfileComplete}');
+    if (!authProvider.isProfileComplete) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _logger.i('User profile is not complete. Navigating to setup.');
+        Navigator.pushReplacementNamed(context, AppRoutes.profileSetup);
+      });
+    } else {
+      _logger.d('User profile is complete. No navigation needed.');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, child) {
-        print("MainWrapper: Building. AuthStatus: ${authProvider.authStatus}, isProfileComplete: ${authProvider.isProfileComplete}, UserID: ${authProvider.firebaseUser?.uid}, UserModel: ${authProvider.userModel?.toJson()}");
-
-        // If AuthProvider is still figuring out the auth state, show loading.
-        if (authProvider.authStatus == AuthStatus.unknown) {
-          print("MainWrapper: AuthStatus is Unknown. Showing initial loading indicator.");
-          return const Scaffold(body: Center(child: CircularProgressIndicator(key: ValueKey("MainWrapperInitialLoading"))));
-        }
-
-        // If authenticated but profile is not complete, redirect to ProfileSetupScreen.
-        if (authProvider.authStatus == AuthStatus.authenticated && 
-            !authProvider.isProfileComplete) { 
-          print("MainWrapper: Condition MET - Authenticated AND profile NOT complete. Redirecting to ProfileSetupScreen.");
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && ModalRoute.of(context)?.settings.name != AppRoutes.profileSetup) {
-                 print("MainWrapper: Navigating to ProfileSetupScreen via addPostFrameCallback.");
-                 Navigator.pushNamedAndRemoveUntil(context, AppRoutes.profileSetup, (route) => false);
-            }
-          });
-          // Return a loading indicator or placeholder while redirecting to avoid flicker
-          return const Scaffold(body: Center(child: CircularProgressIndicator(key: ValueKey("MainWrapperRedirectLoading"))));
-        }
-        
-        print("MainWrapper: Condition NOT MET or passed. Proceeding to show main content.");
-        return Scaffold(
-          appBar: AppBar(
-        
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        
-        title:  Text(
-          _screenTitles[_selectedIndex],
-          style: TextStyle(
-            color: Color(0xFF0F3057),
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
+    return Scaffold(
+     appBar: AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      // leading: IconButton(
+      //   icon: const Icon(Icons.menu, color: Colors.black),
+      //   onPressed: () {},
+      // ),
+      title: const Text(
+        'Cloud Ironing',
+        style: TextStyle(
+          color: Colors.black,
+          fontWeight: FontWeight.bold,
+          fontSize: 22,
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none_outlined, color: Color(0xFF0F3057)),
-            onPressed: () {
-              print('Notifications tapped');
-            },
-            
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline, color: Color(0xFF0F3057)),
-            onPressed: () {
-              print('Profile tapped');
-            },
-          ),
-          const SizedBox(width: 4),
-        ],
       ),
-          body: IndexedStack(
-            index: _selectedIndex,
-            children: _screens,
-          ),
-          bottomNavigationBar: BottomNavigation(
-            selectedIndex: _selectedIndex,
-            onItemTapped: _onItemTapped,
-          ),
-        );
-      },
+      centerTitle: true,
+      // actions: [
+      //   IconButton(
+      //     icon: const Icon(Icons.notifications_outlined, color: Colors.black),
+      //     onPressed: () {},
+      //   ),
+      //   IconButton(
+      //     icon: const Icon(Icons.person_outline, color: Colors.black),
+      //     onPressed: () {},
+      //   ),
+      // ],
+    ),
+      body: _screens[_currentIndex],
+      bottomNavigationBar: BottomNavigation(
+        selectedIndex: _currentIndex,
+        onItemTapped: _onTap,
+      ),
     );
   }
 }

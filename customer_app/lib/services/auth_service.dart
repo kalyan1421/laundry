@@ -5,17 +5,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../core/errors/app_exceptions.dart';
 import '../core/utils/id_utils.dart'; // Import IdUtils
+import 'throttle_service.dart'; // Import ThrottleService
 
 // Added imports for QR code generation and storage
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui; // For ui.Image
+import 'dart:io' as io;
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance; // Added FirebaseStorage instance
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  
+  // Rate limiting variables
+  static DateTime? _lastOtpRequest;
+  static const Duration _otpCooldownDuration = Duration(minutes: 1);
+  static String? _lastPhoneNumber; // Added FirebaseStorage instance
 
   // Current user
   User? get currentUser => _auth.currentUser;
@@ -23,7 +30,7 @@ class AuthService {
   // Auth state stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  // Send OTP to phone number with enhanced debugging
+  // Send OTP to phone number with enhanced debugging and dual-layer rate limiting
   Future<String> sendOTP({
     required String phoneNumber,
     required Function(PhoneAuthCredential) verificationCompleted,
@@ -34,8 +41,43 @@ class AuthService {
     try {
       String completePhoneNumber = '+91$phoneNumber';
       
+      // 🔒 LAYER 1: Client-side rate limiting
+      final now = DateTime.now();
+      if (_lastOtpRequest != null && 
+          _lastPhoneNumber == completePhoneNumber &&
+          now.difference(_lastOtpRequest!) < _otpCooldownDuration) {
+        final remainingTime = _otpCooldownDuration - now.difference(_lastOtpRequest!);
+        final remainingSeconds = remainingTime.inSeconds;
+        print('🔥 ⏱️ Client-side rate limit hit. Please wait ${remainingSeconds} seconds before requesting another OTP.');
+        final rateLimitException = FirebaseAuthException(
+          code: 'rate-limit', 
+          message: 'Please wait ${remainingSeconds} seconds before requesting another OTP for this number.'
+        );
+        verificationFailed(rateLimitException);
+        return completePhoneNumber;
+      }
+      
+      // 🔒 LAYER 2: Server-side throttling check
+      print('🔒 Checking server-side throttling...');
+      final throttleResult = await ThrottleService.checkThrottle(completePhoneNumber);
+      print('🔒 Throttle result: $throttleResult');
+      
+      if (!throttleResult.isAllowed) {
+        print('🔒 ❌ Server-side throttling blocked the request');
+        final serverThrottleException = FirebaseAuthException(
+          code: throttleResult.isBlocked ? 'account-blocked' : 'server-rate-limit',
+          message: throttleResult.reason ?? 'Request blocked by server-side throttling.'
+        );
+        verificationFailed(serverThrottleException);
+        return completePhoneNumber;
+      }
+      
       print('🔥 Firebase Auth: Starting OTP process');
       print('🔥 Phone Number: $completePhoneNumber');
+      
+      // Record this request for client-side rate limiting
+      _lastOtpRequest = now;
+      _lastPhoneNumber = completePhoneNumber;
       print('🔥 Firebase App: ${_auth.app.name}');
       print('🔥 Current User: ${_auth.currentUser?.uid ?? 'None'}');
       
@@ -48,12 +90,20 @@ class AuthService {
         verificationFailed: (FirebaseAuthException e) {
           print('🔥 ❌ Verification failed: ${e.code} - ${e.message}');
           print('🔥 Stack trace: ${e.stackTrace}');
+          
+          // Record failed attempt in server-side throttling
+          ThrottleService.recordAttempt(completePhoneNumber, isSuccessful: false);
+          
           _handleVerificationError(e, verificationFailed);
         },
         codeSent: (String verificationId, int? resendToken) {
           print('🔥 ✅ Code sent successfully');
           print('🔥 Verification ID: $verificationId');
           print('🔥 Resend Token: $resendToken');
+          
+          // Record successful OTP request in server-side throttling
+          ThrottleService.recordAttempt(completePhoneNumber, isSuccessful: true);
+          
           codeSent(verificationId, resendToken);
         },
         codeAutoRetrievalTimeout: (String verificationId) {
@@ -87,7 +137,16 @@ class AuthService {
         errorMessage = 'The phone number format is invalid.';
         break;
       case 'too-many-requests':
-        errorMessage = 'Too many requests. Please try again later.';
+        errorMessage = 'Too many requests. Please try again later (15-30 minutes).';
+        break;
+      case 'rate-limit':
+        errorMessage = e.message ?? 'Please wait before requesting another OTP.';
+        break;
+      case 'server-rate-limit':
+        errorMessage = e.message ?? 'Server rate limit exceeded. Please try again later.';
+        break;
+      case 'account-blocked':
+        errorMessage = e.message ?? 'Your account has been temporarily blocked due to excessive requests.';
         break;
       case 'quota-exceeded':
         errorMessage = 'SMS quota exceeded. Please try again later.';
@@ -103,14 +162,12 @@ class AuthService {
         break;
       case 'unknown':
         // This often happens with Play Integrity issues in debug mode
-        if (kDebugMode) {
-          errorMessage = 'Verification failed in debug mode. This is often due to Firebase configuration issues. Please:\n'
-                       '1. Check SHA-1 fingerprints in Firebase console\n'
-                       '2. Ensure google-services.json is up to date\n'
-                       '3. Try on a real device instead of emulator';
-        } else {
-          errorMessage = 'Unknown error occurred. Please try again.';
-        }
+        errorMessage = 'Authentication verification failed. This could be due to:\n'
+                     '1. Network connectivity issues\n'
+                     '2. Firebase configuration mismatch\n'
+                     '3. Rate limiting - please wait a few minutes\n'
+                     '4. App verification issues\n\n'
+                     'Please try again in a few minutes.';
         break;
       case 'network-request-failed':
         errorMessage = 'Network error. Please check your internet connection.';
@@ -130,7 +187,7 @@ class AuthService {
   }
 
   // Verify OTP and sign in with enhanced debugging
-  Future<UserCredential> verifyOTPAndSignIn({
+  Future<UserModel> verifyOTPAndSignIn({
     required String verificationId,
     required String otp,
   }) async {
@@ -153,16 +210,12 @@ class AuthService {
       print('🔥 Phone: ${userCredential.user?.phoneNumber}');
       
       if (userCredential.user != null) {
-        bool docCreated = await _createOrUpdateUserDocument(userCredential.user!);
-        if (!docCreated) {
-          await _auth.signOut();
-          throw AuthException('Failed to setup user account. Please try again.');
-        }
+        UserModel userModel = await _createOrUpdateUserDocument(userCredential.user!);
+        return userModel;
       } else {
         throw AuthException('User is null after successful credential sign-in.');
       }
       
-      return userCredential;
     } on FirebaseAuthException catch (e) {
       print('🔥 ❌ Firebase Auth Exception: ${e.code} - ${e.message}');
       print('🔥 Stack trace: ${e.stackTrace}');
@@ -189,8 +242,33 @@ class AuthService {
     }
   }
 
-  // Create or update user document in Firestore
-  Future<bool> _createOrUpdateUserDocument(User user) async {
+  // Sign in with phone credential and return UserModel
+  Future<UserModel> signInWithPhoneCredential(PhoneAuthCredential credential) async {
+    try {
+      print('🔥 Signing in with phone credential.');
+      final userCredential = await _auth.signInWithCredential(credential);
+      
+      print('🔥 ✅ Signed in with credential successful');
+      print('🔥 User ID: ${userCredential.user?.uid}');
+      
+      if (userCredential.user != null) {
+        final userModel = await _createOrUpdateUserDocument(userCredential.user!);
+        return userModel;
+      } else {
+        throw AuthException('User is null after successful credential sign-in.');
+      }
+    } on FirebaseAuthException catch (e) {
+      print('🔥 ❌ Firebase Auth Exception during credential sign-in: ${e.code} - ${e.message}');
+      throw AuthException('Failed to sign in with credential: ${e.message}');
+    } catch (e) {
+      print('🔥 ❌ General exception during credential sign-in: $e');
+      if (e is AuthException) rethrow;
+      throw AuthException('An unknown error occurred during credential sign-in.');
+    }
+  }
+
+  // Create or update user document in Firestore and return UserModel
+  Future<UserModel> _createOrUpdateUserDocument(User user) async {
     try {
       print('🔥 Creating/updating user document for: ${user.uid}');
       DocumentReference userDoc = _firestore.collection('customer').doc(user.uid);
@@ -210,11 +288,10 @@ class AuthService {
           'name': '',
           'email': user.email ?? '',
           'profileImageUrl': user.photoURL ?? '',
-          // 'addresses': [], // Addresses are now a subcollection
           'isProfileComplete': false,
           'role': 'customer',
           'createdAt': FieldValue.serverTimestamp(),
-          'qrCodeUrl': null, // Initialize qrCodeUrl as null
+          'qrCodeUrl': null,
         });
         print('🔥 Creating new user document with data: $userData');
       } else {
@@ -228,18 +305,46 @@ class AuthService {
           userData['clientId'] = clientId;
           print('🔥 Adding missing Client ID to existing user: $clientId');
         }
-         if (!existingData.containsKey('qrCodeUrl')) {
-          userData['qrCodeUrl'] = null; // Ensure qrCodeUrl field exists if user is old
+        if (!existingData.containsKey('qrCodeUrl')) {
+          userData['qrCodeUrl'] = null;
         }
       }
 
       await userDoc.set(userData, SetOptions(merge: true));
       print('🔥 ✅ User document saved successfully for UID: ${user.uid}');
-      return true;
+      
+      // Add a small delay and retry mechanism to handle Firestore eventual consistency
+      int retryCount = 0;
+      const maxRetries = 3;
+      const retryDelay = Duration(milliseconds: 500);
+      
+      while (retryCount < maxRetries) {
+        try {
+          // Small delay to allow Firestore to propagate the write
+          if (retryCount > 0) {
+            await Future.delayed(retryDelay);
+          }
+          
+          DocumentSnapshot newSnapshot = await userDoc.get();
+          if (newSnapshot.exists) {
+            print('🔥 ✅ User document successfully fetched after ${retryCount} retries for UID: ${user.uid}');
+            return UserModel.fromFirestore(newSnapshot as DocumentSnapshot<Map<String, dynamic>>);
+          } else {
+            print('🔥 ⚠️ User document still not found, retry ${retryCount + 1}/${maxRetries}');
+          }
+        } catch (e) {
+          print('🔥 ⚠️ Error fetching user document on retry ${retryCount + 1}: $e');
+        }
+        retryCount++;
+      }
+      
+      // If all retries failed, throw an exception
+      throw AuthException('Failed to fetch user document after creation. Please try signing in again.');
+
     } catch (e, stackTrace) {
       print('🔥 ❌ Error creating/updating user document for UID ${user.uid}: $e');
       print('🔥 Stack trace: $stackTrace');
-      return false;
+      throw AuthException('Failed to create or update user profile.');
     }
   }
 
@@ -248,14 +353,16 @@ class AuthService {
     try {
       DocumentReference userDoc = _firestore.collection('customer').doc(user.uid);
       DocumentSnapshot snapshot = await userDoc.get();
+
       if (!snapshot.exists) {
         print('🔥 User document missing for ${user.uid}, creating with defaults.');
-        return await _createOrUpdateUserDocument(user);
+        await _createOrUpdateUserDocument(user);
+        return true;
       }
       print('🔥 User document already exists for ${user.uid}.');
-      return true; // Document already exists
+      return true;
     } catch (e, stackTrace) {
-      print('🔥 ❌ Error in ensureUserDocument for UID ${user.uid}: $e');
+      print('🔥 ❌ Error ensuring user document for ${user.uid}: $e');
       print('🔥 Stack trace: $stackTrace');
       return false;
     }
@@ -363,60 +470,49 @@ class AuthService {
     required String uid,
     String? name,
     String? email,
-    String? profileImageUrl,
-    Map<String, dynamic>? additionalData,
+    String? profilePhotoUrl,
   }) async {
     try {
       print('🔥 Updating user profile for: $uid');
       
-      Map<String, dynamic> updateData = {
+      Map<String, dynamic> dataToUpdate = {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      if (name != null) updateData['name'] = name;
-      if (email != null) updateData['email'] = email;
-      if (profileImageUrl != null) updateData['profileImageUrl'] = profileImageUrl;
+      if (name != null) dataToUpdate['name'] = name;
+      if (email != null) dataToUpdate['email'] = email;
+      if (profilePhotoUrl != null) dataToUpdate['profileImageUrl'] = profilePhotoUrl;
       
-      bool shouldGenerateQr = false;
-      if (additionalData != null) {
-        updateData.addAll(additionalData);
-        if (additionalData['isProfileComplete'] == true) {
-          shouldGenerateQr = true;
+      // Check if profile is now complete
+      DocumentSnapshot<Map<String, dynamic>> userDoc = await _firestore.collection('customer').doc(uid).get();
+      if (userDoc.exists) {
+        final currentData = userDoc.data()!;
+        final newName = name ?? currentData['name'];
+        final newEmail = email ?? currentData['email'];
+
+        if (newName.isNotEmpty && newEmail.isNotEmpty) {
+          dataToUpdate['isProfileComplete'] = true;
         }
       }
 
-      if (shouldGenerateQr) {
-        // Fetch the user document to get clientId and check existing qrCodeUrl
-        DocumentSnapshot userDoc = await _firestore.collection('customer').doc(uid).get();
-        if (userDoc.exists) {
-          Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-          String? existingQrCodeUrl = userData['qrCodeUrl'] as String?;
-          String? clientId = userData['clientId'] as String?;
-
-          if (clientId != null && clientId.isNotEmpty && existingQrCodeUrl == null) {
-            print('🔥 Profile complete, generating QR code for user $uid with clientId $clientId');
-            String? newQrCodeUrl = await _generateAndStoreQrCode(uid, clientId);
-            if (newQrCodeUrl != null) {
-              updateData['qrCodeUrl'] = newQrCodeUrl;
-            } else {
-              print('🔥 ⚠️ Failed to generate QR code, will not update qrCodeUrl field.');
-            }
-          } else if (clientId == null || clientId.isEmpty) {
-             print('🔥 ⚠️ Cannot generate QR code: clientId is missing for user $uid.');
-          } else if (existingQrCodeUrl != null) {
-             print('🔥 QR code URL already exists for user $uid. Skipping generation.');
-          }
-        } else {
-           print('🔥 ⚠️ User document not found when trying to generate QR code for $uid.');
-        }
-      }
-
-      await _firestore.collection('customer').doc(uid).update(updateData);
+      await _firestore.collection('customer').doc(uid).update(dataToUpdate);
       print('🔥 ✅ User profile updated successfully');
     } catch (e, stackTrace) {
       print('🔥 ❌ Error updating user profile: $e');
       print('🔥 Stack trace: $stackTrace');
       throw DatabaseException('Failed to update profile: ${e.toString()}');
+    }
+  }
+
+  // Upload profile photo and get URL
+  Future<String> uploadProfilePhoto(String filePath, String uid) async {
+    try {
+      final ref = _storage.ref().child('profile_photos').child('$uid.jpg');
+      final uploadTask = await ref.putFile(io.File(filePath));
+      final url = await uploadTask.ref.getDownloadURL();
+      return url;
+    } catch (e) {
+      throw StorageException('Failed to upload profile photo: ${e.toString()}');
     }
   }
 
@@ -508,6 +604,16 @@ class AuthService {
       print('🔥 ❌ Error in forceResendOTP: $e');
       print('🔥 Stack trace: $stackTrace');
       throw AuthException('Failed to resend OTP: ${e.toString()}');
+    }
+  }
+
+  // Update user profile
+  Future<void> updateProfile(String uid, Map<String, dynamic> data) async {
+    try {
+      await _firestore.collection('customer').doc(uid).update(data);
+    } catch (e) {
+      // Handle errors, maybe throw a custom exception
+      throw AuthException('Failed to update profile.');
     }
   }
 }

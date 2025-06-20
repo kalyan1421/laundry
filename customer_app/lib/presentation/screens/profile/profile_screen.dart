@@ -5,6 +5,7 @@ import 'package:customer_app/presentation/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -72,9 +73,7 @@ class ProfileScreen extends StatelessWidget {
                   context,
                   Icons.payment_outlined,
                   'Payment Methods',
-                  () { /* TODO: Navigate to Payment Methods Screen */ 
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment Methods: TBD')));
-                  },
+                  () => Navigator.pushNamed(context, AppRoutes.paymentMethods),
                 ),
               ],
             ),
@@ -86,9 +85,7 @@ class ProfileScreen extends StatelessWidget {
                   context,
                   Icons.notifications_none_outlined,
                   'Notifications',
-                  () { /* TODO: Navigate to Notifications Screen */ 
-                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notifications: TBD')));
-                  },
+                  () => Navigator.pushNamed(context, AppRoutes.notificationPreferences),
                 ),
                 _buildMenuItem(
                   context,
@@ -102,9 +99,7 @@ class ProfileScreen extends StatelessWidget {
                   context,
                   Icons.star_border_outlined,
                   'Ironing Preferences',
-                  () { /* TODO: Navigate to Ironing Preferences Screen */ 
-                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ironing Preferences: TBD')));
-                  },
+                  () => Navigator.pushNamed(context, AppRoutes.ironingPreferences),
                 ),
               ],
             ),
@@ -124,9 +119,7 @@ class ProfileScreen extends StatelessWidget {
                   context,
                   Icons.favorite_border_outlined,
                   'Saved Items',
-                  () { /* TODO: Navigate to Saved Items Screen */ 
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved Items: TBD')));
-                  },
+                  () => Navigator.pushNamed(context, AppRoutes.savedItems),
                 ),
                 _buildMenuItem(
                   context,
@@ -146,9 +139,7 @@ class ProfileScreen extends StatelessWidget {
                   context,
                   Icons.help_outline_outlined,
                   'Help & Support',
-                  () { /* TODO: Navigate to Help & Support Screen */ 
-                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help & Support: TBD')));
-                  },
+                  () => Navigator.pushNamed(context, AppRoutes.helpSupport),
                 ),
                 _buildMenuItem(
                   context,
@@ -162,9 +153,7 @@ class ProfileScreen extends StatelessWidget {
                   context,
                   Icons.settings_outlined,
                   'App Settings',
-                  () { /* TODO: Navigate to App Settings Screen */ 
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('App Settings: TBD')));
-                  },
+                  () => Navigator.pushNamed(context, AppRoutes.appSettings),
                 ),
               ],
             ),
@@ -177,10 +166,6 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildUserInfoHeader(BuildContext context, UserModel user) {
-    // Edit icon for the header conceptually (actual AppBar action might be in MainWrapper)
-    // For this self-contained example, adding it directly in the body for visual representation.
-    // If MainWrapper's AppBar is used, this edit button might be redundant or placed differently.
-    
     Widget profileImageWidget;
     if (user.profileImageUrl != null && user.profileImageUrl!.isNotEmpty) {
       profileImageWidget = CachedNetworkImage(
@@ -207,81 +192,256 @@ class ProfileScreen extends StatelessWidget {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(20.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children:[
-        const SizedBox(height: 10),
-          profileImageWidget,
-          const SizedBox(width: 30),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
         children: [
-         
-          
-          const SizedBox(height: 12),
-          Text(
-            user.name.isNotEmpty ? user.name : 'N/A',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              profileImageWidget,
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            user.name.isNotEmpty ? user.name : 'Complete your profile',
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit, size: 20),
+                          onPressed: () => Navigator.pushNamed(context, AppRoutes.editProfile),
+                          color: const Color(0xFF0F3057),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    if (user.phoneNumber.isNotEmpty)
+                      Row(
+                        children: [
+                          Icon(Icons.phone_outlined, size: 16, color: Colors.grey[700]),
+                          const SizedBox(width: 6),
+                          Text(user.formattedPhoneNumber, style: TextStyle(fontSize: 15, color: Colors.grey[700])),
+                        ],
+                      ),
+                    const SizedBox(height: 4),
+                    if (user.email.isNotEmpty)
+                      Row(
+                        children: [
+                          Icon(Icons.email_outlined, size: 16, color: Colors.grey[700]),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(user.email, style: TextStyle(fontSize: 15, color: Colors.grey[700])),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 8),
+                    // Member since and profile completion
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Member since ${_formatDate(user.createdAt)}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          user.isProfileComplete ? Icons.verified : Icons.warning,
+                          size: 14,
+                          color: user.isProfileComplete ? Colors.green : Colors.orange,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          user.isProfileComplete ? 'Profile Complete' : 'Complete your profile',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: user.isProfileComplete ? Colors.green : Colors.orange,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          if (user.phoneNumber.isNotEmpty)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.phone_outlined, size: 16, color: Colors.grey[700]),
-                const SizedBox(width: 6),
-                Text(user.formattedPhoneNumber, style: TextStyle(fontSize: 15, color: Colors.grey[700])),
-              ],
+          if (user.clientId != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F3057).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.qr_code, size: 16, color: const Color(0xFF0F3057)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'ID: ${user.clientId}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F3057),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          const SizedBox(height: 4),
-          if (user.email.isNotEmpty)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.email_outlined, size: 16, color: Colors.grey[700]),
-                const SizedBox(width: 6),
-                Text(user.email, style: TextStyle(fontSize: 15, color: Colors.grey[700])),
-              ],
-            ),
+          ],
         ],
       ),
-      ]),
-      
     );
+  }
+
+  String _formatDate(dynamic timestamp) {
+    if (timestamp == null) return 'Recently';
+    try {
+      DateTime date;
+      if (timestamp is Timestamp) {
+        date = timestamp.toDate();
+      } else if (timestamp is DateTime) {
+        date = timestamp;
+      } else {
+        return 'Recently';
+      }
+      
+      final now = DateTime.now();
+      final difference = now.difference(date);
+      
+      if (difference.inDays < 30) {
+        return '${difference.inDays} days ago';
+      } else if (difference.inDays < 365) {
+        final months = (difference.inDays / 30).floor();
+        return '$months month${months > 1 ? 's' : ''} ago';
+      } else {
+        final years = (difference.inDays / 365).floor();
+        return '$years year${years > 1 ? 's' : ''} ago';
+      }
+    } catch (e) {
+      return 'Recently';
+    }
   }
 
   Widget _buildStatsBar(BuildContext context, UserModel user) {
-    // Static data for now for Orders and Credits
-    // Address count can be dynamic
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.only(top:0, bottom: 16.0, left: 16.0, right: 16.0),
+      padding: const EdgeInsets.only(top: 0, bottom: 16.0, left: 16.0, right: 16.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem(user.orderCount.toString(), 'Orders'), // Use user.orderCount
-          _buildStatItem(user.addresses.length.toString(), 'Addresses'),
-          _buildStatItem('₹0', 'Credits'), // Placeholder - TODO: Implement credits
+          _buildStatItem(
+            user.orderCount.toString(),
+            'Orders',
+            Icons.shopping_bag_outlined,
+            () => Provider.of<BottomNavigationProvider>(context, listen: false).selectedIndex = 1,
+          ),
+          _buildStatItem(
+            user.addresses.length.toString(),
+            'Addresses',
+            Icons.location_on_outlined,
+            () => Navigator.pushNamed(context, AppRoutes.manageAddresses),
+          ),
+          _buildStatItem(
+            '₹0',
+            'Wallet',
+            Icons.account_balance_wallet_outlined,
+            () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Wallet feature coming soon!')),
+            ),
+          ),
+          _buildStatItem(
+            _calculateLoyaltyPoints(user.orderCount).toString(),
+            'Points',
+            Icons.stars_outlined,
+            () => _showLoyaltyDialog(context),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String value, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F3057))),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+  int _calculateLoyaltyPoints(int orderCount) {
+    // Simple loyalty calculation: 10 points per order
+    return orderCount * 10;
+  }
+
+  void _showLoyaltyDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Loyalty Points'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Earn points with every order!'),
+            const SizedBox(height: 12),
+            const Text('• 10 points per order'),
+            const Text('• 50 points for referrals'),
+            const Text('• Bonus points on special occasions'),
+            const SizedBox(height: 12),
+            const Text('Redeem points for discounts and free services.'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String value, String label, IconData icon, VoidCallback onTap) {
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 20, color: const Color(0xFF0F3057)),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F3057),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[700],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -1,13 +1,14 @@
+// main.dart - Simplified version
 import 'package:admin_panel/firebase_options.dart';
 import 'package:admin_panel/providers/auth_provider.dart';
 import 'package:admin_panel/screens/login/login_screen.dart';
-import 'package:admin_panel/screens/admin/first_admin_signup_screen.dart';
 import 'package:admin_panel/screens/login/otp_verification_screen.dart';
 import 'package:admin_panel/screens/admin/admin_home.dart';
+import 'package:admin_panel/screens/admin/order_details_screen.dart';
 import 'package:admin_panel/screens/delivery/delivery_home.dart';
-import 'package:admin_panel/services/fcm_service.dart';
+import 'package:admin_panel/screens/delivery/task_detail_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/item_provider.dart';
@@ -16,6 +17,9 @@ import 'providers/banner_provider.dart';
 import 'providers/offer_provider.dart';
 import 'providers/dashboard_provider.dart';
 import 'providers/user_provider.dart';
+import 'services/fcm_service.dart';
+import 'services/database_service.dart';
+import 'models/order_model.dart';
 
 // Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -26,8 +30,9 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // Set the background messaging handler from FcmService
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  // Initialize FCM service
+  final fcmService = FcmService();
+  await fcmService.initialize(null);
   
   runApp(const AdminPanelApp());
 }
@@ -46,11 +51,12 @@ class AdminPanelApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => OfferProvider()),
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
+        Provider<DatabaseService>(create: (_) => DatabaseService()),
       ],
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         title: 'Laundry Management Admin Panel',
-        navigatorKey: navigatorKey,
         theme: ThemeData(
           primarySwatch: Colors.blue,
           fontFamily: 'Poppins',
@@ -73,19 +79,10 @@ class AdminPanelApp extends StatelessWidget {
         home: const AuthWrapper(),
         routes: {
           '/login': (context) => const LoginScreen(),
-          // '/admin-signup': (context) => const FirstAdminSignupScreen(),
           '/admin-home': (context) => const AdminHome(),
           '/delivery-home': (context) => const DeliveryHome(),
-          '/admin_order_details': (context) {
-            final String? orderId = ModalRoute.of(context)?.settings.arguments as String?;
-            if (orderId != null) {
-              return AdminOrderDetailsScreen(orderId: orderId);
-            }            
-            return const Scaffold(body: Center(child: Text('Error: Order ID missing')));
-          },
         },
         onGenerateRoute: (settings) {
-          // Handle dynamic routes like OTP verification
           if (settings.name == '/otp-verification') {
             final args = settings.arguments as Map<String, dynamic>?;
             if (args != null) {
@@ -93,8 +90,21 @@ class AdminPanelApp extends StatelessWidget {
                 builder: (context) => OTPVerificationScreen(
                   phoneNumber: args['phoneNumber'] as String,
                   expectedRole: args['expectedRole'] as UserRole,
-                  // registrationDetails: args['registrationDetails'] as Map<String, dynamic>?,
                 ),
+              );
+            }
+          } else if (settings.name == '/order_details') {
+            final orderId = settings.arguments as String?;
+            if (orderId != null) {
+              return MaterialPageRoute(
+                builder: (context) => OrderDetailsScreen(orderId: orderId),
+              );
+            }
+          } else if (settings.name == '/task_details') {
+            final orderId = settings.arguments as String?;
+            if (orderId != null) {
+              return MaterialPageRoute(
+                builder: (context) => TaskDetailWrapper(orderId: orderId),
               );
             }
           }
@@ -112,78 +122,101 @@ class AuthWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
+        print('🔥 AuthWrapper: Status=${authProvider.authStatus}, Role=${authProvider.userRole}');
+        
+        // Show loading
         if (authProvider.authStatus == AuthStatus.loading) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            backgroundColor: Colors.white,
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Loading...'),
+                ],
+              ),
+            ),
+          );
         }
 
+        // If authenticated, show appropriate home screen
         if (authProvider.isAuthenticated && authProvider.userRole != null) {
           final role = authProvider.userRole!;
+          print('🔥 AuthWrapper: Authenticated user with role: $role');
+          
+          // Ensure FCM token is saved for delivery partners
+          if (role == UserRole.delivery) {
+            _ensureDeliveryFCMToken(authProvider);
+          }
+          
           switch (role) {
             case UserRole.admin:
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                FcmService().initialize(context);
-              });
               return const AdminHome();
             case UserRole.delivery:
               return const DeliveryHome();
           }
         }
         
-        // If not authenticated, always show LoginScreen.
-        // LoginScreen has its own logic to handle the first admin case.
+        // Show login screen
+        print('🔥 AuthWrapper: Not authenticated, showing LoginScreen');
         return const LoginScreen();
       },
     );
   }
+
+  void _ensureDeliveryFCMToken(AuthProvider authProvider) {
+    // Run FCM token check after the widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final fcmService = FcmService();
+        await fcmService.ensureDeliveryPartnerTokenSaved();
+        print('🔥 Delivery FCM token check completed');
+      } catch (e) {
+        print('🔥 Error ensuring delivery FCM token: $e');
+      }
+    });
+  }
 }
 
-class AdminOrderDetailsScreen extends StatelessWidget {
+// Wrapper widget to fetch order by ID and pass to TaskDetailScreen
+class TaskDetailWrapper extends StatelessWidget {
   final String orderId;
-  const AdminOrderDetailsScreen({super.key, required this.orderId});
+
+  const TaskDetailWrapper({super.key, required this.orderId});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Order #$orderId'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.receipt_long,
-              size: 64,
-              color: Colors.grey,
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('orders')
+          .doc(orderId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Order Details',
-              style: Theme.of(context).textTheme.headlineSmall,
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Error'),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Order ID: $orderId',
-              style: Theme.of(context).textTheme.bodyLarge,
+            body: const Center(
+              child: Text('Order not found'),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Order details implementation pending...',
-              style: TextStyle(
-                color: Colors.grey,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Go Back'),
-            ),
-          ],
-        ),
-      ),
+          );
+        }
+
+        final order = OrderModel.fromFirestore(snapshot.data! as DocumentSnapshot<Map<String, dynamic>>);
+
+        return TaskDetailScreen(order: order);
+      },
     );
   }
 }

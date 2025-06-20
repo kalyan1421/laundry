@@ -29,15 +29,12 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   bool _hasNavigated = false;
   bool _isDisposed = false;
   
-  // Store context-dependent values early
-  late final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey;
-  late final GlobalKey<NavigatorState> _navigatorKey;
+  final _formKey = GlobalKey<FormState>();
+  final _otpController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
-    _navigatorKey = GlobalKey<NavigatorState>();
     _startResendTimer();
   }
 

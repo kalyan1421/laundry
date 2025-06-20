@@ -1,7 +1,8 @@
-// providers/auth_provider.dart - Updated with session locking
+// providers/auth_provider.dart - Simplified version with fixes
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/fcm_service.dart';
 import 'dart:async';
 
 enum UserRole { admin, delivery }
@@ -11,6 +12,7 @@ enum OTPStatus { idle, sending, sent, verifying, verified, failed }
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FcmService _fcmService = FcmService();
   
   User? _user;
   Map<String, dynamic>? _userData;
@@ -22,11 +24,6 @@ class AuthProvider extends ChangeNotifier {
   String? _verificationId;
   String? _phoneNumber;
   StreamSubscription<User?>? _authSubscription;
-  bool _hasCheckedFirstAdmin = false;
-  bool _isFirstAdmin = false;
-  
-  // Session lock to prevent auth state changes during admin operations
-  bool _sessionLocked = false;
   
   // Getters
   User? get user => _user;
@@ -39,48 +36,21 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _authStatus == AuthStatus.authenticated;
   String? get verificationId => _verificationId;
   String? get phoneNumber => _phoneNumber;
-  bool get isFirstAdmin => _isFirstAdmin;
-  bool get hasCheckedFirstAdmin => _hasCheckedFirstAdmin;
-  bool get isSessionLocked => _sessionLocked;
   
   AuthProvider() {
     _initAuth();
-  }
-  
-  // Lock the current session (prevents auth state changes)
-  void lockSession() {
-    _sessionLocked = true;
-    print('🔥 Session locked for role: $_userRole');
-    notifyListeners();
-  }
-  
-  // Unlock the session
-  void unlockSession() {
-    _sessionLocked = false;
-    print('🔥 Session unlocked');
-    notifyListeners();
   }
   
   void _initAuth() {
     _authSubscription = _auth.authStateChanges().listen(
       (User? user) async {
         print('🔥 Auth state changed: ${user?.uid}');
-        print('🔥 Session locked: $_sessionLocked');
-        print('🔥 Current role: $_userRole');
-        
-        // If session is locked and we have a user, don't process auth changes
-        if (_sessionLocked && _user != null && _userRole != null) {
-          print('🔥 Session is locked, ignoring auth state change');
-          return;
-        }
         
         _user = user;
         
         if (user != null) {
-          // A user is authenticated with Firebase, now load their app-specific data.
           await _loadUserData(user.uid);
         } else {
-          // User is signed out.
           _userData = null;
           _userRole = null;
           _authStatus = AuthStatus.unauthenticated;
@@ -96,41 +66,142 @@ class AuthProvider extends ChangeNotifier {
     );
   }
 
-  // Load user data from Firestore with better error handling
+  // Load user data from Firestore
   Future<void> _loadUserData(String uid) async {
-    print('🔥 Loading user data for: $uid');
+    print('🔥 Loading user data for UID: $uid');
     try {
-      // Check admins collection
+      // Check admins collection first
       DocumentSnapshot adminDoc = await _firestore.collection('admins').doc(uid).get();
       if (adminDoc.exists && adminDoc.data() != null) {
         final data = adminDoc.data() as Map<String, dynamic>;
+        print('🔥 Admin doc found for UID: $data');
         if (data['isActive'] == true) {
           _userData = data;
           _userRole = UserRole.admin;
           _authStatus = AuthStatus.authenticated;
-          print('🔥 Admin user authenticated: $uid');
-          return; // Exit after finding the user
+          print('🔥 ✅ Admin user authenticated with UID: $uid');
+          return;
         }
       }
 
-      // Check delivery_personnel collection
-      DocumentSnapshot deliveryDoc = await _firestore.collection('delivery_personnel').doc(uid).get();
+      // If not found by UID, search through all admin documents
+      print('🔥 Admin not found by UID, searching all admin documents...');
+      final QuerySnapshot allAdmins = await _firestore.collection('admins').get();
+      
+      for (var doc in allAdmins.docs) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          print('🔥 Checking admin doc ${doc.id}: $data');
+          
+          // Check if this document's UID matches OR phone matches the current Firebase user's phone
+          final docUid = data['uid']?.toString();
+          final docPhone = data['phoneNumber']?.toString();
+          final currentUserPhone = _auth.currentUser?.phoneNumber;
+          
+          print('🔥 Admin - Doc UID: $docUid, Current UID: $uid');
+          print('🔥 Admin - Doc Phone: $docPhone, Current Phone: $currentUserPhone');
+          
+          bool uidMatch = docUid == uid;
+          
+          // Enhanced phone matching for admin - try multiple formats
+          bool phoneMatch = false;
+          if (currentUserPhone != null && docPhone != null) {
+            List<String> phoneFormats = [
+              currentUserPhone,                                // +919063290632
+              currentUserPhone.replaceAll('+91', ''),          // 9063290632
+              '+91${currentUserPhone.replaceAll('+91', '')}',  // +919063290632
+            ];
+            
+            List<String> docPhoneFormats = [
+              docPhone,                                        // Could be 9063290632 or +919063290632
+              docPhone.replaceAll('+91', ''),                  // 9063290632
+              '+91${docPhone.replaceAll('+91', '')}',          // +919063290632
+            ];
+            
+            // Check if any format matches
+            for (String userFormat in phoneFormats) {
+              for (String docFormat in docPhoneFormats) {
+                if (userFormat == docFormat) {
+                  phoneMatch = true;
+                  print('🔥 📞 ADMIN PHONE MATCH! User: "$userFormat" matches Doc: "$docFormat"');
+                  break;
+                }
+              }
+              if (phoneMatch) break;
+            }
+          }
+          
+          if ((uidMatch || phoneMatch) && data['isActive'] == true) {
+            // Update the document with correct UID if it was matched by phone
+            if (phoneMatch && docUid != uid) {
+              print('🔥 Updating admin doc ${doc.id} with correct UID: $uid');
+              await _firestore.collection('admins').doc(doc.id).update({'uid': uid});
+              data['uid'] = uid; // Update local data too
+            }
+            
+            _userData = data;
+            _userRole = UserRole.admin;
+            _authStatus = AuthStatus.authenticated;
+            print('🔥 ✅ Admin user found and authenticated: ${doc.id}');
+            return;
+          }
+        } catch (e) {
+          print('🔥 Error checking admin doc ${doc.id}: $e');
+        }
+      }
+
+      // Check delivery collection
+      DocumentSnapshot deliveryDoc = await _firestore.collection('delivery').doc(uid).get();
       if (deliveryDoc.exists && deliveryDoc.data() != null) {
         final data = deliveryDoc.data() as Map<String, dynamic>;
-        if (data['isActive'] == true) {
+        print('🔥 Delivery doc found for UID: $data');
+        if (data['isActive'] == true) { // Fixed: was checking == false
           _userData = data;
           _userRole = UserRole.delivery;
           _authStatus = AuthStatus.authenticated;
-          print('🔥 Delivery user authenticated: $uid');
-          return; // Exit after finding the user
+          print('🔥 ✅ Delivery user authenticated with UID: $uid');
+          return;
+        }
+      }
+
+      // If not found by UID, search through all delivery documents
+      print('🔥 Delivery not found by UID, searching all delivery documents...');
+      final QuerySnapshot allDelivery = await _firestore.collection('delivery').get();
+      
+      for (var doc in allDelivery.docs) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          print('🔥 Checking delivery doc ${doc.id}: $data');
+          
+          // Check if this document's UID matches OR phone matches
+          final docUid = data['uid']?.toString();
+          final docPhone = data['phoneNumber']?.toString();
+          final currentUserPhone = _auth.currentUser?.phoneNumber;
+          
+          bool uidMatch = docUid == uid;
+          bool phoneMatch = currentUserPhone != null && docPhone == currentUserPhone;
+          
+          if ((uidMatch || phoneMatch) && data['isActive'] == true) {
+            // Update the document with correct UID if it was matched by phone
+            if (phoneMatch && docUid != uid) {
+              print('🔥 Updating delivery doc ${doc.id} with correct UID: $uid');
+              await _firestore.collection('delivery').doc(doc.id).update({'uid': uid});
+              data['uid'] = uid; // Update local data too
+            }
+            
+            _userData = data;
+            _userRole = UserRole.delivery;
+            _authStatus = AuthStatus.authenticated;
+            print('🔥 ✅ Delivery user found and authenticated: ${doc.id}');
+            return;
+          }
+        } catch (e) {
+          print('🔥 Error checking delivery doc ${doc.id}: $e');
         }
       }
       
-      // If we reach here, the user is authenticated with Firebase but has no
-      // active, valid document in our database. This is the expected state
-      // for a delivery partner on their very first login.
-      // We set them as unauthenticated for app purposes so they are sent to the linking/login flow.
-      print('🔥 User data not found or inactive for UID: $uid. Treating as Unauthenticated for app flow.');
+      // User not found in our collections
+      print('🔥 ❌ User data not found for UID: $uid');
       _authStatus = AuthStatus.unauthenticated;
       _userRole = null;
       _userData = null;
@@ -138,163 +209,105 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       print('🔥 Error loading user data: $e');
       _error = 'Failed to load user profile.';
-      _authStatus = AuthStatus.unauthenticated; // On error, default to unauthenticated
+      _authStatus = AuthStatus.unauthenticated;
     }
   }
 
-  // Check if any admin exists in the system
-  Future<bool> checkIfFirstAdmin() async {
-    if (_hasCheckedFirstAdmin) {
-      return _isFirstAdmin;
-    }
-    
+  // Send OTP - Simple version
+  Future<bool> sendOTP(String phoneNumber, {required UserRole roleToCheck}) async {
     try {
-      print('🔥 Checking if first admin exists...');
-      
-      final QuerySnapshot adminSnapshot = await _firestore
-          .collection('admins')
-          .limit(1)
-          .get()
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              print('🔥 Admin check timeout - assuming not first admin');
-              throw TimeoutException('Admin check timeout');
-            },
-          );
-      
-      _isFirstAdmin = adminSnapshot.docs.isEmpty;
-      _hasCheckedFirstAdmin = true;
-      
-      print('🔥 Admin check result: isEmpty=${adminSnapshot.docs.isEmpty}, isFirstAdmin=$_isFirstAdmin');
-      return _isFirstAdmin;
-      
-    } catch (e) {
-      print('🔥 Error checking for first admin: $e');
-      _hasCheckedFirstAdmin = true;
-      _isFirstAdmin = false;
-      return false;
-    }
-  }
-
-  // Create first admin (signup)
-  Future<bool> createFirstAdmin({
-    required String phoneNumber,
-    required String name,
-    required String email,
-    required String verificationId,
-    required String otpCode,
-  }) async {
-    try {
-      print('🔥 Creating first admin...');
-      _isLoading = true;
-      _otpStatus = OTPStatus.verifying;
-      notifyListeners();
-
-      PhoneAuthCredential credential = PhoneAuthProvider.credential(
-        verificationId: verificationId,
-        smsCode: otpCode,
-      );
-      
-      UserCredential userCredential = await _auth.signInWithCredential(credential);
-      
-      if (userCredential.user == null) {
-        throw Exception('Authentication failed');
-      }
-
-      final adminData = {
-        'uid': userCredential.user!.uid,
-        'name': name,
-        'email': email,
-        'phoneNumber': phoneNumber,
-        'role': 'admin',
-        'isActive': true,
-        'permissions': ['all'],
-        'createdAt': Timestamp.now(),
-        'updatedAt': Timestamp.now(),
-        'createdBy': 'system',
-      };
-
-      await _firestore.collection('admins').doc(userCredential.user!.uid).set(adminData);
-
-      _userData = adminData;
-      _userRole = UserRole.admin;
-      _authStatus = AuthStatus.authenticated;
-      _otpStatus = OTPStatus.verified;
-      _error = null;
-      _isLoading = false;
-      _isFirstAdmin = false;
-      _hasCheckedFirstAdmin = true;
-      
-      print('🔥 First admin created successfully');
-      notifyListeners();
-      return true;
-
-    } on FirebaseAuthException catch (e) {
-      print('🔥 Firebase Auth Error: ${e.code} - ${e.message}');
-      _error = _getAuthErrorMessage(e);
-      _otpStatus = OTPStatus.failed;
-    } catch (e) {
-      print('🔥 Error creating first admin: $e');
-      _error = 'Failed to create admin account: ${e.toString()}';
-      _otpStatus = OTPStatus.failed;
-    }
-
-    _isLoading = false;
-    notifyListeners();
-    return false;
-  }
-
-  // Send OTP for phone verification
-  Future<bool> sendOTP(String phoneNumber, {UserRole? roleToCheck}) async {
-    try {
-      print('🔥 Sending OTP to: $phoneNumber');
+      print('🔥 Sending OTP to: $phoneNumber for role: $roleToCheck');
       _isLoading = true;
       _otpStatus = OTPStatus.sending;
       _error = null;
       notifyListeners();
 
-      String formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : '+91$phoneNumber';
+      String formattedPhone = phoneNumber.startsWith('+91') ? phoneNumber : '+91$phoneNumber';
       _phoneNumber = formattedPhone;
+      print('🔥 Formatted phone: $formattedPhone');
 
-      // If roleToCheck is provided, verify user exists in that role
-      if (roleToCheck != null) {
+      // For ADMIN: Check if admin exists with this phone number
+      if (roleToCheck == UserRole.admin) {
         try {
-          String collection = roleToCheck == UserRole.admin ? 'admins' : 'delivery';
+          print('🔥 Checking if admin exists with phone: $formattedPhone');
           
-          // For delivery partners, check both with formatted phone
-          final QuerySnapshot querySnapshot = await _firestore
-              .collection(collection)
-              .where('phoneNumber', isEqualTo: formattedPhone)
-              .limit(1)
+          // Get ALL documents from admins collection and check each one
+          final QuerySnapshot allAdmins = await _firestore
+              .collection('admins')
               .get();
-
-          if (querySnapshot.docs.isEmpty && roleToCheck == UserRole.admin) {
-            // Only show error for admin, not for delivery partners
+          
+          print('🔥 Total admin documents found: ${allAdmins.docs.length}');
+          
+          // Try different phone formats to match against
+          List<String> phoneFormats = [
+            formattedPhone,                          // +919063290632
+            phoneNumber.replaceAll('+91', ''),       // 9063290632
+            phoneNumber,                             // Original input
+          ];
+          
+          bool adminFound = false;
+          
+          // Check each admin document
+          for (var doc in allAdmins.docs) {
+            try {
+              final data = doc.data() as Map<String, dynamic>;
+              print('🔥 Checking admin doc ${doc.id}: $data');
+              
+              // Check if this admin is active
+              final isActive = data['isActive'] ?? false;
+              print('🔥 Admin ${doc.id} isActive: $isActive');
+              
+              if (isActive == true) {
+                // Get phone number from this document
+                final docPhone = data['phoneNumber']?.toString();
+                print('🔥 Admin ${doc.id} phone: "$docPhone"');
+                
+                // Check if any of our phone formats match this document's phone
+                for (String format in phoneFormats) {
+                  if (docPhone != null && docPhone == format) {
+                    print('🔥 ✅ MATCH FOUND! Admin ${doc.id} has phone "$docPhone" matching format "$format"');
+                    adminFound = true;
+                    break;
+                  }
+                }
+                
+                if (adminFound) break;
+              }
+            } catch (e) {
+              print('🔥 Error processing admin doc ${doc.id}: $e');
+            }
+          }
+          
+          if (!adminFound) {
+            print('🔥 ❌ No active admin found with any of these phone formats: $phoneFormats');
             _error = 'No admin account found with this phone number';
             _otpStatus = OTPStatus.failed;
             _isLoading = false;
             notifyListeners();
             return false;
-          }
-          
-          // For delivery partners, we proceed even if not found
-          // They might be logging in for the first time
-          if (querySnapshot.docs.isEmpty && roleToCheck == UserRole.delivery) {
-            print('🔥 Delivery partner not found, but proceeding - might be first login');
+          } else {
+            print('🔥 ✅ Admin verification successful!');
           }
           
         } catch (e) {
-          print('🔥 Warning: Could not verify user existence, proceeding with OTP: $e');
-          // Continue with OTP even if verification fails
+          print('🔥 Error checking admin existence: $e');
+          _error = 'Error verifying admin account: ${e.toString()}';
+          _otpStatus = OTPStatus.failed;
+          _isLoading = false;
+          notifyListeners();
+          return false;
         }
       }
 
+      // For DELIVERY: Don't check existence, just send OTP
+      // They might be logging in for the first time
+
+      // Send OTP via Firebase Auth
       await _auth.verifyPhoneNumber(
         phoneNumber: formattedPhone,
         verificationCompleted: (PhoneAuthCredential credential) async {
           print('🔥 Auto-verification completed');
-          await _signInWithCredential(credential);
+          await _signInWithCredential(credential, expectedRole: roleToCheck);
         },
         verificationFailed: (FirebaseAuthException e) {
           print('🔥 Verification failed: ${e.code} - ${e.message}');
@@ -329,7 +342,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // Verify OTP and sign in
-  Future<bool> verifyOTP(String otpCode, {UserRole? expectedRole}) async {
+  Future<bool> verifyOTP(String otpCode, {required UserRole expectedRole}) async {
     if (_verificationId == null) {
       _error = 'No verification ID found. Please request OTP again.';
       return false;
@@ -366,11 +379,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // Sign in with credential
-  Future<void> _signInWithCredential(PhoneAuthCredential credential, {UserRole? expectedRole}) async {
+  Future<void> _signInWithCredential(PhoneAuthCredential credential, {required UserRole expectedRole}) async {
     try {
-      print('🔥 Signing in with credential...');
-      print('🔥 Expected role: $expectedRole');
-      print('🔥 Phone number: $_phoneNumber');
+      print('🔥 Signing in with credential for role: $expectedRole');
       
       UserCredential userCredential = await _auth.signInWithCredential(credential);
       
@@ -378,58 +389,34 @@ class AuthProvider extends ChangeNotifier {
         throw Exception('Authentication failed');
       }
 
-      // Store the phone number for delivery partner lookup
-      String? phoneToUse = _phoneNumber ?? userCredential.user!.phoneNumber;
-      if (phoneToUse != null && expectedRole == UserRole.delivery) {
-        _phoneNumber = phoneToUse;
-      }
+      print('🔥 Firebase auth successful, UID: ${userCredential.user!.uid}');
 
       await _loadUserData(userCredential.user!.uid);
       
-      if (_userData != null) {
+      if (_userData != null && _userRole == expectedRole) {
         _authStatus = AuthStatus.authenticated;
         _otpStatus = OTPStatus.verified;
         _error = null;
+        print('🔥 Sign in successful for role: $_userRole');
         
-        // If it's a delivery partner logging in for the first time, mark as registered
-        if (_userRole == UserRole.delivery && _userData!['isRegistered'] == false) {
-          await _markDeliveryPartnerAsRegistered(userCredential.user!.uid);
-        }
-        
-        print('🔥 Sign in successful');
+        // Save FCM token after successful login
+        await _saveFCMTokenAfterLogin();
       } else {
+        // User authenticated with Firebase but not found in our collections for the expected role
         await _auth.signOut();
-        throw Exception('User data not found or inactive');
+        if (expectedRole == UserRole.admin) {
+          throw Exception('Admin account not found or inactive');
+        } else {
+          throw Exception('Delivery account not found or inactive');
+        }
       }
 
     } catch (e) {
       print('🔥 Sign in error: $e');
       _authStatus = AuthStatus.unauthenticated;
       _otpStatus = OTPStatus.failed;
+      _error = e.toString();
       throw e;
-    }
-  }
-
-  // Mark delivery partner as registered on first login
-  Future<void> _markDeliveryPartnerAsRegistered(String uid) async {
-    try {
-      await _firestore.collection('delivery').doc(uid).update({
-        'isRegistered': true,
-        'lastLoginAt': Timestamp.now(),
-        'updatedAt': Timestamp.now(),
-      });
-      
-      // Update local data
-      if (_userData != null) {
-        _userData!['isRegistered'] = true;
-        _userData!['lastLoginAt'] = Timestamp.now();
-        _userData!['updatedAt'] = Timestamp.now();
-      }
-      
-      print('🔥 Delivery partner marked as registered');
-    } catch (e) {
-      print('🔥 Error marking delivery partner as registered: $e');
-      // Don't throw error, this is not critical for authentication
     }
   }
 
@@ -464,11 +451,34 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Reset first admin check
-  void resetFirstAdminCheck() {
-    _hasCheckedFirstAdmin = false;
-    _isFirstAdmin = false;
-    notifyListeners();
+  // Save FCM token after login
+  Future<void> _saveFCMTokenAfterLogin() async {
+    try {
+      print('🔥 Saving FCM token after login for role: $_userRole');
+      
+      if (_userRole == UserRole.delivery) {
+        // For delivery partners, use the enhanced method
+        await _fcmService.ensureDeliveryPartnerTokenSaved();
+      } else {
+        // For admins, use the standard method
+        await _fcmService.saveFCMTokenAfterLogin();
+      }
+      
+      print('🔥 FCM token saved successfully');
+    } catch (e) {
+      print('🔥 Error saving FCM token after login: $e');
+      // Don't throw error as FCM is not critical for login flow
+    }
+  }
+
+  // Method to manually refresh FCM token (can be called from UI)
+  Future<void> refreshFCMToken() async {
+    try {
+      await _fcmService.saveFCMTokenAfterLogin();
+      print('🔥 FCM token refreshed successfully');
+    } catch (e) {
+      print('🔥 Error refreshing FCM token: $e');
+    }
   }
 
   // Sign out
@@ -476,16 +486,13 @@ class AuthProvider extends ChangeNotifier {
     try {
       print('🔥 Signing out...');
       
-      // Update online status for delivery partners
-      if (_userRole == UserRole.delivery && _user != null) {
-        try {
-          await _firestore.collection('delivery').doc(_user!.uid).update({
-            'isOnline': false,
-            'updatedAt': Timestamp.now(),
-          });
-        } catch (e) {
-          print('🔥 Warning: Could not update online status: $e');
-        }
+      // Delete FCM token before signing out
+      try {
+        await _fcmService.deleteTokenForCurrentUser();
+        print('🔥 FCM token deleted successfully');
+      } catch (e) {
+        print('🔥 Error deleting FCM token: $e');
+        // Continue with sign out even if token deletion fails
       }
       
       await _auth.signOut();
@@ -497,7 +504,7 @@ class AuthProvider extends ChangeNotifier {
       _verificationId = null;
       _phoneNumber = null;
       _error = null;
-      _sessionLocked = false;
+      
       notifyListeners();
     } catch (e) {
       print('🔥 Error signing out: $e');

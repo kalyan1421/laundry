@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:customer_app/core/routes/app_routes.dart';
 import 'package:customer_app/core/theme/app_colors.dart';
 import 'package:customer_app/core/theme/app_text_theme.dart';
@@ -6,6 +8,7 @@ import 'package:customer_app/presentation/widgets/common/custom_button.dart';
 import 'package:customer_app/presentation/widgets/common/custom_text_field.dart';
 import 'package:customer_app/presentation/widgets/common/loading_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import '../../../presentation/providers/auth_provider.dart';
 
@@ -20,6 +23,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _logger = Logger();
+  File? _imageFile;
 
   @override
   void dispose() {
@@ -28,40 +33,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     super.dispose();
   }
 
-  Future<void> _submitProfile() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final name = _nameController.text.trim();
-    final email = _emailController.text.trim();
-
-    bool success = await authProvider.updateProfile(
-      name: name,
-      email: email,
-      additionalData: {
-        'isProfileComplete': true,
-      },
-    );
-
-    if (!mounted) return;
-
-    print("ProfileSetupScreen: _submitProfile - After updateProfile call. success: $success, authProvider.isProfileComplete: ${authProvider.isProfileComplete}");
-
-    if (success && authProvider.isProfileComplete) { 
-      print("ProfileSetupScreen: Navigating to AddAddress. authProvider.isProfileComplete = ${authProvider.isProfileComplete}");
-      AppRoutes.navigateToAddAddress(context);
-    } else if (success && !authProvider.isProfileComplete) {
-      print("ProfileSetupScreen: Profile update reported success, but authProvider.isProfileComplete is false. UserID: ${authProvider.firebaseUser?.uid}, UserModel: ${authProvider.userModel?.toJson()}");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile status not updated immediately. Please try navigating again or check your connection.')),
+  void _submit() async {
+    if (_formKey.currentState!.validate()) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final success = await authProvider.updateProfile(
+        name: _nameController.text,
+        email: _emailController.text,
       );
-    } else { 
-      print("ProfileSetupScreen: Profile update failed. Error: ${authProvider.errorMessage}");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(authProvider.errorMessage ?? 'Failed to update profile. Please try again.')),
-      );
+
+      if (success) {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+      }
     }
   }
 
@@ -117,7 +99,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     ? const LoadingWidget()
                     : CustomButton(
                         text: 'Continue',
-                        onPressed: _submitProfile,
+                        onPressed: _submit,
                       ),
               ],
             ),

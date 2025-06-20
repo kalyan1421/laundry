@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBC7wDFaKRWSDYM10aPFfoLmVf2sSjhuxQ',
-    appId: '1:491316420371:android:d863532138463318bc84e6',
+    appId: '1:491316420371:android:b3af2a34528835e4bc84e6',
     messagingSenderId: '491316420371',
     projectId: 'laundry-management-57453',
     storageBucket: 'laundry-management-57453.firebasestorage.app',
@@ -59,10 +59,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBXiNKVWqHGIdauRiomI_Own_rqxOggyPE',
-    appId: '1:491316420371:ios:c2c54d606a5d9b95bc84e6',
+    appId: '1:491316420371:ios:9c3e6cfa74eede88bc84e6',
     messagingSenderId: '491316420371',
     projectId: 'laundry-management-57453',
     storageBucket: 'laundry-management-57453.firebasestorage.app',
-    iosBundleId: 'com.example.customerApp',
+    iosBundleId: 'com.cloudironingfactory.customer',
   );
+
 }

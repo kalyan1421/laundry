@@ -12,6 +12,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart'; // For LatLng
 import 'package:provider/provider.dart';
 import 'package:customer_app/core/routes/app_routes.dart';
+import 'package:geocoding/geocoding.dart';
 
 class AddAddressScreen extends StatefulWidget {
   const AddAddressScreen({super.key});
@@ -24,6 +25,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _doorNoController = TextEditingController();
+  final _floorController = TextEditingController();
   final _apartmentNameController = TextEditingController();
   final _streetController = TextEditingController();
   final _landmarkController = TextEditingController();
@@ -38,6 +40,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   @override
   void dispose() {
     _doorNoController.dispose();
+    _floorController.dispose();
     _apartmentNameController.dispose();
     _streetController.dispose();
     _landmarkController.dispose();
@@ -76,12 +79,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       }
 
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      setState(() {
-        _latitude = position.latitude;
-        _longitude = position.longitude;
-        _isFetchingLocation = false;
-      });
-       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Current location fetched: Lat: ${_latitude?.toStringAsFixed(4)}, Lon: ${_longitude?.toStringAsFixed(4)}')));
+      _updateLocationAndAddress(position.latitude, position.longitude);
+
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to get current location: ${e.toString()}')));
       setState(() => _isFetchingLocation = false);
@@ -95,11 +94,35 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     );
 
     if (selectedLocation != null) {
-      setState(() {
-        _latitude = selectedLocation.latitude;
-        _longitude = selectedLocation.longitude;
-      });
-       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Location selected from map: Lat: ${_latitude?.toStringAsFixed(4)}, Lon: ${_longitude?.toStringAsFixed(4)}')));
+      _updateLocationAndAddress(selectedLocation.latitude, selectedLocation.longitude);
+    }
+  }
+
+  Future<void> _updateLocationAndAddress(double lat, double lon) async {
+    setState(() {
+      _latitude = lat;
+      _longitude = lon;
+      _isFetchingLocation = true; // Show loading while geocoding
+    });
+
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lon);
+      if (placemarks.isNotEmpty) {
+        final Placemark place = placemarks.first;
+        _streetController.text = place.street ?? '';
+        _cityController.text = place.locality ?? '';
+        _pincodeController.text = place.postalCode ?? '';
+        _stateController.text = place.administrativeArea ?? '';
+        _apartmentNameController.text = place.subLocality ?? '';
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to get address details: ${e.toString()}')));
+    } finally {
+      if(mounted) {
+        setState(() {
+          _isFetchingLocation = false;
+        });
+      }
     }
   }
 
@@ -120,8 +143,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
     Map<String, dynamic> addressData = {
       'type': 'Home', // TODO: Allow user to select type
-      'addressLine1': _doorNoController.text.trim() + (_apartmentNameController.text.trim().isNotEmpty ? ", " + _apartmentNameController.text.trim() : ""),
-      'addressLine2': _streetController.text.trim(),
+      'addressLine1': 'Floor: ${_floorController.text.trim()}, Door: ${_doorNoController.text.trim()}',
+      'addressLine2': '${_apartmentNameController.text.trim()}, ${_streetController.text.trim()}',
       'landmark': _landmarkController.text.trim(),
       'city': _cityController.text.trim(),
       'state': _stateController.text.trim(),
@@ -197,7 +220,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                   child: Text(
                     'Selected: Lat: ${_latitude!.toStringAsFixed(4)}, Lon: ${_longitude!.toStringAsFixed(4)}',
                     textAlign: TextAlign.center,
-                    style: AppTextTheme.bodySmall.copyWith(color: AppColors.textSuccess),
+                    style: AppTextTheme.bodySmall.copyWith(color: AppColors.success),
                   ),
                 ),
               const SizedBox(height: 12),
@@ -215,17 +238,24 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
               ),
               const SizedBox(height: 16),
               CustomTextField(
+                controller: _floorController,
+                labelText: 'Floor',
+                hintText: 'e.g., 3rd Floor',
+                validator: (value) => Validators.validateGeneric(value, 'Floor'),
+              ),
+              const SizedBox(height: 16),
+              CustomTextField(
                 controller: _apartmentNameController,
                 labelText: 'Apartment / Building Name',
                 hintText: 'e.g., Sunshine Apartments',
-                validator: (value) => Validators.validateGeneric(value, 'Apartment Name'),
+                enabled: false,
               ),
               const SizedBox(height: 16),
               CustomTextField(
                 controller: _streetController,
                 labelText: 'Street Address / Area',
                 hintText: 'e.g., Main Street, Gandhi Nagar',
-                validator: (value) => Validators.validateAddress(value, fieldName: 'Street Address'),
+                enabled: false,
               ),
               const SizedBox(height: 16),
               CustomTextField(
@@ -238,7 +268,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 controller: _cityController,
                 labelText: 'City',
                 hintText: 'e.g., Hyderabad',
-                validator: Validators.validateCity,
+                enabled: false,
               ),
               const SizedBox(height: 16),
               CustomTextField(
@@ -246,14 +276,14 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 labelText: 'Pincode',
                 hintText: 'e.g., 500001',
                 keyboardType: TextInputType.number,
-                validator: Validators.validatePincode,
+                enabled: false,
               ),
               const SizedBox(height: 16),
               CustomTextField(
                 controller: _stateController,
                 labelText: 'State',
                 hintText: 'e.g., Telangana',
-                validator: Validators.validateState,
+                enabled: false,
               ),
               const SizedBox(height: 32),
               addressProvider.isLoading && !_isFetchingLocation

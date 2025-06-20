@@ -161,10 +161,7 @@ class _ManageBannersState extends State<ManageBanners> {
     final bannerProvider = Provider.of<BannerProvider>(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Banners'),
-        backgroundColor: Theme.of(context).primaryColor,
-      ),
+      
       body: StreamBuilder<List<BannerModel>>(
         stream: bannerProvider.getBannersStream(),
         builder: (context, snapshot) {

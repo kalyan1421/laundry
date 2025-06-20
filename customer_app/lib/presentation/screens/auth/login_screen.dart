@@ -8,9 +8,10 @@ import 'package:flutter/material.dart' hide TextButton;
 import 'package:flutter/material.dart' as material show TextButton;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import '../../providers/auth_provider.dart';
-import '../../widgets/common/custom_button.dart';
-import '../../widgets/common/loading_widget.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/common/error_text.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -23,6 +24,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final FocusNode _phoneFocusNode = FocusNode();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  
+  // Rate limiting countdown
+  Timer? _countdownTimer;
+  int _remainingSeconds = 0;
+  bool _isRateLimited = false;
 
   @override
   void initState() {
@@ -44,11 +50,43 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _phoneController.dispose();
     _phoneFocusNode.dispose();
+    _countdownTimer?.cancel();
     super.dispose();
+  }
+
+  void _startCountdown(int seconds) {
+    setState(() {
+      _isRateLimited = true;
+      _remainingSeconds = seconds;
+    });
+    
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _remainingSeconds--;
+        if (_remainingSeconds <= 0) {
+          _isRateLimited = false;
+          timer.cancel();
+        }
+      });
+    });
+  }
+  
+  void _extractCountdownFromError(String errorMessage) {
+    // Extract seconds from rate limit message
+    final regex = RegExp(r'(\d+) seconds');
+    final match = regex.firstMatch(errorMessage);
+    if (match != null) {
+      final seconds = int.tryParse(match.group(1) ?? '0') ?? 60;
+      _startCountdown(seconds);
+    } else {
+      _startCountdown(60); // Default to 60 seconds
+    }
   }
 
   void _sendOTP() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_isRateLimited) return; // Don't send if rate limited
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
@@ -70,6 +108,18 @@ class _LoginScreenState extends State<LoginScreen> {
       // Error handling is managed by the provider
       print('Error sending OTP: $e');
       
+      // Check if it's a rate limit error and start countdown
+      final errorMessage = authProvider.errorMessage ?? '';
+      if (errorMessage.contains('wait') && errorMessage.contains('seconds')) {
+        _extractCountdownFromError(errorMessage);
+      } else if (errorMessage.contains('Too many requests')) {
+        _startCountdown(15 * 60); // 15 minutes for too-many-requests
+      } else if (errorMessage.contains('Server rate limit')) {
+        _startCountdown(5 * 60); // 5 minutes for server rate limit
+      } else if (errorMessage.contains('blocked')) {
+        _startCountdown(2 * 60 * 60); // 2 hours for account blocked
+      }
+      
       // Show snackbar for additional feedback
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -80,6 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -343,30 +394,34 @@ class _LoginScreenState extends State<LoginScreen> {
       width: double.infinity,
       height: 52,
       child: ElevatedButton(
-        onPressed: isValid && !isLoading ? _sendOTP : null,
+        onPressed: isValid && !isLoading && !_isRateLimited ? _sendOTP : null,
         style: ElevatedButton.styleFrom(
           backgroundColor:
-              isValid && !isLoading
+              isValid && !isLoading && !_isRateLimited
                   ? const Color(0xFF0F3057)
-                  : const Color(0xFF0F3057).withOpacity(0.6), // Fixed opacity issue
+                  : const Color(0xFF0F3057).withOpacity(0.6),
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        child:
-            isLoading
+        child: _isRateLimited
+            ? Text(
+                'Try again in ${_remainingSeconds}s',
+                style: AppTypography.button.copyWith(color: Colors.white),
+              )
+            : isLoading
                 ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
                 : Text(
-                  'Continue',
-                  style: AppTypography.button.copyWith(color: Colors.white),
-                ),
+                    'Continue',
+                    style: AppTypography.button.copyWith(color: Colors.white),
+                  ),
       ),
     );
   }

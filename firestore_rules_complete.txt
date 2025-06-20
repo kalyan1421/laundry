@@ -1,0 +1,299 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ========== HELPER FUNCTIONS ==========
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      let adminPath = /databases/$(database)/documents/admins/$(request.auth.uid);
+      return isAuthenticated() && exists(adminPath) && get(adminPath).data.isActive == true;
+    }
+    
+    function isDeliveryPartner() {
+      let deliveryPath = /databases/$(database)/documents/delivery/$(request.auth.uid);
+      return isAuthenticated() && exists(deliveryPath) && get(deliveryPath).data.isActive == true;
+    }
+    
+    function isCustomer() {
+      let customerPath = /databases/$(database)/documents/customer/$(request.auth.uid);
+      return isAuthenticated() && exists(customerPath);
+    }
+    
+    // Helper function to validate notification data
+    function isValidNotificationCreate() {
+      return request.resource.data.keys().hasAll(['title', 'body', 'type']) &&
+             request.resource.data.read == false;
+    }
+    
+    // IMPROVED: More flexible customer creation validation
+    function isValidCustomerCreate() {
+      return request.resource.data.uid == request.auth.uid &&
+             request.resource.data.keys().hasAll(['uid', 'phoneNumber', 'role']) &&
+             request.resource.data.role == 'customer';
+    }
+    
+    // ========== AUTHENTICATION & VERIFICATION COLLECTIONS ==========
+    
+    // OTP ATTEMPTS: Allow users to record their own OTP attempts for rate limiting/analytics
+    match /otpAttempts/{attemptId} {
+      allow create: if true; // Allow anonymous users to create attempts (for rate limiting)
+      allow read, update: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow read, list, delete: if isAdmin();
+    }
+    
+    // AUTH ATTEMPTS: Similar to OTP attempts but more general
+    match /authAttempts/{attemptId} {
+      allow create: if true; // Allow anonymous attempts logging
+      allow read, update: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow read, list, delete: if isAdmin();
+    }
+    
+    // SMS VERIFICATION: For SMS verification logging
+    match /smsVerification/{verificationId} {
+      allow create: if true; // Allow creation for rate limiting
+      allow read, update: if isAuthenticated() && resource.data.phoneNumber != null;
+      allow read, list, delete: if isAdmin();
+    }
+    
+    // PHONE VERIFICATION: For phone number verification attempts
+    match /phoneVerification/{verificationId} {
+      allow create: if true; // Allow creation for logging purposes
+      allow read, update: if isAuthenticated();
+      allow read, list, delete: if isAdmin();
+    }
+    
+    // VERIFICATION LOGS: General verification logging
+    match /verificationLogs/{logId} {
+      allow create: if true; // Allow logging for all users
+      allow read: if isAuthenticated();
+      allow read, list, update, delete: if isAdmin();
+    }
+    
+    // ========== COLLECTION RULES ==========
+    
+    // ADMINS: Allow phone verification during login and notification access
+    match /admins/{adminId} {
+      allow read: if true;
+      allow update: if isAdmin() || isOwner(adminId);
+      allow create: if isOwner(adminId) || isAdmin();
+      allow list: if true;
+      allow delete: if isAdmin();
+      
+      // ADMIN NOTIFICATIONS SUBCOLLECTION
+      match /notifications/{notificationId} {
+        // Admins can do everything with their own notifications
+        allow read, write: if isAdmin() && isOwner(adminId);
+        // Any admin can read all admin notifications
+        allow read, list: if isAdmin();
+        // Delivery partners can create notifications for admins (for status updates)
+        allow create: if isDeliveryPartner() && isValidNotificationCreate();
+        // Authenticated users (customers, delivery partners) can create notifications for admins
+        allow create: if isAuthenticated() && isValidNotificationCreate();
+        // Admins can update their own notifications (mark as read, etc.)
+        allow update: if isAdmin() && isOwner(adminId) && 
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+      }
+    }
+    
+    // DELIVERY PARTNERS: Admins create. Partners can link their profile once and then edit.
+    match /delivery/{partnerId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      // Allow updates by admin, document owner, or UID match
+      allow update: if isAdmin() || 
+                      isOwner(partnerId) ||
+                      (isAuthenticated() && resource.data.uid == request.auth.uid);
+      allow list: if isAuthenticated();
+      
+      // DELIVERY PARTNER NOTIFICATIONS SUBCOLLECTION
+      match /notifications/{notificationId} {
+        allow create, update, delete: if isAdmin();
+        allow create: if isAuthenticated() && isValidNotificationCreate();
+        allow read, list: if isOwner(partnerId);
+        allow update: if isOwner(partnerId) && 
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+        allow read, list: if isAdmin();
+      }
+    }
+    
+    match /delivery_personnel/{partnerId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || 
+                      isOwner(partnerId) ||
+                      (isAuthenticated() && resource.data.uid == request.auth.uid);
+      allow list: if isAuthenticated();
+      
+      match /notifications/{notificationId} {
+        allow create, update, delete: if isAdmin();
+        allow create: if isAuthenticated() && isValidNotificationCreate();
+        allow read, list: if isOwner(partnerId);
+        allow update: if isOwner(partnerId) && 
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+        allow read, list: if isAdmin();
+      }
+    }
+    
+    // CUSTOMERS: FIXED - More permissive rules for customer document creation and access
+    match /customer/{customerId} { 
+      allow read, write: if isAdmin();
+      
+      // FIXED: Allow customer creation with proper validation
+      allow create: if isAuthenticated() && 
+                      request.auth.uid == customerId &&
+                      isValidCustomerCreate();
+      
+      // FIXED: Allow customers to read and update their own data
+      allow read, update: if isAuthenticated() && request.auth.uid == customerId;
+      
+      // Allow delivery partners to read customer info (for delivery purposes)
+      allow read: if isDeliveryPartner();
+      allow list: if isAdmin() || isDeliveryPartner();
+      
+      match /addresses/{addressId} {
+        allow read, write: if isAdmin();
+        allow create, read, update, delete: if isAuthenticated() && request.auth.uid == customerId;
+        // Allow delivery partners to read customer addresses (for delivery)
+        allow read: if isDeliveryPartner();
+        allow list: if (isAuthenticated() && request.auth.uid == customerId) || isDeliveryPartner();
+      }
+    }
+    
+    // LEGACY: Support for users collection - FIXED with same validation
+    match /users/{userId} { 
+      allow read, write: if isAdmin();
+      
+      // FIXED: Allow user creation with proper validation
+      allow create: if isAuthenticated() && 
+                      request.auth.uid == userId &&
+                      request.resource.data.uid == request.auth.uid;
+      
+      // FIXED: Allow users to read and update their own data
+      allow read, update: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow delivery partners to read user info (for delivery purposes)
+      allow read: if isDeliveryPartner();
+      allow list: if isAdmin() || isDeliveryPartner();
+      
+      match /addresses/{addressId} {
+        allow read, write: if isAdmin();
+        allow create, read, update, delete: if isAuthenticated() && request.auth.uid == userId;
+        // Allow delivery partners to read user addresses (for delivery)
+        allow read: if isDeliveryPartner();
+        allow list: if (isAuthenticated() && request.auth.uid == userId) || isDeliveryPartner();
+      }
+    }
+    
+    // ORDERS: Customers can create and manage their orders
+    match /orders/{orderId} { 
+      allow read, write: if isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid;
+      // Delivery partners can read all orders
+      allow read, list: if isDeliveryPartner();
+      allow list: if isAuthenticated();
+      
+      // Customer update permissions (multiple rules for different scenarios)
+      // 1. Customer can update order status, cancel reason, and notification flags
+      allow update: if isAuthenticated() && 
+        resource.data.customerId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'updatedAt', 'cancelReason', 'notificationSentToAdmin', 'notificationSentToDeliveryPerson']);
+      
+      // 2. Allow system/automated updates for notification flags only
+      allow update: if isAuthenticated() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notificationSentToAdmin', 'notificationSentToDeliveryPerson', 'updatedAt']);
+      
+      // 3. Allow customers to cancel orders (specific case)
+      allow update: if isAuthenticated() && 
+        resource.data.customerId == request.auth.uid &&
+        request.resource.data.status == 'cancelled' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'cancelReason', 'updatedAt']);
+      
+      // 4. Delivery partners can update delivery-related fields
+      allow update: if isDeliveryPartner() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'deliveryStatus', 'updatedAt', 'completedAt', 'deliveredAt', 'notificationSentToDeliveryPerson']);
+    }
+    
+    // Publicly readable collections for the customer app. Admins have write access.
+    match /items/{doc=**} { 
+      allow read: if true; 
+      allow write: if isAdmin(); 
+    }
+    
+    match /banners/{doc=**} { 
+      allow read: if true; 
+      allow write: if isAdmin(); 
+    }
+    
+    match /offers/{doc=**} { 
+      allow read: if true; 
+      allow write: if isAdmin(); 
+    }
+    
+    // FIXED: Corrected typo from 'notication' to 'notification'
+    match /notification/{doc=**} { 
+      allow read: if true; 
+      allow write: if isAdmin(); 
+    }
+    
+    match /categories/{doc=**} { 
+      allow read: if true; 
+      allow write: if isAdmin(); 
+    }
+    
+    match /settings/{doc=**} { 
+      allow read: if true; 
+      allow write: if isAdmin(); 
+    }
+    
+    // QUICK ORDER NOTIFICATIONS: Admins have full access, customers can create
+    match /quickOrderNotifications/{notificationId} {
+      allow read, list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidNotificationCreate();
+      allow update: if isAdmin() || isDeliveryPartner();
+      allow delete: if isAdmin();
+    }
+    
+    // FEEDBACK: Customers can create feedback, admins can manage all
+    match /feedback/{feedbackId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin();
+      allow list: if isAdmin();
+    }
+    
+    // ========== ADDITIONAL COLLECTIONS FOR COMPREHENSIVE COVERAGE ==========
+    
+    // ANALYTICS: Allow authenticated users to write analytics data
+    match /analytics/{doc=**} {
+      allow create: if isAuthenticated();
+      allow read, list, update, delete: if isAdmin();
+    }
+    
+    // LOGS: General application logs
+    match /logs/{doc=**} {
+      allow create: if isAuthenticated();
+      allow read, list, update, delete: if isAdmin();
+    }
+    
+    // APP EVENTS: For tracking app events and user actions
+    match /appEvents/{doc=**} {
+      allow create: if true; // Allow all users to log events
+      allow read, list, update, delete: if isAdmin();
+    }
+    
+    // DEVICE INFO: For storing device information during authentication
+    match /deviceInfo/{doc=**} {
+      allow create, read, update: if isAuthenticated();
+      allow read, list, delete: if isAdmin();
+    }
+  }
+} 

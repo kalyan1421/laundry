@@ -8,6 +8,7 @@ import 'package:geocoding/geocoding.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common/custom_button.dart';
 import '../../widgets/common/loading_widget.dart';
+import 'dart:io';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
@@ -20,11 +21,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _zipController = TextEditingController();
+  final _countryController = TextEditingController();
+  final _landmarkController = TextEditingController();
   final _buildingController = TextEditingController();
   final _floorController = TextEditingController();
   final _doorNumberController = TextEditingController();
-  final _landmarkController = TextEditingController();
-  final _addressController = TextEditingController();
+  File? _imageFile;
 
   bool _isLoading = false;
   bool _isLoadingLocation = false;
@@ -42,11 +48,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _zipController.dispose();
+    _countryController.dispose();
+    _landmarkController.dispose();
     _buildingController.dispose();
     _floorController.dispose();
     _doorNumberController.dispose();
-    _landmarkController.dispose();
-    _addressController.dispose();
     super.dispose();
   }
 
@@ -159,38 +169,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
-      // Prepare address data
-      Map<String, dynamic> addressData = {
-        'fullAddress': _addressController.text.trim(),
-        'buildingName': _buildingController.text.trim(),
-        'floor': _floorController.text.trim(),
-        'doorNumber': _doorNumberController.text.trim(),
-        'landmark': _landmarkController.text.trim(),
-        'latitude': _currentPosition!.latitude,
-        'longitude': _currentPosition!.longitude,
-        'isDefault': true,
-        'type': 'Home',
-        'createdAt': DateTime.now().toIso8601String(),
-      };
-
       // Update user profile
-      bool success = await authProvider.updateProfile(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        additionalData: {
-          'isProfileComplete': true,
-          'addresses': [addressData],
-          'defaultAddress': addressData,
-        },
+      final success = await authProvider.updateProfile(
+        name: _nameController.text,
+        email: _emailController.text,
       );
 
-      if (success && mounted) {
-        // Navigate to home screen
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/home',
-          (route) => false,
-        );
+      if (success) {
+        Navigator.of(context).pop();
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

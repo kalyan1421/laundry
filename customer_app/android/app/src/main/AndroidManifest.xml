@@ -9,9 +9,10 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application
-        android:label="customer_app"
+        android:label="Cloud Ironing"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -30,15 +31,6 @@
               android:resource="@style/NormalTheme" />
               
             <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-            
-            <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
-            <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
@@ -74,5 +66,28 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        
+        <!-- UPI Apps Query for package visibility -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" />
+        </intent>
+        
+        <!-- Popular UPI Apps -->
+        <package android:name="com.google.android.apps.nbu.paisa.user" /> <!-- Google Pay -->
+        <package android:name="com.phonepe.app" /> <!-- PhonePe -->
+        <package android:name="net.one97.paytm" /> <!-- Paytm -->
+        <package android:name="in.gov.uidai.mAadhaarPlus" /> <!-- BHIM -->
+        <package android:name="in.amazon.mShop.android.shopping" /> <!-- Amazon Pay -->
+        <package android:name="com.mobikwik_new" /> <!-- MobiKwik -->
+        <package android:name="com.freecharge.android" /> <!-- FreeCharge -->
+        <package android:name="com.myairtelapp" /> <!-- Airtel Thanks -->
+        <package android:name="com.yesbank.yesbankapp" /> <!-- Yes Pay -->
+        <package android:name="com.axis.mobile" /> <!-- Axis Mobile -->
+        <package android:name="com.sbi.SBIFreedomPlus" /> <!-- SBI Pay -->
+        <package android:name="com.icicibank.pockets" /> <!-- ICICI Pockets -->
+        <package android:name="com.csam.icici.bank.imobile" /> <!-- iMobile Pay -->
+        <package android:name="com.barodampay.app" /> <!-- Baroda M-Pay -->
+        <package android:name="com.whatsapp" /> <!-- WhatsApp Pay -->
     </queries>
 </manifest>

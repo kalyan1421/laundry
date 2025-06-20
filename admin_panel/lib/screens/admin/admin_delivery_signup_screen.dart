@@ -7,6 +7,7 @@ import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../providers/auth_provider.dart';
 import 'package:flutter/rendering.dart';
+import 'admin_home.dart';
 
 class AddDeliveryPartnerScreen extends StatefulWidget {
   const AddDeliveryPartnerScreen({super.key});
@@ -245,8 +246,11 @@ class _AddDeliveryPartnerScreenState extends State<AddDeliveryPartnerScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop(); // Go back to delivery partners list
+             Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const AdminHome(),
+              ),
+            );
             },
             child: const Text('Done'),
           ),
@@ -314,11 +318,7 @@ class _AddDeliveryPartnerScreenState extends State<AddDeliveryPartnerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Delivery Partner'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
+      
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Form(

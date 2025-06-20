@@ -1,16 +1,21 @@
-// lib/providers/auth_provider.dart
+// lib/presentation/providers/auth_provider.dart
 import 'package:customer_app/data/models/user_model.dart';
 import 'package:customer_app/services/auth_service.dart';
+import 'package:customer_app/services/notification_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
+import 'package:logger/logger.dart';
 import '../../core/errors/app_exceptions.dart';
+import '../../core/errors/error_handler.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum AuthStatus {
   unknown,
-  authenticated,
   unauthenticated,
   authenticating,
+  authenticated,
+  failed,
 }
 
 enum OTPStatus {
@@ -24,6 +29,7 @@ enum OTPStatus {
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final Logger _logger = Logger();
   
   // Auth state
   AuthStatus _authStatus = AuthStatus.unknown;
@@ -35,8 +41,6 @@ class AuthProvider extends ChangeNotifier {
 
   // User data
   User? _firebaseUser;
-  User? get firebaseUser => _firebaseUser;
-
   UserModel? _userModel;
   UserModel? get userModel => _userModel;
 
@@ -50,6 +54,21 @@ class AuthProvider extends ChangeNotifier {
   // Error handling
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
+
+  // New user flag
+  bool isNewUser = false;
+
+  // Profile completion status
+  bool get isProfileComplete => _userModel?.isProfileComplete ?? false;
+
+  // Method to clear the error message
+  void clearError() {
+    if (_errorMessage != null) {
+      _logger.d("Clearing error message.");
+      _errorMessage = null;
+      _safeNotifyListeners();
+    }
+  }
 
   // OTP resend
   bool _canResend = false;
@@ -70,12 +89,19 @@ class AuthProvider extends ChangeNotifier {
 
   // Constructor
   AuthProvider() {
-    _initializeAuthState();
+    _logger.i("AuthProvider initialized. Listening to auth state changes.");
+    _authService.authStateChanges.listen(_onAuthStateChanged, onError: (error) {
+      _logger.e("Error in auth state stream: $error");
+      _authStatus = AuthStatus.failed;
+      _setError("An unexpected error occurred. Please restart the app.");
+      _safeNotifyListeners();
+    });
   }
 
   @override
   void dispose() {
     _isDisposed = true;
+    _logger.w("AuthProvider disposed.");
     _authStateSubscription?.cancel();
     super.dispose();
   }
@@ -83,70 +109,121 @@ class AuthProvider extends ChangeNotifier {
   // Safe notify listeners
   void _safeNotifyListeners() {
     if (!_isDisposed) {
-      print("AuthProvider: Notifying listeners. AuthStatus: $_authStatus, Current UserModel: ${_userModel?.toJson()}, isProfileComplete: ${_userModel?.isProfileComplete}");
+      _logger.d("Notifying listeners. AuthStatus: $_authStatus, Current UserModel: ${_userModel != null}");
       notifyListeners();
+    } else {
+      _logger.w("Attempted to notify listeners after dispose.");
     }
   }
 
-  // Initialize auth state
-  void _initializeAuthState() {
-    _authStatus = AuthStatus.unknown;
-    _safeNotifyListeners();
-
-    _authStateSubscription = _authService.authStateChanges.listen((User? user) async {
-      if (_isDisposed) return;
-      print("AuthProvider: Auth state stream received. Firebase user: ${user?.uid}.");
-      
-      if (user == null) {
-        // User is logged out.
-        print("AuthProvider: User is null. Setting state to Unauthenticated.");
-        _authStatus = AuthStatus.unauthenticated;
-        _firebaseUser = null;
-        _userModel = null;
-        _safeNotifyListeners();
-      } else {
-        // User is logged in. Set as authenticating while we fetch data.
-        print("AuthProvider: User ${user.uid} exists. Setting state to Authenticating.");
-        _firebaseUser = user;
-        _authStatus = AuthStatus.authenticating;
-        _safeNotifyListeners(); // Notify UI that we are fetching data
-        
-        // Now load user data.
-        await _loadUserData(user.uid);
-      }
-    });
-  }
-
-  // Load user data from Firestore
-  Future<void> _loadUserData(String uid) async {
+  // Handle auth state changes from Firebase
+  Future<void> _onAuthStateChanged(User? firebaseUser) async {
     if (_isDisposed) return;
-    print("AuthProvider: Loading user data for UID: $uid.");
 
-    try {
-      final userModel = await _authService.getUserData(uid);
-      
-      if (userModel != null) {
-        // Data loaded successfully.
-        _userModel = userModel;
-        _authStatus = AuthStatus.authenticated;
-        print("AuthProvider: User data loaded. Final status: Authenticated.");
-      } else {
-        // This can happen if the user is authenticated with Firebase,
-        // but their document in Firestore was deleted. This is a critical error state.
-        print("AuthProvider: CRITICAL - User authenticated but no data in Firestore for UID $uid.");
-        _setError('Your user profile could not be found. Please contact support.');
-        await signOut(isErrorState: true); // Force sign out to prevent being stuck.
-      }
-    } catch (e) {
-      print('AuthProvider: Error loading user data for UID $uid: $e');
-      // On error, we don't want to log the user out immediately.
-      // We keep their authenticated state but show an error.
-      // This allows them to retry or use parts of the app that don't need user data.
-      _setError('Could not load your profile. Please check your connection and try again.');
-      _authStatus = AuthStatus.authenticated; // Keep them logged in but with an error.
-    } finally {
+    if (firebaseUser == null) {
+      _logger.i("Auth state changed: User is null. Setting to Unauthenticated.");
+      _authStatus = AuthStatus.unauthenticated;
+      _userModel = null;
       _safeNotifyListeners();
+    } else {
+      _logger.i("Auth state changed: User found with UID: ${firebaseUser.uid}. Loading data.");
+      _authStatus = AuthStatus.authenticating;
+      _safeNotifyListeners();
+      await _loadUserDataWithRetry(firebaseUser.uid);
     }
+  }
+
+  // FIXED: Load user data with retry mechanism to handle Firestore eventual consistency
+  Future<UserModel?> _loadUserDataWithRetry(String uid) async {
+    if (_isDisposed) return null;
+    
+    const int maxRetries = 5;
+    const Duration baseDelay = Duration(milliseconds: 300);
+    
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        _logger.d("AuthProvider: Loading user data for UID: $uid (attempt ${attempt + 1}/$maxRetries)");
+        
+        // Add exponential backoff delay for retries
+        if (attempt > 0) {
+          final delay = Duration(milliseconds: baseDelay.inMilliseconds * (attempt * 2));
+          _logger.d("Waiting ${delay.inMilliseconds}ms before retry...");
+          await Future.delayed(delay);
+        }
+
+        final userModel = await _authService.getUserData(uid);
+        
+        if (_isDisposed) return null;
+        
+        if (userModel != null) {
+          _userModel = userModel;
+          _authStatus = AuthStatus.authenticated;
+          _logger.d("AuthProvider: User data loaded successfully on attempt ${attempt + 1}. Final status: Authenticated.");
+          
+          // Save FCM token for notifications
+          try {
+            await NotificationService.saveTokenToFirestore();
+          } catch (e) {
+            _logger.w("Failed to save FCM token: $e");
+          }
+          
+          _safeNotifyListeners();
+          return _userModel;
+        } else {
+          _logger.w("AuthProvider: User document not found for UID $uid on attempt ${attempt + 1}");
+          
+          // If this is the last attempt, handle the error
+          if (attempt == maxRetries - 1) {
+            _logger.e("AuthProvider: Failed to load user data after $maxRetries attempts for UID $uid");
+            
+            // Try to ensure the document exists
+            final currentUser = _authService.currentUser;
+            if (currentUser != null) {
+              _logger.i("Attempting to ensure user document exists...");
+              bool documentCreated = await _authService.ensureUserDocument(currentUser);
+              
+              if (documentCreated && !_isDisposed) {
+                // One final attempt to load the data
+                _logger.i("Document created, making final attempt to load user data...");
+                await Future.delayed(const Duration(milliseconds: 1000));
+                final finalUserModel = await _authService.getUserData(uid);
+                
+                if (finalUserModel != null) {
+                  _userModel = finalUserModel;
+                  _authStatus = AuthStatus.authenticated;
+                  _logger.d("AuthProvider: User data loaded successfully after document creation.");
+                  _safeNotifyListeners();
+                  return _userModel;
+                }
+              }
+            }
+            
+            // If all attempts failed, show error but don't immediately sign out
+            _setError('Unable to load your profile. Please check your connection and try again.');
+            _authStatus = AuthStatus.failed;
+            _safeNotifyListeners();
+            return null;
+          }
+        }
+      } catch (e) {
+        _logger.e("AuthProvider: Error loading user data for UID $uid on attempt ${attempt + 1}: $e");
+        
+        // If this is the last attempt, handle the error
+        if (attempt == maxRetries - 1) {
+          _authStatus = AuthStatus.failed;
+          _setError(ErrorHandler.getUserFriendlyMessage(e));
+          _safeNotifyListeners();
+          return null;
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  // DEPRECATED: Keep for backward compatibility but use _loadUserDataWithRetry instead
+  Future<UserModel?> _loadUserData(String uid) async {
+    return _loadUserDataWithRetry(uid);
   }
 
   // Send OTP to phone number
@@ -155,11 +232,11 @@ class AuthProvider extends ChangeNotifier {
     
     try {
       _setLoading(true);
-      _clearError();
+      clearError();
       _setOTPStatus(OTPStatus.sending);
       _phoneNumber = phoneNumber;
       
-      print('AuthProvider: Starting OTP send process for: $phoneNumber');
+      _logger.d('Starting OTP send process for: $phoneNumber');
 
       await _authService.sendOTP(
         phoneNumber: phoneNumber,
@@ -169,10 +246,10 @@ class AuthProvider extends ChangeNotifier {
         codeAutoRetrievalTimeout: _onCodeAutoRetrievalTimeout,
       );
       
-      print('AuthProvider: OTP send process completed for $phoneNumber');
+      _logger.d('OTP send process completed for $phoneNumber');
     } catch (e) {
       if (_isDisposed) return;
-      print('AuthProvider: Error in sendOTP for $phoneNumber: $e');
+      _logger.e('Error in sendOTP for $phoneNumber: $e');
       _setError(e.toString());
       _setOTPStatus(OTPStatus.failed);
     } finally {
@@ -195,29 +272,30 @@ class AuthProvider extends ChangeNotifier {
     try {
       _isVerifying = true;
       _setOTPStatus(OTPStatus.verifying);
-      _clearError();
+      clearError();
       _safeNotifyListeners();
-      print("AuthProvider.verifyOTP: Verifying OTP for $_verificationId");
+      _logger.d("Verifying OTP for $_verificationId");
 
-      UserCredential userCredential = await _authService.verifyOTPAndSignIn(
+      final userModel = await _authService.verifyOTPAndSignIn(
         verificationId: _verificationId!,
         otp: otp,
       );
-      print("AuthProvider.verifyOTP: OTP verified. User: ${userCredential.user?.uid}");
+      _logger.d("OTP verified. User: ${userModel.uid}");
 
       if (_isDisposed) return false;
 
-      _firebaseUser = userCredential.user;
+      _userModel = userModel;
+      _firebaseUser = _authService.currentUser;
+      _authStatus = AuthStatus.authenticated;
       _setOTPStatus(OTPStatus.verified);
-      print("AuthProvider.verifyOTP: User signed in with Firebase, loading user data for ${userCredential.user!.uid}");
-      await _loadUserData(userCredential.user!.uid);
+      
       _isVerifying = false;
       _safeNotifyListeners();
       return true;
 
     } on AuthException catch (e) { 
       if (_isDisposed) return false;
-      print('AuthProvider.verifyOTP: AuthException: ${e.message}');
+      _logger.w('AuthException: ${e.message}');
       _setError(e.message); 
       _setOTPStatus(OTPStatus.failed);
       _isVerifying = false;
@@ -225,7 +303,7 @@ class AuthProvider extends ChangeNotifier {
       return false;
     } catch (e) { 
       if (_isDisposed) return false;
-      print('AuthProvider.verifyOTP: Generic error: $e');
+      _logger.e('Generic error during OTP verification: $e');
       _setError('An unexpected error occurred during OTP verification. Please try again.');
       _setOTPStatus(OTPStatus.failed);
       _isVerifying = false;
@@ -242,134 +320,130 @@ class AuthProvider extends ChangeNotifier {
     await sendOTP(_phoneNumber!);
   }
 
-  // Sign out
+  // FIXED: Modified sign out to be less aggressive
   Future<void> signOut({bool isErrorState = false}) async {
     if (_isDisposed) return;
-    print('AuthProvider: Signing out.');
+    _logger.i("Signing out user.");
     
-    // In a critical error state, we might not want to make a server call that could fail.
-    // However, for a standard sign-out, calling the service is correct.
-    if (!isErrorState) {
-      try {
-        await _authService.signOut();
-      } catch (e) {
-        print('AuthProvider: Error during sign out from service: $e');
-        // Even if the service call fails, we must clear the local state.
+    try {
+      await _authService.signOut();
+      _userModel = null;
+      _firebaseUser = null;
+      _authStatus = AuthStatus.unauthenticated;
+      
+      if (!isErrorState) {
+        clearError();
+      } else {
+        _logger.w("Signed out due to error. Error message preserved.");
       }
+      _safeNotifyListeners();
+    } catch (e) {
+      _logger.e("Error during sign out: $e");
+      // Even if sign out fails, reset local state
+      _userModel = null;
+      _firebaseUser = null;
+      _authStatus = AuthStatus.unauthenticated;
+      _safeNotifyListeners();
     }
+  }
 
-    // Clear all local user state
-    _firebaseUser = null;
-    _userModel = null;
-    _verificationId = null;
-    _phoneNumber = null;
-    _errorMessage = null;
-    _authStatus = AuthStatus.unauthenticated;
-    
-    print('AuthProvider: State cleared. Notifying listeners of Unauthenticated state.');
+  Future<void> loadInitialUser(User user) async {
+    final doc = await FirebaseFirestore.instance.collection('customer').doc(user.uid).get();
+    isNewUser = !doc.exists;
+    await _loadUserDataWithRetry(user.uid);
+  }
+
+  Future<bool> updateProfile({
+    required String name,
+    required String email,
+  }) async {
+    if (_userModel == null) return false;
+
+    _setLoading(true);
+    try {
+      final updatedData = {
+        'name': name,
+        'email': email,
+        'isProfileComplete': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await _authService.updateProfile(_userModel!.uid, updatedData);
+
+      // Optimistically update the local user model
+      _userModel = _userModel!.copyWith(
+        name: name,
+        email: email,
+        isProfileComplete: true,
+      );
+      
+      _safeNotifyListeners();
+      return true;
+    } catch (e) {
+      _setError(ErrorHandler.getUserFriendlyMessage(e));
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> updateUserData(UserModel user) async {
+    _userModel = user;
     _safeNotifyListeners();
   }
 
-  // Update user profile
-  Future<bool> updateProfile({
-    String? name,
-    String? email,
-    String? profileImageUrl,
-    Map<String, dynamic>? additionalData,
-  }) async {
-    if (_isDisposed || _firebaseUser == null) return false;
-    print("AuthProvider.updateProfile: Updating for UID: ${_firebaseUser!.uid}. AdditionalData: $additionalData");
-
+  // FIXED: Retry mechanism for authentication completion
+  Future<void> _onVerificationCompleted(PhoneAuthCredential credential) async {
+    if (_isDisposed) return;
+    _logger.i("Auto verification completed: ${credential.smsCode}");
+    
     try {
-      _setLoading(true);
-      _clearError();
+      _setOTPStatus(OTPStatus.verifying);
+      _isVerifying = true;
+      _safeNotifyListeners();
 
-      await _authService.updateUserProfile(
-        uid: _firebaseUser!.uid,
-        name: name,
-        email: email,
-        profileImageUrl: profileImageUrl,
-        additionalData: additionalData,
-      );
-      print("AuthProvider.updateProfile: Auth service update complete for UID: ${_firebaseUser!.uid}. Reloading user data.");
-      if (_isDisposed) return false;
-      await _loadUserData(_firebaseUser!.uid);
-      print("AuthProvider.updateProfile: User data reloaded for UID: ${_firebaseUser!.uid}. isProfileComplete: $isProfileComplete, AuthStatus: $_authStatus");
-      return true;
+      final userModel = await _authService.signInWithPhoneCredential(credential);
+      _logger.d("User signed in with credential, user data available for ${userModel.uid}");
+      
+      if (_isDisposed) return;
+
+      _userModel = userModel;
+      _firebaseUser = _authService.currentUser;
+      _authStatus = AuthStatus.authenticated;
+      _setOTPStatus(OTPStatus.verified);
+
     } catch (e) {
-      if (!_isDisposed) {
-        print("AuthProvider.updateProfile: Error updating profile for UID: ${_firebaseUser!.uid}: $e");
-        _setError(e.toString());
-      }
-      return false;
+      _logger.e("Error on verification completed: $e");
+      _setError(ErrorHandler.getUserFriendlyMessage(e));
+      _setOTPStatus(OTPStatus.failed);
     } finally {
       if (!_isDisposed) {
-        _setLoading(false);
+        _isVerifying = false;
+        _safeNotifyListeners();
       }
     }
   }
 
-  // Check if user profile is complete
-  bool get isProfileComplete {
-    print("AuthProvider: get isProfileComplete called. Value: ${_userModel?.isProfileComplete ?? false}, UserModel: ${_userModel?.toJson()}");
-    if (_userModel == null) return false;
-    return _userModel!.isProfileComplete;
-  }
-
-  // Check if user is new (just registered)
-  bool get isNewUser {
-    if (_userModel == null) return false;
-    
-    DateTime? createdAt = _userModel!.createdAt?.toDate();
-    DateTime? lastSignIn = _userModel!.lastSignIn?.toDate();
-    
-    if (createdAt == null || lastSignIn == null) return false;
-    
-    // Consider user as new if account was created within last 5 minutes
-    return lastSignIn.difference(createdAt).inMinutes <= 5;
-  }
-
-  // Firebase Auth event handlers
-  void _onVerificationCompleted(PhoneAuthCredential credential) async {
-    if (_isDisposed) return;
-    print('AuthProvider: Auto-verification completed.');
-    try {
-      UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      if (_isDisposed) return;
-      if (userCredential.user != null) {
-        _firebaseUser = userCredential.user;
-        _setOTPStatus(OTPStatus.verified);
-        await _loadUserData(userCredential.user!.uid);
-      }
-    } catch (e) {
-      if (!_isDisposed) {
-        print('AuthProvider: Error in auto-verification: $e');
-        _setError(e.toString());
-      }
-    }
-  }
-
+  // Callback for when verification fails
   void _onVerificationFailed(FirebaseAuthException e) {
     if (_isDisposed) return;
-    print('AuthProvider: Verification failed: ${e.code} - ${e.message}');
-    String errorMessage;
-    switch (e.code) {
-      case 'invalid-phone-number': errorMessage = 'Invalid phone number format.'; break;
-      case 'too-many-requests': errorMessage = 'Too many requests. Please try again later.'; break;
-      case 'quota-exceeded': errorMessage = 'SMS quota exceeded. Please try again later.'; break;
-      case 'app-not-authorized': errorMessage = 'App not authorized for verification.'; break;
-      case 'unknown': errorMessage = 'Verification failed. Please check your network and try again.'; break;
-      default: errorMessage = 'Verification failed: ${e.message}';
-    }
-    _setError(errorMessage);
+    _logger.w('Verification failed: ${e.code} - ${e.message}');
+    _setError(e.message ?? 'Verification failed');
     _setOTPStatus(OTPStatus.failed);
+    _isVerifying = false; 
+    _setLoading(false); 
+    _safeNotifyListeners();
   }
 
+  // Callback for when code is sent
   void _onCodeSent(String verificationId, int? resendToken) {
     if (_isDisposed) return;
-    print('AuthProvider: Code sent. Verification ID: $verificationId');
+    _logger.i("Code sent, verification ID: $verificationId");
     _verificationId = verificationId;
     _setOTPStatus(OTPStatus.sent);
+    _setLoading(false);
+    
+    _canResend = false;
     Future.delayed(const Duration(seconds: 30), () {
       if (!_isDisposed) {
         _canResend = true;
@@ -377,62 +451,54 @@ class AuthProvider extends ChangeNotifier {
       }
     });
   }
-
+  
+  // Callback for auto retrieval timeout
   void _onCodeAutoRetrievalTimeout(String verificationId) {
     if (_isDisposed) return;
-    print('AuthProvider: Auto retrieval timeout. Verification ID: $verificationId');
-    _verificationId = verificationId;
-    _safeNotifyListeners();
+    _logger.w("Auto-retrieval timed out for verification ID: $verificationId");
   }
 
-  // Helper methods
-  void _setLoading(bool loading) {
-    if (_isDisposed) return;
-    _isLoading = loading;
-    _safeNotifyListeners();
-  }
-
+  // Helper to set OTP status and notify listeners
   void _setOTPStatus(OTPStatus status) {
-    if (_isDisposed) return;
-    _otpStatus = status;
-    print('AuthProvider: OTP Status changed to: $status');
+    if (_otpStatus != status) {
+      _logger.d("OTP status changed from $_otpStatus to $status");
+      _otpStatus = status;
+      _safeNotifyListeners();
+    }
+  }
+
+  // Helper to set error message and notify listeners
+  void _setError(String message) {
+    _logger.e("Setting error message: $message");
+    _errorMessage = message;
     _safeNotifyListeners();
   }
 
-  void _setError(String error) {
-    if (_isDisposed) return;
-    _errorMessage = error;
-    print('AuthProvider: Auth Error set: $error');
-    _safeNotifyListeners();
-  }
-
-  void _clearError() {
-    _errorMessage = null;
+  // Helper to set loading state and notify listeners
+  void _setLoading(bool value) {
+    if (_isLoading != value) {
+      _logger.d("Setting loading state to $value");
+      _isLoading = value;
+      _safeNotifyListeners();
+    }
   }
 
   // Reset OTP state
   void resetOTPState() {
-    if (_isDisposed) return;
     _otpStatus = OTPStatus.initial;
     _verificationId = null;
-    _canResend = false;
-    _isVerifying = false;
+    _errorMessage = null;
     _safeNotifyListeners();
   }
 
-  // Example of where the conversion might be needed if you are directly using DateTime types
-  // in your AuthProvider from _userModel
-  Future<void> _someMethodUsingUserTimestamps() async {
-    if (_userModel != null) {
-      // Correct conversion from Timestamp to DateTime
-      DateTime? createdAt = _userModel!.createdAt?.toDate();
-      DateTime? lastSignIn = _userModel!.lastSignIn?.toDate();
-      DateTime? updatedAt = _userModel!.updatedAt?.toDate(); // Assuming UserModel has updatedAt as Timestamp
-
-      // Use these DateTime objects
-      print('User created at: $createdAt');
-      print('User last signed in at: $lastSignIn');
-      print('User updated at: $updatedAt');
-    }
+  // ADDED: Method to manually retry loading user data
+  Future<void> retryLoadUserData() async {
+    if (_isDisposed || _authService.currentUser == null) return;
+    
+    _authStatus = AuthStatus.authenticating;
+    clearError();
+    _safeNotifyListeners();
+    
+    await _loadUserDataWithRetry(_authService.currentUser!.uid);
   }
 }
