@@ -414,7 +414,7 @@ class AuthProvider extends ChangeNotifier {
 
       await _authService.updateProfile(_userModel!.uid, updatedData);
 
-      // Then save the address
+      // Then save the address with detailed information
       final addressData = {
         'type': 'home',
         'addressLine1': addressLine1,
@@ -428,6 +428,9 @@ class AuthProvider extends ChangeNotifier {
         'isPrimary': true,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        // Additional metadata for better delivery experience
+        'fullAddress': _buildFullAddress(addressLine1, addressLine2, city, state, pincode),
+        'searchableText': _buildSearchableText(addressLine1, addressLine2, city, state, pincode, landmark),
       };
 
       // Save address to Firestore
@@ -453,6 +456,36 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  // Helper method to build full address string
+  String _buildFullAddress(String addressLine1, String? addressLine2, String city, String state, String pincode) {
+    List<String> parts = [addressLine1];
+    if (addressLine2 != null && addressLine2.isNotEmpty) {
+      parts.add(addressLine2);
+    }
+    parts.addAll([city, state, pincode]);
+    return parts.join(', ');
+  }
+
+  // Helper method to build searchable text for better address search
+  String _buildSearchableText(String addressLine1, String? addressLine2, String city, String state, String pincode, String? landmark) {
+    List<String> searchTerms = [
+      addressLine1.toLowerCase(),
+      city.toLowerCase(),
+      state.toLowerCase(),
+      pincode,
+    ];
+    
+    if (addressLine2 != null && addressLine2.isNotEmpty) {
+      searchTerms.add(addressLine2.toLowerCase());
+    }
+    
+    if (landmark != null && landmark.isNotEmpty) {
+      searchTerms.add(landmark.toLowerCase());
+    }
+    
+    return searchTerms.join(' ');
   }
 
   Future<void> updateUserData(UserModel user) async {

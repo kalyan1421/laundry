@@ -29,12 +29,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   // Controllers for form fields
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  
+  // Detailed address controllers
+  final _doorNumberController = TextEditingController();
+  final _floorNumberController = TextEditingController();
+  final _apartmentNameController = TextEditingController();
   final _addressLine1Controller = TextEditingController();
-  final _addressLine2Controller = TextEditingController();
+  final _nearbyLandmarkController = TextEditingController();
   final _cityController = TextEditingController();
-  final _stateController = TextEditingController();
   final _pincodeController = TextEditingController();
-  final _landmarkController = TextEditingController();
+  final _stateController = TextEditingController();
   
   File? _imageFile;
   Position? _currentPosition;
@@ -53,12 +57,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _doorNumberController.dispose();
+    _floorNumberController.dispose();
+    _apartmentNameController.dispose();
     _addressLine1Controller.dispose();
-    _addressLine2Controller.dispose();
+    _nearbyLandmarkController.dispose();
     _cityController.dispose();
-    _stateController.dispose();
     _pincodeController.dispose();
-    _landmarkController.dispose();
+    _stateController.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -89,13 +95,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         throw Exception('Location permission permanently denied. Please grant permission in settings.');
       }
 
-      // Get current position
+      // Get current position with high accuracy
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
+        timeLimit: const Duration(seconds: 15),
       );
 
-      // Get address from coordinates
+      // Get detailed address from coordinates
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
         position.longitude,
@@ -103,18 +109,89 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
       if (placemarks.isNotEmpty) {
         Placemark place = placemarks.first;
+        
+        // Extract maximum details from placemark
+        String street = place.street ?? '';
+        String subLocality = place.subLocality ?? '';
+        String locality = place.locality ?? '';
+        String subAdministrativeArea = place.subAdministrativeArea ?? '';
+        String administrativeArea = place.administrativeArea ?? '';
+        String postalCode = place.postalCode ?? '';
+        String country = place.country ?? '';
+        String name = place.name ?? '';
+        String thoroughfare = place.thoroughfare ?? '';
+        String subThoroughfare = place.subThoroughfare ?? '';
+        
         setState(() {
           _currentPosition = position;
-          _currentAddress = '${place.street}, ${place.locality}, ${place.administrativeArea} ${place.postalCode}';
           
-          // Pre-fill address fields
-          _addressLine1Controller.text = place.street ?? '';
-          _cityController.text = place.locality ?? '';
-          _stateController.text = place.administrativeArea ?? '';
-          _pincodeController.text = place.postalCode ?? '';
+          // Create a comprehensive address string for display
+          List<String> addressParts = [];
+          if (name.isNotEmpty && name != street) addressParts.add(name);
+          if (street.isNotEmpty) addressParts.add(street);
+          if (subLocality.isNotEmpty && subLocality != locality) addressParts.add(subLocality);
+          if (locality.isNotEmpty) addressParts.add(locality);
+          if (subAdministrativeArea.isNotEmpty && subAdministrativeArea != locality) addressParts.add(subAdministrativeArea);
+          if (administrativeArea.isNotEmpty) addressParts.add(administrativeArea);
+          if (postalCode.isNotEmpty) addressParts.add(postalCode);
+          
+          _currentAddress = addressParts.join(', ');
+          
+          // Pre-fill address fields with maximum available data
+          // Address Line 1: Use street, thoroughfare, or name (most specific)
+          if (street.isNotEmpty) {
+            _addressLine1Controller.text = street;
+          } else if (thoroughfare.isNotEmpty) {
+            _addressLine1Controller.text = thoroughfare;
+          } else if (name.isNotEmpty) {
+            _addressLine1Controller.text = name;
+          }
+          
+          // If we have subThoroughfare (house/building number), use it for door number
+          if (subThoroughfare.isNotEmpty) {
+            _doorNumberController.text = subThoroughfare;
+          }
+          
+          // Use subLocality for apartment/area name if available
+          if (subLocality.isNotEmpty && subLocality != locality) {
+            _apartmentNameController.text = subLocality;
+          }
+          
+          // City: Use locality or subAdministrativeArea
+          if (locality.isNotEmpty) {
+            _cityController.text = locality;
+          } else if (subAdministrativeArea.isNotEmpty) {
+            _cityController.text = subAdministrativeArea;
+          }
+          
+          // State
+          if (administrativeArea.isNotEmpty) {
+            _stateController.text = administrativeArea;
+          }
+          
+          // Pincode
+          if (postalCode.isNotEmpty) {
+            _pincodeController.text = postalCode;
+          }
+          
+          // Nearby landmark: Use name if it's different from street
+          if (name.isNotEmpty && name != street && name != thoroughfare) {
+            _nearbyLandmarkController.text = name;
+          }
           
           _isLoadingLocation = false;
         });
+        
+        _logger.i('Location details extracted:');
+        _logger.i('Street: $street');
+        _logger.i('SubLocality: $subLocality');
+        _logger.i('Locality: $locality');
+        _logger.i('SubAdministrativeArea: $subAdministrativeArea');
+        _logger.i('AdministrativeArea: $administrativeArea');
+        _logger.i('PostalCode: $postalCode');
+        _logger.i('Name: $name');
+        _logger.i('Thoroughfare: $thoroughfare');
+        _logger.i('SubThoroughfare: $subThoroughfare');
       }
     } catch (e) {
       setState(() {
@@ -203,16 +280,34 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
     try {
+      // Create detailed address string
+      List<String> addressComponents = [];
+      
+      if (_doorNumberController.text.trim().isNotEmpty) {
+        addressComponents.add('Door: ${_doorNumberController.text.trim()}');
+      }
+      if (_floorNumberController.text.trim().isNotEmpty) {
+        addressComponents.add('Floor: ${_floorNumberController.text.trim()}');
+      }
+      if (_apartmentNameController.text.trim().isNotEmpty) {
+        addressComponents.add(_apartmentNameController.text.trim());
+      }
+      
+      String addressLine1 = _addressLine1Controller.text.trim();
+      if (addressComponents.isNotEmpty) {
+        addressLine1 = '${addressComponents.join(', ')}, $addressLine1';
+      }
+
       // Use the new method that saves both profile and address
       final success = await authProvider.updateProfileWithAddress(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
-        addressLine1: _addressLine1Controller.text.trim(),
-        addressLine2: _addressLine2Controller.text.trim().isEmpty ? null : _addressLine2Controller.text.trim(),
+        addressLine1: addressLine1,
+        addressLine2: _nearbyLandmarkController.text.trim().isEmpty ? null : 'Near: ${_nearbyLandmarkController.text.trim()}',
         city: _cityController.text.trim(),
         state: _stateController.text.trim(),
         pincode: _pincodeController.text.trim(),
-        landmark: _landmarkController.text.trim().isEmpty ? null : _landmarkController.text.trim(),
+        landmark: _nearbyLandmarkController.text.trim().isEmpty ? null : _nearbyLandmarkController.text.trim(),
         latitude: _currentPosition!.latitude,
         longitude: _currentPosition!.longitude,
       );
@@ -406,7 +501,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             style: AppTextTheme.bodyLarge.copyWith(color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 32),
           
           // Current location card
           Container(
@@ -471,11 +566,49 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           ),
           const SizedBox(height: 24),
           
-          // Address form
+          // Building/Apartment Details Section
+          _buildSectionHeader('Building Details'),
+          const SizedBox(height: 16),
+          
+          Row(
+            children: [
+              Expanded(
+                child: CustomTextField(
+                  controller: _doorNumberController,
+                  labelText: 'Door Number',
+                  hintText: 'e.g., 101, A-12',
+                  prefixIcon: Icons.door_front_door_outlined,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomTextField(
+                  controller: _floorNumberController,
+                  labelText: 'Floor Number',
+                  hintText: 'e.g., Ground, 2nd',
+                  prefixIcon: Icons.layers_outlined,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          CustomTextField(
+            controller: _apartmentNameController,
+            labelText: 'Apartment/Building Name',
+            hintText: 'e.g., Sunrise Apartments, Tower A',
+            prefixIcon: Icons.apartment_outlined,
+          ),
+          const SizedBox(height: 24),
+          
+          // Address Details Section
+          _buildSectionHeader('Address Details'),
+          const SizedBox(height: 16),
+          
           CustomTextField(
             controller: _addressLine1Controller,
-            labelText: 'Address Line 1',
-            hintText: 'House/Building number, Street name',
+            labelText: 'Address Line 1 *',
+            hintText: 'Street name, Area',
             prefixIcon: Icons.home_outlined,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
@@ -485,19 +618,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             },
           ),
           const SizedBox(height: 16),
+          
           CustomTextField(
-            controller: _addressLine2Controller,
-            labelText: 'Address Line 2 (Optional)',
-            hintText: 'Area, Locality',
-            prefixIcon: Icons.location_city_outlined,
+            controller: _nearbyLandmarkController,
+            labelText: 'Nearby Landmark',
+            hintText: 'e.g., Near Metro Station, Opposite Mall',
+            prefixIcon: Icons.place_outlined,
           ),
           const SizedBox(height: 16),
+          
           Row(
             children: [
               Expanded(
                 child: CustomTextField(
                   controller: _cityController,
-                  labelText: 'City',
+                  labelText: 'City *',
                   hintText: 'City',
                   prefixIcon: Icons.location_city,
                   validator: (value) {
@@ -512,7 +647,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               Expanded(
                 child: CustomTextField(
                   controller: _pincodeController,
-                  labelText: 'Pincode',
+                  labelText: 'Pincode *',
                   hintText: 'Pincode',
                   prefixIcon: Icons.pin_drop,
                   keyboardType: TextInputType.number,
@@ -530,9 +665,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             ],
           ),
           const SizedBox(height: 16),
+          
           CustomTextField(
             controller: _stateController,
-            labelText: 'State',
+            labelText: 'State *',
             hintText: 'State',
             prefixIcon: Icons.map_outlined,
             validator: (value) {
@@ -542,14 +678,46 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               return null;
             },
           ),
-          const SizedBox(height: 16),
-          CustomTextField(
-            controller: _landmarkController,
-            labelText: 'Landmark (Optional)',
-            hintText: 'Nearby landmark for easy identification',
-            prefixIcon: Icons.place_outlined,
+          const SizedBox(height: 24),
+          
+          // Info card
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'All fields marked with * are required. Other fields help us deliver more accurately.',
+                    style: AppTextTheme.bodySmall.copyWith(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Text(
+      title,
+      style: AppTextTheme.titleMedium.copyWith(
+        color: AppColors.textPrimary,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
