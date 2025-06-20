@@ -387,6 +387,74 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // New method to update profile with address
+  Future<bool> updateProfileWithAddress({
+    required String name,
+    required String email,
+    required String addressLine1,
+    String? addressLine2,
+    required String city,
+    required String state,
+    required String pincode,
+    String? landmark,
+    required double latitude,
+    required double longitude,
+  }) async {
+    if (_userModel == null) return false;
+
+    _setLoading(true);
+    try {
+      // First update the user profile
+      final updatedData = {
+        'name': name,
+        'email': email,
+        'isProfileComplete': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await _authService.updateProfile(_userModel!.uid, updatedData);
+
+      // Then save the address
+      final addressData = {
+        'type': 'home',
+        'addressLine1': addressLine1,
+        'addressLine2': addressLine2 ?? '',
+        'city': city,
+        'state': state,
+        'pincode': pincode,
+        'landmark': landmark ?? '',
+        'latitude': latitude,
+        'longitude': longitude,
+        'isPrimary': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      // Save address to Firestore
+      await FirebaseFirestore.instance
+          .collection('customer')
+          .doc(_userModel!.uid)
+          .collection('addresses')
+          .add(addressData);
+
+      // Optimistically update the local user model
+      _userModel = _userModel!.copyWith(
+        name: name,
+        email: email,
+        isProfileComplete: true,
+      );
+      
+      _safeNotifyListeners();
+      return true;
+    } catch (e) {
+      _logger.e('Error updating profile with address: $e');
+      _setError(ErrorHandler.getUserFriendlyMessage(e));
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<void> updateUserData(UserModel user) async {
     _userModel = user;
     _safeNotifyListeners();

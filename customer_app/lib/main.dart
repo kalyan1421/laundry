@@ -48,7 +48,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SpecialOfferProvider()),
       ],
       child: MaterialApp(
-        title: 'Laundry App',
+        title: 'Cloud Ironing Factory',
         theme: AppTheme.lightTheme,
         debugShowCheckedModeBanner: false,
         darkTheme: AppTheme.darkTheme,

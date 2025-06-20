@@ -75,7 +75,7 @@ class _MainWrapperState extends State<MainWrapper> {
       //   onPressed: () {},
       // ),
       title: const Text(
-        'Cloud Ironing',
+        'Cloud Ironing Factory',
         style: TextStyle(
           color: Colors.black,
           fontWeight: FontWeight.bold,

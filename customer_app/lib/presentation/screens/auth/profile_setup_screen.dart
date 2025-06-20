@@ -10,6 +10,8 @@ import 'package:customer_app/presentation/widgets/common/loading_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../../presentation/providers/auth_provider.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
@@ -21,29 +23,210 @@ class ProfileSetupScreen extends StatefulWidget {
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _pageController = PageController();
+  final _logger = Logger();
+  
+  // Controllers for form fields
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _logger = Logger();
+  final _addressLine1Controller = TextEditingController();
+  final _addressLine2Controller = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _pincodeController = TextEditingController();
+  final _landmarkController = TextEditingController();
+  
   File? _imageFile;
+  Position? _currentPosition;
+  String? _currentAddress;
+  bool _isLoadingLocation = false;
+  String? _locationError;
+  int _currentStep = 0;
+  
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _addressLine1Controller.dispose();
+    _addressLine2Controller.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _pincodeController.dispose();
+    _landmarkController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
-  void _submit() async {
-    if (_formKey.currentState!.validate()) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final success = await authProvider.updateProfile(
-        name: _nameController.text,
-        email: _emailController.text,
+  Future<void> _getCurrentLocation() async {
+    setState(() {
+      _isLoadingLocation = true;
+      _locationError = null;
+    });
+
+    try {
+      // Check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw Exception('Location services are disabled. Please enable them in settings.');
+      }
+
+      // Check location permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('Location permission denied. Please grant permission in settings.');
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception('Location permission permanently denied. Please grant permission in settings.');
+      }
+
+      // Get current position
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      // Get address from coordinates
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks.first;
+        setState(() {
+          _currentPosition = position;
+          _currentAddress = '${place.street}, ${place.locality}, ${place.administrativeArea} ${place.postalCode}';
+          
+          // Pre-fill address fields
+          _addressLine1Controller.text = place.street ?? '';
+          _cityController.text = place.locality ?? '';
+          _stateController.text = place.administrativeArea ?? '';
+          _pincodeController.text = place.postalCode ?? '';
+          
+          _isLoadingLocation = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _locationError = e.toString();
+        _isLoadingLocation = false;
+      });
+      _logger.e('Error getting location: $e');
+    }
+  }
+
+  void _nextStep() {
+    if (_currentStep == 0) {
+      // Validate basic info step
+      if (_nameController.text.trim().isEmpty) {
+        _showSnackBar('Please enter your name', isError: true);
+        return;
+      }
+      if (_emailController.text.trim().isEmpty || !Validators.isValidEmail(_emailController.text.trim())) {
+        _showSnackBar('Please enter a valid email address', isError: true);
+        return;
+      }
+    }
+    
+    if (_currentStep < 1) {
+      setState(() {
+        _currentStep++;
+      });
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      _submitProfile();
+    }
+  }
+
+  void _previousStep() {
+    if (_currentStep > 0) {
+      setState(() {
+        _currentStep--;
+      });
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _submitProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    // Check if location is available
+    if (_currentPosition == null) {
+      _showSnackBar('Please enable location services to continue', isError: true);
+      return;
+    }
+
+    // Validate required address fields
+    if (_addressLine1Controller.text.trim().isEmpty) {
+      _showSnackBar('Please enter address line 1', isError: true);
+      return;
+    }
+    if (_cityController.text.trim().isEmpty) {
+      _showSnackBar('Please enter city', isError: true);
+      return;
+    }
+    if (_stateController.text.trim().isEmpty) {
+      _showSnackBar('Please enter state', isError: true);
+      return;
+    }
+    if (_pincodeController.text.trim().isEmpty) {
+      _showSnackBar('Please enter pincode', isError: true);
+      return;
+    }
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    try {
+      // Use the new method that saves both profile and address
+      final success = await authProvider.updateProfileWithAddress(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        addressLine1: _addressLine1Controller.text.trim(),
+        addressLine2: _addressLine2Controller.text.trim().isEmpty ? null : _addressLine2Controller.text.trim(),
+        city: _cityController.text.trim(),
+        state: _stateController.text.trim(),
+        pincode: _pincodeController.text.trim(),
+        landmark: _landmarkController.text.trim().isEmpty ? null : _landmarkController.text.trim(),
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
       );
 
       if (success) {
+        _showSnackBar('Profile setup completed successfully!');
+        // Navigate to home
         Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+      } else {
+        _showSnackBar(authProvider.errorMessage ?? 'Failed to complete profile setup', isError: true);
       }
+    } catch (e) {
+      _showSnackBar('An error occurred. Please try again.', isError: true);
+      _logger.e('Error submitting profile: $e');
     }
   }
 
@@ -55,56 +238,318 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       appBar: AppBar(
         title: const Text('Setup Your Profile'),
         backgroundColor: AppColors.primary,
+        leading: _currentStep > 0 
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: _previousStep,
+            )
+          : null,
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
+      body: Column(
+        children: [
+          // Progress indicator
+          Container(
+            padding: const EdgeInsets.all(16),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Text(
-                  'Almost there!',
-                  style: AppTextTheme.headlineMedium.copyWith(color: AppColors.textPrimary),
-                  textAlign: TextAlign.center,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: LinearProgressIndicator(
+                        value: (_currentStep + 1) / 2,
+                        backgroundColor: Colors.grey[300],
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Let\'s get your name and email set up.',
-                  style: AppTextTheme.bodyLarge.copyWith(color: AppColors.textSecondary),
-                  textAlign: TextAlign.center,
+                  'Step ${_currentStep + 1} of 2',
+                  style: AppTextTheme.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-                const SizedBox(height: 40),
-                CustomTextField(
-                  controller: _nameController,
-                  labelText: 'Full Name',
-                  hintText: 'Enter your full name',
-                  prefixIcon: Icons.person_outline_rounded,
-                  validator: Validators.validateName,
-                  keyboardType: TextInputType.name,
-                ),
-                const SizedBox(height: 20),
-                CustomTextField(
-                  controller: _emailController,
-                  labelText: 'Email Address',
-                  hintText: 'Enter your email address',
-                  prefixIcon: Icons.email_outlined,
-                  validator: Validators.validateEmail,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 40),
-                authProvider.isLoading
-                    ? const LoadingWidget()
-                    : CustomButton(
-                        text: 'Continue',
-                        onPressed: _submit,
-                      ),
               ],
             ),
           ),
+          
+          // Page content
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildBasicInfoStep(),
+                _buildLocationStep(),
+              ],
+            ),
+          ),
+          
+          // Bottom navigation
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                if (_currentStep > 0)
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _previousStep,
+                      child: const Text('Previous'),
+                    ),
+                  ),
+                if (_currentStep > 0) const SizedBox(width: 16),
+                Expanded(
+                  child: authProvider.isLoading
+                      ? const LoadingWidget()
+                      : CustomButton(
+                          text: _currentStep == 1 ? 'Complete Setup' : 'Next',
+                          onPressed: _nextStep,
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBasicInfoStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Tell us about yourself',
+              style: AppTextTheme.headlineMedium.copyWith(color: AppColors.textPrimary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Let\'s start with your basic information',
+              style: AppTextTheme.bodyLarge.copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 40),
+            
+            // Profile picture placeholder
+            Center(
+              child: GestureDetector(
+                onTap: () {
+                  // TODO: Implement image picker
+                },
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary.withOpacity(0.1),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                  ),
+                  child: Icon(
+                    Icons.add_a_photo,
+                    size: 40,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap to add profile picture (optional)',
+              style: AppTextTheme.bodySmall.copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 40),
+            
+            CustomTextField(
+              controller: _nameController,
+              labelText: 'Full Name',
+              hintText: 'Enter your full name',
+              prefixIcon: Icons.person_outline_rounded,
+              validator: Validators.validateName,
+              keyboardType: TextInputType.name,
+            ),
+            const SizedBox(height: 20),
+            CustomTextField(
+              controller: _emailController,
+              labelText: 'Email Address',
+              hintText: 'Enter your email address',
+              prefixIcon: Icons.email_outlined,
+              validator: Validators.validateEmail,
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLocationStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Your delivery address',
+            style: AppTextTheme.headlineMedium.copyWith(color: AppColors.textPrimary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'We\'ll use this for pickup and delivery',
+            style: AppTextTheme.bodyLarge.copyWith(color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 40),
+          
+          // Current location card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _currentPosition != null ? AppColors.success.withOpacity(0.1) : AppColors.error.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _currentPosition != null ? AppColors.success.withOpacity(0.3) : AppColors.error.withOpacity(0.3),
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _currentPosition != null ? Icons.location_on : Icons.location_off,
+                      color: _currentPosition != null ? AppColors.success : AppColors.error,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _currentPosition != null ? 'Current Location Detected' : 'Location Access Required',
+                            style: AppTextTheme.titleSmall.copyWith(
+                              color: _currentPosition != null ? AppColors.success : AppColors.error,
+                            ),
+                          ),
+                          if (_currentAddress != null)
+                            Text(
+                              _currentAddress!,
+                              style: AppTextTheme.bodySmall.copyWith(color: AppColors.textSecondary),
+                            ),
+                          if (_locationError != null)
+                            Text(
+                              _locationError!,
+                              style: AppTextTheme.bodySmall.copyWith(color: AppColors.error),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (_isLoadingLocation) ...[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(),
+                ],
+                if (_locationError != null) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _getCurrentLocation,
+                      child: const Text('Retry Location'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Address form
+          CustomTextField(
+            controller: _addressLine1Controller,
+            labelText: 'Address Line 1',
+            hintText: 'House/Building number, Street name',
+            prefixIcon: Icons.home_outlined,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter your address';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          CustomTextField(
+            controller: _addressLine2Controller,
+            labelText: 'Address Line 2 (Optional)',
+            hintText: 'Area, Locality',
+            prefixIcon: Icons.location_city_outlined,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: CustomTextField(
+                  controller: _cityController,
+                  labelText: 'City',
+                  hintText: 'City',
+                  prefixIcon: Icons.location_city,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter city';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomTextField(
+                  controller: _pincodeController,
+                  labelText: 'Pincode',
+                  hintText: 'Pincode',
+                  prefixIcon: Icons.pin_drop,
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter pincode';
+                    }
+                    if (value.length != 6) {
+                      return 'Invalid pincode';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          CustomTextField(
+            controller: _stateController,
+            labelText: 'State',
+            hintText: 'State',
+            prefixIcon: Icons.map_outlined,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter state';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          CustomTextField(
+            controller: _landmarkController,
+            labelText: 'Landmark (Optional)',
+            hintText: 'Nearby landmark for easy identification',
+            prefixIcon: Icons.place_outlined,
+          ),
+        ],
       ),
     );
   }

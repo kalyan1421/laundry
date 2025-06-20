@@ -80,6 +80,12 @@ class Validators {
     return null;
   }
   
+  // Static method to check if email is valid (returns boolean)
+  static bool isValidEmail(String email) {
+    String trimmedValue = email.trim().toLowerCase();
+    return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(trimmedValue);
+  }
+  
   // Address validation
   static String? validateAddress(String? value, {String fieldName = 'Address'}) {
     if (value == null || value.isEmpty) {

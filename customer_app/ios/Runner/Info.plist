@@ -8,10 +8,6 @@
     <string>This app needs location access to provide delivery services and find nearby service areas.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-    <string>This app needs access to location to provide accurate delivery services.</string>
-    <key>NSLocationAlwaysUsageDescription</key>
-    <string>This app needs access to location to provide accurate delivery services.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Customer App</string>
 	<key>CFBundleExecutable</key>

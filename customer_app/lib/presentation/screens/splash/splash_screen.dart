@@ -23,16 +23,16 @@ class _SplashScreenState extends State<SplashScreen> {
             Container(
               width: 120,
               height: 120,
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(20),
-              ),
+              // decoration: BoxDecoration(
+              //   color: Colors.grey[100],
+              //   borderRadius: BorderRadius.circular(20),
+              // ),
               child: Image.asset("assets/icons/icon.png", fit: BoxFit.cover),
             ),
             const SizedBox(height: 30),
             // App title
             const Text(
-              'CLOUD IRONING',
+              'CLOUD IRONING FACTORY',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,

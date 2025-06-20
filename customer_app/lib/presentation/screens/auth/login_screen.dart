@@ -218,7 +218,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         // Logo and welcome text
                         _buildHeader(),
 
-                        const SizedBox(height: 16), // Reduced from 20
+                        const SizedBox(height: 20), // Reduced from 20
 
                         // Phone number input
                         _buildPhoneInput(authProvider),
@@ -228,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         // Continue button
                         _buildContinueButton(authProvider),
 
-                        const SizedBox(height: 24), // Reduced from 35
+                        const SizedBox(height: 20), // Reduced from 35
 
                         // Social login section
                         _buildSocialLogin(),
@@ -253,19 +253,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildHeader() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         // Iron icon - Reduced size
-        Container(
-          width: 200, // Reduced from 250
-          height: 200, // Reduced from 250
-          child: Image.asset("assets/icons/icon.png"),
-        ),
+        Image.asset("assets/icons/icon.png", width: 200, height: 200),
 
         const SizedBox(height: 8),
 
         // App title with SF Pro Display
-        AppText.appTitle('Welcome to CLOUD IRONING'),
-
+        AppText.appTitle('Welcome to'),
+        AppText.appTitle('Cloud Ironing Factory pvt ltd'),
         const SizedBox(height: 6),
 
         // Subtitle with SF Pro Display
