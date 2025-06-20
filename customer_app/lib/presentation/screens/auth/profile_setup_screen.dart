@@ -280,6 +280,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
     try {
+      // Log coordinates before sending
+      _logger.i('Profile Setup - Coordinates to save:');
+      _logger.i('Latitude: ${_currentPosition!.latitude}');
+      _logger.i('Longitude: ${_currentPosition!.longitude}');
+      _logger.i('Position accuracy: ${_currentPosition!.accuracy}');
+      _logger.i('Position timestamp: ${_currentPosition!.timestamp}');
+      
       // Create detailed address string
       List<String> addressComponents = [];
       
@@ -298,6 +305,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         addressLine1 = '${addressComponents.join(', ')}, $addressLine1';
       }
 
+      _logger.i('Profile Setup - Address components:');
+      _logger.i('Final Address Line 1: $addressLine1');
+      _logger.i('Address Line 2: ${_nearbyLandmarkController.text.trim().isEmpty ? 'None' : 'Near: ${_nearbyLandmarkController.text.trim()}'}');
+      _logger.i('City: ${_cityController.text.trim()}');
+      _logger.i('State: ${_stateController.text.trim()}');
+      _logger.i('Pincode: ${_pincodeController.text.trim()}');
+
       // Use the new method that saves both profile and address
       final success = await authProvider.updateProfileWithAddress(
         name: _nameController.text.trim(),
@@ -313,15 +327,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       );
 
       if (success) {
+        _logger.i('Profile Setup - Success! Address saved with coordinates');
         _showSnackBar('Profile setup completed successfully!');
         // Navigate to home
         Navigator.of(context).pushReplacementNamed(AppRoutes.home);
       } else {
+        _logger.e('Profile Setup - Failed to save profile/address');
         _showSnackBar(authProvider.errorMessage ?? 'Failed to complete profile setup', isError: true);
       }
     } catch (e) {
+      _logger.e('Profile Setup - Exception occurred: $e');
       _showSnackBar('An error occurred. Please try again.', isError: true);
-      _logger.e('Error submitting profile: $e');
     }
   }
 

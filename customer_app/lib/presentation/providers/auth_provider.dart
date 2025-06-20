@@ -404,6 +404,10 @@ class AuthProvider extends ChangeNotifier {
 
     _setLoading(true);
     try {
+      _logger.i('Starting profile update with address');
+      _logger.i('User ID: ${_userModel!.uid}');
+      _logger.i('Latitude: $latitude, Longitude: $longitude');
+      
       // First update the user profile
       final updatedData = {
         'name': name,
@@ -413,6 +417,7 @@ class AuthProvider extends ChangeNotifier {
       };
 
       await _authService.updateProfile(_userModel!.uid, updatedData);
+      _logger.i('User profile updated successfully');
 
       // Then save the address with detailed information
       final addressData = {
@@ -433,12 +438,42 @@ class AuthProvider extends ChangeNotifier {
         'searchableText': _buildSearchableText(addressLine1, addressLine2, city, state, pincode, landmark),
       };
 
+      _logger.i('Address data to be saved:');
+      _logger.i('Type: ${addressData['type']}');
+      _logger.i('AddressLine1: ${addressData['addressLine1']}');
+      _logger.i('AddressLine2: ${addressData['addressLine2']}');
+      _logger.i('City: ${addressData['city']}');
+      _logger.i('State: ${addressData['state']}');
+      _logger.i('Pincode: ${addressData['pincode']}');
+      _logger.i('Landmark: ${addressData['landmark']}');
+      _logger.i('Latitude: ${addressData['latitude']} (Type: ${addressData['latitude'].runtimeType})');
+      _logger.i('Longitude: ${addressData['longitude']} (Type: ${addressData['longitude'].runtimeType})');
+      _logger.i('IsPrimary: ${addressData['isPrimary']}');
+
       // Save address to Firestore
-      await FirebaseFirestore.instance
+      _logger.i('Saving address to Firestore...');
+      final docRef = await FirebaseFirestore.instance
           .collection('customer')
           .doc(_userModel!.uid)
           .collection('addresses')
           .add(addressData);
+      
+      _logger.i('Address saved successfully with document ID: ${docRef.id}');
+
+      // Verify the saved data by reading it back
+      try {
+        final savedDoc = await docRef.get();
+        if (savedDoc.exists) {
+          final savedData = savedDoc.data();
+          _logger.i('Verified saved address data:');
+          _logger.i('Saved Latitude: ${savedData?['latitude']} (Type: ${savedData?['latitude'].runtimeType})');
+          _logger.i('Saved Longitude: ${savedData?['longitude']} (Type: ${savedData?['longitude'].runtimeType})');
+        } else {
+          _logger.e('Document was not saved properly - does not exist');
+        }
+      } catch (e) {
+        _logger.e('Error verifying saved data: $e');
+      }
 
       // Optimistically update the local user model
       _userModel = _userModel!.copyWith(
