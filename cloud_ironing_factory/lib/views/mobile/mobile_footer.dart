@@ -29,13 +29,13 @@ class MobileFooter extends StatelessWidget {
                   height: 80,
                   decoration: BoxDecoration(
                     color: AppTheme.white,
-                    borderRadius: BorderRadius.circular(40),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(40),
+                    borderRadius: BorderRadius.circular(10),
                     child: Image.asset(
                       'assets/images/logo.png',
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           decoration: BoxDecoration(
@@ -54,7 +54,7 @@ class MobileFooter extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Cloud Ironing\nFactory',
+                  'Cloud Ironing Factory',
                   style: TextStyle(
                     color: AppTheme.white,
                     fontSize: 16,
@@ -65,9 +65,9 @@ class MobileFooter extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Company Info Section
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,7 +83,7 @@ class MobileFooter extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Navigation Links
                 Center(
                   child: Wrap(
@@ -97,31 +97,34 @@ class MobileFooter extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Contact Info
                 _buildFooterContactItem(Icons.phone, '+91 9566654788'),
                 _buildFooterContactItem(Icons.phone, '+91 6382654316'),
-                _buildFooterContactItem(Icons.email, 'cloudironingfactory@gmail.com'),
-                
+                _buildFooterContactItem(
+                  Icons.email,
+                  'cloudironingfactory@gmail.com',
+                ),
+
                 const SizedBox(height: 16),
-                
+
                 // Addresses
                 _buildFooterContactItem(
-                  Icons.location_on, 
-                  'Registered Address: Tulip A5, Majestic Orchid, Ben Foundation, Jaswanth Nagar, Mogappair West, Chennai - 600037.'
+                  Icons.location_on,
+                  'Registered Address: Tulip A5, Majestic Orchid, Ben Foundation, Jaswanth Nagar, Mogappair West, Chennai - 600037.',
                 ),
                 const SizedBox(height: 8),
                 _buildFooterContactItem(
-                  Icons.business, 
-                  'Administrative Office Address: B-10, Mogappair West Industrial Estate, Reddypalayam Road, 3rd Street Mogappair West Estate, Chennai - 600037'
+                  Icons.business,
+                  'Administrative Office Address: B-10, Mogappair West Industrial Estate, Reddypalayam Road, 3rd Street Mogappair West Estate, Chennai - 600037',
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // QR Code and Download App Section
             Column(
               children: [
@@ -135,13 +138,13 @@ class MobileFooter extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                
+
                 // QR Code
                 Container(
-                  width: 100,
-                  height: 100,
+                  width: MediaQuery.of(context).size.width * 0.8,
+                  height: MediaQuery.of(context).size.width * 0.8,
                   decoration: BoxDecoration(
-                    color: AppTheme.white,
+                    color: Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: ClipRRect(

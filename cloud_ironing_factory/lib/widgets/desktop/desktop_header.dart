@@ -6,10 +6,8 @@ import '../../theme/app_theme.dart';
 class ResponsiveHeader extends StatefulWidget {
   final Function(double) onNavigate;
 
-  const ResponsiveHeader({
-    Key? key,
-    required this.onNavigate,
-  }) : super(key: key);
+  const ResponsiveHeader({Key? key, required this.onNavigate})
+    : super(key: key);
 
   @override
   State<ResponsiveHeader> createState() => _ResponsiveHeaderState();
@@ -47,7 +45,7 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
               tablet: 60.0,
               desktop: 80.0,
             ),
-            
+
             decoration: BoxDecoration(
               color: AppTheme.primaryNavy,
               borderRadius: BorderRadius.circular(40),
@@ -62,7 +60,7 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
             child: Padding(
               padding: ResponsiveHelper.getResponsivePadding(
                 context,
-                desktop: const EdgeInsets.symmetric(horizontal: 100),
+                desktop: const EdgeInsets.symmetric(horizontal: 80),
                 tablet: const EdgeInsets.symmetric(horizontal: 30),
                 mobile: const EdgeInsets.symmetric(horizontal: 20),
               ),
@@ -75,16 +73,16 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
                       'Cloud Ironing Factory',
                       mobileSize: 16,
                       tabletSize: 20,
-                      desktopSize: 26,
+                      desktopSize: 32,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                       fontFamily: AppTheme.primaryFont,
                     ),
                   ),
-                  
+
                   // Spacer for center logo
-                  const SizedBox(width: 160),
-                  
+                  Spacer(),
+
                   // Navigation links - only show on larger screens
                   if (ResponsiveHelper.isDesktop(context)) ...[
                     const Spacer(),
@@ -100,7 +98,7 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
               ),
             ),
           ),
-          
+
           // Half-circle logo container positioned on top center
           Positioned(
             left: 0,
@@ -109,69 +107,72 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
             child: ClipRect(
               child: Align(
                 alignment: Alignment.bottomCenter,
-                  heightFactor: 0.5, // Show only bottom 50% to create half-circle
-                  child: Container(
-                    width: ResponsiveHelper.getResponsiveValue(
-                      context,
-                      mobile: 100.0,
-                      tablet: 120.0,
-                      desktop: 180.0,
-                    ),
-                    height: ResponsiveHelper.getResponsiveValue(
-                      context,
-                      mobile: 100.0,
-                      tablet: 120.0,
-                      desktop: 180.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.accentAzure.withOpacity(0.2),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
+                heightFactor: 0.5, // Show only bottom 50% to create half-circle
+                child: Container(
+                  clipBehavior: Clip.none,
+                  width: ResponsiveHelper.getResponsiveValue(
+                    context,
+                    mobile: 100.0,
+                    tablet: 120.0,
+                    desktop: 200.0,
+                  ),
+                  height: ResponsiveHelper.getResponsiveValue(
+                    context,
+                    mobile: 100.0,
+                    tablet: 120.0,
+                    desktop: 180.0,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.accentAzure.withOpacity(0.2),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        top: 70, // Adjusted for better visibility
+                      ), // Position logo in visible half
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: ResponsiveHelper.getResponsiveValue(
+                          context,
+                          mobile: 40.0,
+                          tablet: 50.0,
+                          desktop: 100.0,
                         ),
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
+                        height: ResponsiveHelper.getResponsiveValue(
+                          context,
+                          mobile: 40.0,
+                          tablet: 50.0,
+                          desktop: 100.0,
                         ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 30), // Position logo in visible half
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          width: ResponsiveHelper.getResponsiveValue(
-                            context,
-                            mobile: 40.0,
-                            tablet: 50.0,
-                            desktop: 100.0,
-                          ),
-                          height: ResponsiveHelper.getResponsiveValue(
-                            context,
-                            mobile: 40.0,
-                            tablet: 50.0,
-                            desktop: 100.0,
-                          ),
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(
-                              Icons.iron,
-                              color: AppTheme.accentAzure,
-                              size: ResponsiveHelper.getResponsiveValue(
-                                context,
-                                mobile: 35.0,
-                                tablet: 40.0,
-                                desktop: 50.0,
-                              ),
-                            );
-                          },
-                        ),
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            Icons.iron,
+                            color: AppTheme.accentAzure,
+                            size: ResponsiveHelper.getResponsiveValue(
+                              context,
+                              mobile: 35.0,
+                              tablet: 40.0,
+                              desktop: 50.0,
+                            ),
+                          );
+                        },
                       ),
                     ),
+                  ),
                 ),
               ),
             ),
@@ -222,10 +223,10 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
                           fontFamily: AppTheme.primaryFont,
                         ),
                       ),
-                      
+
                       // Spacer for center logo
                       const SizedBox(width: 100),
-                      
+
                       IconButton(
                         onPressed: () {
                           setState(() {
@@ -242,7 +243,7 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
                   ),
                 ),
               ),
-              
+
               // Half-circle logo container positioned on top center
               Positioned(
                 left: 0,
@@ -252,7 +253,8 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
                   child: ClipRect(
                     child: Align(
                       alignment: Alignment.bottomCenter,
-                      heightFactor: 0.5, // Show only bottom 50% to create half-circle
+                      heightFactor:
+                          0.5, // Show only bottom 50% to create half-circle
                       child: Container(
                         width: 160,
                         height: 160,
@@ -269,7 +271,9 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
                         ),
                         child: Center(
                           child: Padding(
-                            padding: const EdgeInsets.only(top: 25), // Position logo in visible half
+                            padding: const EdgeInsets.only(
+                              top: 25,
+                            ), // Position logo in visible half
                             child: Image.asset(
                               'assets/images/logo.png',
                               width: ResponsiveHelper.getResponsiveValue(
@@ -307,7 +311,7 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
               ),
             ],
           ),
-          
+
           // Expandable menu for tablet
           if (_isMenuOpen) _buildExpandableMenu(),
         ],
@@ -335,7 +339,10 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
             Padding(
               padding: ResponsiveHelper.getResponsivePadding(
                 context,
-                mobile: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                mobile: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
               ),
               child: Row(
                 children: [
@@ -386,9 +393,10 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
                   // Hamburger Menu Icon
                   Container(
                     decoration: BoxDecoration(
-                      color: _isMenuOpen 
-                        ? AppTheme.accentAzure.withOpacity(0.1)
-                        : Colors.transparent,
+                      color:
+                          _isMenuOpen
+                              ? AppTheme.accentAzure.withOpacity(0.1)
+                              : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: IconButton(
@@ -446,7 +454,11 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
           _buildDivider(),
           _buildMobileNavLink('About Us', 600.0, Icons.info_outline),
           _buildDivider(),
-          _buildMobileNavLink('Services', 2000.0, Icons.cleaning_services_outlined),
+          _buildMobileNavLink(
+            'Services',
+            2000.0,
+            Icons.cleaning_services_outlined,
+          ),
           _buildDivider(),
           _buildMobileNavLink('Contact Us', 300.0, Icons.headset_mic_outlined),
           const SizedBox(height: 16),
@@ -469,7 +481,7 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
             mobileSize: 14,
             tabletSize: 16,
             desktopSize: 18,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
             color: Colors.white,
             fontFamily: AppTheme.primaryFont,
           ),
@@ -499,11 +511,7 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
           ),
           child: Row(
             children: [
-              Icon(
-                icon,
-                color: const Color(0xFF1E3A8A),
-                size: 20,
-              ),
+              Icon(icon, color: const Color(0xFF1E3A8A), size: 20),
               const SizedBox(width: 16),
               ResponsiveText(
                 title,

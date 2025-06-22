@@ -26,6 +26,19 @@ class MobileHeroSection extends StatelessWidget {
     }
   }
 
+  Future<void> _DownloadApp() async {
+    final Uri _DownloadApp = Uri.parse(
+      'https://play.google.com/store/apps/details?id=com.cloudironingfactory.customer',
+    );
+    try {
+      if (await canLaunchUrl(_DownloadApp)) {
+        await launchUrl(_DownloadApp, mode: LaunchMode.externalApplication);
+      } else {}
+    } catch (e) {
+      print('Error booking pickup: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -37,51 +50,55 @@ class MobileHeroSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 20),
-            
+
             // Hero Title
             _buildHeroTitle(context),
             const SizedBox(height: 24),
-            
+
             // Hero Image
             Center(
-              child: Image.asset(
-                'assets/images/hero_ironing.jpg',
-                height: 250,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 250,
-                    width: 250,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(
-                          Icons.dry_cleaning,
-                          size: 80,
-                          color: AppTheme.primaryBlue,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'Professional Ironing Services',
-                          style: TextStyle(
-                            color: AppTheme.textDark,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+
+                child: Image.asset(
+                  'images/hero-image.png',
+                  height: 250,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 250,
+                      width: 250,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(
+                            Icons.dry_cleaning,
+                            size: 80,
+                            color: AppTheme.primaryBlue,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                          SizedBox(height: 16),
+                          Text(
+                            'Professional Ironing Services',
+                            style: TextStyle(
+                              color: AppTheme.textDark,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Subtitle
             Text(
               'Convenient Door-To-Door Ironing\nServices That Save You Time.',
@@ -95,7 +112,7 @@ class MobileHeroSection extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
-            
+
             // CTA Button
             ElevatedButton(
               onPressed: () {
@@ -103,7 +120,10 @@ class MobileHeroSection extends StatelessWidget {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryBlue,
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 15,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
@@ -111,6 +131,32 @@ class MobileHeroSection extends StatelessWidget {
               child: const Text(
                 'Book a Pickup',
                 style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: AppTheme.primaryFont,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                _DownloadApp();
+              },
+              style: ElevatedButton.styleFrom(
+                side: BorderSide(color: AppTheme.primaryBlue, width: 2),
+                backgroundColor: AppTheme.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 15,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: const Text(
+                'Download App',
+                style: TextStyle(
+                  color: AppTheme.primaryBlue,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   fontFamily: AppTheme.primaryFont,
@@ -127,15 +173,15 @@ class MobileHeroSection extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         // Adjust font size for mobile
-        double fontSize = 35;
+        double fontSize = 50;
 
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 40),
             // First line: "We Pick Up"
             RichText(
-              textAlign: TextAlign.center,
+              textAlign: TextAlign.left,
               text: TextSpan(
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(
                   fontSize: fontSize,
@@ -147,7 +193,7 @@ class MobileHeroSection extends StatelessWidget {
                     text: 'We ',
                     style: TextStyle(
                       color: AppTheme.textDark,
-                      fontWeight: FontWeight.normal,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   TextSpan(
@@ -160,7 +206,7 @@ class MobileHeroSection extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // Second line: "We Iron" with logo
             Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
@@ -168,6 +214,7 @@ class MobileHeroSection extends StatelessWidget {
               runSpacing: 10.0,
               children: [
                 RichText(
+                  textAlign: TextAlign.left,
                   text: TextSpan(
                     style: Theme.of(context).textTheme.displayLarge?.copyWith(
                       fontSize: fontSize,
@@ -179,7 +226,7 @@ class MobileHeroSection extends StatelessWidget {
                         text: 'We ',
                         style: TextStyle(
                           color: AppTheme.textDark,
-                          fontWeight: FontWeight.normal,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       TextSpan(
@@ -227,10 +274,10 @@ class MobileHeroSection extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             // Third line: "We Deliver"
             RichText(
-              textAlign: TextAlign.center,
+              textAlign: TextAlign.left,
               text: TextSpan(
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(
                   fontSize: fontSize,

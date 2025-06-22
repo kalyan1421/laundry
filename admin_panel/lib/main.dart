@@ -26,14 +26,12 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   // Initialize FCM service
   final fcmService = FcmService();
   await fcmService.initialize(null);
-  
+
   runApp(const AdminPanelApp());
 }
 
@@ -87,10 +85,11 @@ class AdminPanelApp extends StatelessWidget {
             final args = settings.arguments as Map<String, dynamic>?;
             if (args != null) {
               return MaterialPageRoute(
-                builder: (context) => OTPVerificationScreen(
-                  phoneNumber: args['phoneNumber'] as String,
-                  expectedRole: args['expectedRole'] as UserRole,
-                ),
+                builder:
+                    (context) => OTPVerificationScreen(
+                      phoneNumber: args['phoneNumber'] as String,
+                      expectedRole: args['expectedRole'] as UserRole,
+                    ),
               );
             }
           } else if (settings.name == '/order_details') {
@@ -122,8 +121,10 @@ class AuthWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
-        print('🔥 AuthWrapper: Status=${authProvider.authStatus}, Role=${authProvider.userRole}');
-        
+        print(
+          '🔥 AuthWrapper: Status=${authProvider.authStatus}, Role=${authProvider.userRole}',
+        );
+
         // Show loading
         if (authProvider.authStatus == AuthStatus.loading) {
           return const Scaffold(
@@ -145,12 +146,12 @@ class AuthWrapper extends StatelessWidget {
         if (authProvider.isAuthenticated && authProvider.userRole != null) {
           final role = authProvider.userRole!;
           print('🔥 AuthWrapper: Authenticated user with role: $role');
-          
+
           // Ensure FCM token is saved for delivery partners
           if (role == UserRole.delivery) {
             _ensureDeliveryFCMToken(authProvider);
           }
-          
+
           switch (role) {
             case UserRole.admin:
               return const AdminHome();
@@ -158,7 +159,7 @@ class AuthWrapper extends StatelessWidget {
               return const DeliveryHome();
           }
         }
-        
+
         // Show login screen
         print('🔥 AuthWrapper: Not authenticated, showing LoginScreen');
         return const LoginScreen();
@@ -189,31 +190,28 @@ class TaskDetailWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('orders')
-          .doc(orderId)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('orders')
+              .doc(orderId)
+              .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
         if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Error'),
-            ),
-            body: const Center(
-              child: Text('Order not found'),
-            ),
+            appBar: AppBar(title: const Text('Error')),
+            body: const Center(child: Text('Order not found')),
           );
         }
 
-        final order = OrderModel.fromFirestore(snapshot.data! as DocumentSnapshot<Map<String, dynamic>>);
+        final order = OrderModel.fromFirestore(
+          snapshot.data! as DocumentSnapshot<Map<String, dynamic>>,
+        );
 
         return TaskDetailScreen(order: order);
       },

@@ -16,18 +16,18 @@ class MobileSpecialServicesSection extends StatelessWidget {
           // Section Title
           _buildSectionTitle(context),
           const SizedBox(height: 40),
-          
+
           // Special Services Cards (Stacked vertically for mobile)
           _buildMobileServiceCard(
             context,
             'Perfumed',
             'Ironing',
-            'Elevate Your Laundry Experience With Our Perfumed Ironing Service. We Infuse Your Clothes With A Delicate, Long-Lasting Fragrance, Leaving Them Fresh And Beautifully Scented. Choose From Our Selection Of Premium, Garment-Safe Perfumes For A Truly Luxurious Finish.',
-            'assets/images/perfumed_ironing.jpeg',
+            'Elevate Your Ironing Experience With Our Perfumed Ironing Service. We Infuse Your Clothes With A Delicate, Long-Lasting Fragrance, Leaving Them Fresh And Beautifully Scented. Choose From Our Selection Of Premium, Garment-Safe Perfumes For A Truly Luxurious Finish.',
+            'images/perfumed-ironoing.png',
             Icons.local_florist,
           ),
           const SizedBox(height: 30),
-          
+
           _buildMobileServiceCard(
             context,
             'Stiff And Starch',
@@ -37,7 +37,7 @@ class MobileSpecialServicesSection extends StatelessWidget {
             Icons.straighten,
           ),
           const SizedBox(height: 30),
-          
+
           _buildMobileServiceCard(
             context,
             'Instant',
@@ -89,9 +89,7 @@ class MobileSpecialServicesSection extends StatelessWidget {
   ) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: AppTheme.white,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -134,7 +132,7 @@ class MobileSpecialServicesSection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // Title
             RichText(
               text: TextSpan(
@@ -161,7 +159,7 @@ class MobileSpecialServicesSection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Description
             Text(
               description,

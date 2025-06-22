@@ -26,6 +26,19 @@ class DesktopHeroSection extends StatelessWidget {
     }
   }
 
+  Future<void> _DownloadApp() async {
+    final Uri _DownloadApp = Uri.parse(
+      'https://play.google.com/store/apps/details?id=com.cloudironingfactory.customer',
+    );
+    try {
+      if (await canLaunchUrl(_DownloadApp)) {
+        await launchUrl(_DownloadApp, mode: LaunchMode.externalApplication);
+      } else {}
+    } catch (e) {
+      print('Error booking pickup: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -37,17 +50,18 @@ class DesktopHeroSection extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(width: 50,),
+            SizedBox(width: 50),
             // Left Content
             Expanded(
               child: Column(
+                spacing: 40.0, // Increased spacing
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Title with colored words and logo
                   _buildHeroTitle(context),
-                  const SizedBox(height: 24),
-                  
+
                   // Subtitle
                   Text(
                     'Convenient Door-To-Door Ironing\nServices That Save You Time.',
@@ -58,84 +72,127 @@ class DesktopHeroSection extends StatelessWidget {
                       fontFamily: AppTheme.primaryFont,
                     ),
                   ),
-                  const SizedBox(height: 40),
-                  
+
                   // CTA Button
-                  ElevatedButton(
-                    onPressed: () {
-                      _bookPickup();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
+                  Wrap(
+                    runSpacing: 10,
+                    spacing: 10,
+                    // mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          _bookPickup();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryBlue,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 20,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: const Text(
+                          'Book a Pickup',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: AppTheme.primaryFont,
+                          ),
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      'Book a Pickup',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: AppTheme.primaryFont,
+                      ElevatedButton(
+                        onPressed: () {
+                          _DownloadApp();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          side: BorderSide(
+                            color: AppTheme.primaryBlue,
+                            width: 2,
+                          ),
+                          backgroundColor: AppTheme.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 20,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: const Text(
+                          'Download App',
+                          style: TextStyle(
+                            color: AppTheme.primaryBlue,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: AppTheme.primaryFont,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
             ),
-            
+
             // Right Image
             Expanded(
-            // flex: 4,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Image.asset(
-                width: 400, 
-                'assets/images/hero_ironing.jpg',
-                height: 400,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                      height: 500,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppTheme.primaryBlue, AppTheme.darkBlue],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(
-                          Icons.business,
-                          size: 80,
-                          color: AppTheme.white,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'Professional Team',
-                          style: TextStyle(
-                            color: AppTheme.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Expert Ironing Services',
-                          style: TextStyle(
-                            color: AppTheme.white,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),),
+              // flex: 4,
+              child: Container(
+                width: 400,
+                height: 500,
+                margin: const EdgeInsets.only(top: 50),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  image: DecorationImage(
+                    image: AssetImage('images/hero-image.png'),
+                    fit: BoxFit.cover,
+                  ),
+                ),
 
+                // child: Image.asset(
+                //   width: 400,
+                //   'images/hero-image.png',
+                //   height: 400,
+                //   fit: BoxFit.contain,
+                //   errorBuilder: (context, error, stackTrace) {
+                //     return Container(
+                //       height: 500,
+                //       decoration: BoxDecoration(
+                //         gradient: const LinearGradient(
+                //           colors: [AppTheme.primaryBlue, AppTheme.darkBlue],
+                //         ),
+                //         borderRadius: BorderRadius.circular(20),
+                //       ),
+                //       child: Column(
+                //         mainAxisAlignment: MainAxisAlignment.center,
+                //         children: const [
+                //           Icon(Icons.business, size: 80, color: AppTheme.white),
+                //           SizedBox(height: 16),
+                //           Text(
+                //             'Professional Team',
+                //             style: TextStyle(
+                //               color: AppTheme.white,
+                //               fontSize: 24,
+                //               fontWeight: FontWeight.bold,
+                //             ),
+                //           ),
+                //           SizedBox(height: 8),
+                //           Text(
+                //             'Expert Ironing Services',
+                //             style: TextStyle(
+                //               color: AppTheme.white,
+                //               fontSize: 16,
+                //             ),
+                //           ),
+                //         ],
+                //       ),
+                //     );
+                //   },
+                // ),
+              ),
+            ),
           ],
         ),
       ),
@@ -151,7 +208,7 @@ class DesktopHeroSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 100),
+            const SizedBox(height: 50),
             // First line: "We Pick Up"
             RichText(
               text: TextSpan(
@@ -165,7 +222,8 @@ class DesktopHeroSection extends StatelessWidget {
                     text: 'We ',
                     style: TextStyle(
                       color: AppTheme.primaryNavy,
-                      fontWeight: FontWeight.normal,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: AppTheme.primaryFont,
                     ),
                   ),
                   TextSpan(
@@ -178,7 +236,7 @@ class DesktopHeroSection extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // Second line: "We Iron" with logo
             Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
@@ -197,7 +255,7 @@ class DesktopHeroSection extends StatelessWidget {
                         text: 'We ',
                         style: TextStyle(
                           color: AppTheme.primaryNavy,
-                          fontWeight: FontWeight.normal,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       TextSpan(
@@ -220,7 +278,7 @@ class DesktopHeroSection extends StatelessWidget {
                       'assets/images/logo.png',
                       width: 100,
                       height: 100,
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           width: 50,
@@ -245,7 +303,7 @@ class DesktopHeroSection extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             // Third line: "We Deliver"
             RichText(
               text: TextSpan(
@@ -259,7 +317,7 @@ class DesktopHeroSection extends StatelessWidget {
                     text: 'We ',
                     style: TextStyle(
                       color: AppTheme.primaryNavy,
-                      fontWeight: FontWeight.normal,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   TextSpan(
