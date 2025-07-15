@@ -631,13 +631,33 @@ class _DeliveryOrdersScreenState extends State<DeliveryOrdersScreen> {
     try {
       Map<String, dynamic> updateData = {
         'status': newStatus,
-        'updatedAt': Timestamp.now(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'lastModifiedBy': 'delivery_partner',
+        'lastModifiedAt': FieldValue.serverTimestamp(),
+        'statusHistory': FieldValue.arrayUnion([
+          {
+            'status': newStatus,
+            'timestamp': Timestamp.now(),
+            'updatedBy': 'delivery_partner',
+            'title': 'Status Updated by Delivery Partner',
+            'description': 'Order status updated to ${newStatus.replaceAll('_', ' ')}',
+          }
+        ]),
       };
 
       // If delivered, mark as completed
       if (newStatus == 'delivered') {
-        updateData['completedAt'] = Timestamp.now();
+        updateData['completedAt'] = FieldValue.serverTimestamp();
         updateData['status'] = 'completed';
+        updateData['statusHistory'] = FieldValue.arrayUnion([
+          {
+            'status': 'completed',
+            'timestamp': Timestamp.now(),
+            'updatedBy': 'delivery_partner',
+            'title': 'Order Delivered',
+            'description': 'Order has been successfully delivered to customer',
+          }
+        ]);
       }
 
       await _firestore.collection('orders').doc(orderDoc.id).update(updateData);
@@ -645,7 +665,7 @@ class _DeliveryOrdersScreenState extends State<DeliveryOrdersScreen> {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Order status updated to ${newStatus.toUpperCase().replaceAll('_', ' ')}'),
+          content: Text('Order status updated to ${(newStatus == 'delivered' ? 'completed' : newStatus).toUpperCase().replaceAll('_', ' ')}'),
           backgroundColor: Colors.green,
         ),
       );

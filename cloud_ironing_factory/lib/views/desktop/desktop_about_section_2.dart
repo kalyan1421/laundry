@@ -77,7 +77,7 @@ class DesktopAboutSection2 extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: Image.asset(
-                'images/about_us_2.png',
+                                  'assets/images/about_us_2.png',
                 height: 500,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {

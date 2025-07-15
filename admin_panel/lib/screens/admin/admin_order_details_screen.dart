@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 // Assuming you have an OrderModel in your admin panel, adjust path if needed
-import 'package:admin_panel/models/order_model.dart'; 
+import 'package:admin_panel/models/order_model.dart';
+import '../../utils/phone_formatter.dart';
 
 class AdminOrderDetailsScreen extends StatelessWidget {
   final String orderId;
@@ -39,7 +40,7 @@ class AdminOrderDetailsScreen extends StatelessWidget {
                 Text('Order ID: ${order.id}', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 8),
                 Text('Order Number: ${order.orderNumber}'),
-                Text('Customer User ID: ${order.userId}'),
+                Text('Client ID: ${PhoneFormatter.getClientId(order.customer?.phoneNumber)}'),
                 Text('Status: ${order.status}'),
                 Text('Total Amount: ₹${order.totalAmount}'),
                 Text('Payment Method: ${order.paymentMethod ?? "N/A"}'),

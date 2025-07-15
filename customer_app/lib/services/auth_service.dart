@@ -13,6 +13,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui; // For ui.Image
 import 'dart:io' as io;
+import 'qr_code_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -313,6 +314,18 @@ class AuthService {
       await userDoc.set(userData, SetOptions(merge: true));
       print('🔥 ✅ User document saved successfully for UID: ${user.uid}');
       
+      // Auto-generate QR code if it doesn't exist
+      try {
+        String userName = userData['name'] ?? user.displayName ?? 'Unknown User';
+        String phoneNumber = userData['phoneNumber'] ?? user.phoneNumber ?? '';
+        
+        await QRCodeService.ensureUserQRCodeExists(user.uid, userName, phoneNumber);
+        print('🔥 ✅ QR code auto-generated/verified for user: ${user.uid}');
+      } catch (e) {
+        print('🔥 ⚠️ Failed to auto-generate QR code for user ${user.uid}: $e');
+        // Continue without failing the entire authentication process
+      }
+      
       // Add a small delay and retry mechanism to handle Firestore eventual consistency
       int retryCount = 0;
       const maxRetries = 3;
@@ -388,11 +401,45 @@ class AuthService {
         final QuerySnapshot<Map<String, dynamic>> addressSnapshot =
             await _firestore.collection('customer').doc(uid).collection('addresses').get();
         
+        print('🔥 AuthService.getUserData: Found ${addressSnapshot.docs.length} address documents');
+        
         if (addressSnapshot.docs.isNotEmpty) {
-          addresses = addressSnapshot.docs
-              .map((doc) => Address.fromMap(doc.data()))
-              .toList();
-          print('🔥 AuthService.getUserData: Fetched ${addresses.length} addresses for UID: $uid');
+          for (int i = 0; i < addressSnapshot.docs.length; i++) {
+            final doc = addressSnapshot.docs[i];
+            final data = doc.data();
+            print('🔥 AuthService.getUserData: Address $i - Document ID: ${doc.id}');
+            print('🔥 AuthService.getUserData: Address $i - Data fields: ${data.keys.toList()}');
+            print('🔥 AuthService.getUserData: Address $i - Type: ${data['type']}');
+            print('🔥 AuthService.getUserData: Address $i - AddressLine1: ${data['addressLine1']}');
+            print('🔥 AuthService.getUserData: Address $i - DoorNumber: ${data['doorNumber']}');
+            print('🔥 AuthService.getUserData: Address $i - FloorNumber: ${data['floorNumber']}');
+            print('🔥 AuthService.getUserData: Address $i - ApartmentName: ${data['apartmentName']}');
+            print('🔥 AuthService.getUserData: Address $i - City: ${data['city']}');
+            print('🔥 AuthService.getUserData: Address $i - IsPrimary: ${data['isPrimary']}');
+            print('🔥 AuthService.getUserData: Address $i - Latitude: ${data['latitude']}');
+            print('🔥 AuthService.getUserData: Address $i - Longitude: ${data['longitude']}');
+            
+            try {
+              final address = Address.fromMap({...data, 'id': doc.id});
+              addresses.add(address);
+              print('🔥 AuthService.getUserData: Address $i - Successfully created Address object');
+              print('🔥 AuthService.getUserData: Address $i - Full address: "${address.fullAddress}"');
+            } catch (e) {
+              print('🔥 AuthService.getUserData: Address $i - Error creating Address object: $e');
+            }
+          }
+          
+          print('🔥 AuthService.getUserData: Successfully processed ${addresses.length} addresses');
+          
+          // Log address summary
+          for (int i = 0; i < addresses.length; i++) {
+            final addr = addresses[i];
+            print('🔥 AuthService.getUserData: Address $i Summary - Type: ${addr.type}, Primary: ${addr.isPrimary}');
+            print('🔥 AuthService.getUserData: Address $i Summary - AddressLine1: "${addr.addressLine1}"');
+            print('🔥 AuthService.getUserData: Address $i Summary - AddressLine2: "${addr.addressLine2}"');
+            print('🔥 AuthService.getUserData: Address $i Summary - City: "${addr.city}"');
+            print('🔥 AuthService.getUserData: Address $i Summary - Full: "${addr.fullAddress}"');
+          }
         } else {
           print('🔥 AuthService.getUserData: No addresses found in subcollection for UID: $uid');
         }
@@ -418,8 +465,14 @@ class AuthService {
         // Continue with orderCount = 0 if fetch fails
       }
       
-      print('🔥 AuthService.getUserData: Creating UserModel with addresses and order count for UID: $uid');
-      return UserModel.fromFirestore(userDoc, addresses: addresses, orderCount: orderCount);
+      print('🔥 AuthService.getUserData: Creating UserModel with ${addresses.length} addresses and $orderCount orders for UID: $uid');
+      final userModel = UserModel.fromFirestore(userDoc, addresses: addresses, orderCount: orderCount);
+      
+      print('🔥 AuthService.getUserData: UserModel created successfully');
+      print('🔥 AuthService.getUserData: UserModel addresses count: ${userModel.addresses.length}');
+      print('🔥 AuthService.getUserData: UserModel primary address: ${userModel.primaryAddress?.fullAddress ?? 'None'}');
+      
+      return userModel;
 
     } catch (e, stackTrace) {
       print('🔥 ❌ AuthService.getUserData: Error fetching user data for UID $uid: $e');

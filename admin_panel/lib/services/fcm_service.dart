@@ -386,7 +386,84 @@ class FcmService {
     }
   }
 
-  // Enhanced method specifically for delivery partners during login
+  // Enhanced method specifically for delivery person during login
+  static Future<void> ensureDeliveryPersonTokenSaved({
+    required String phoneNumber,
+    required String? token,
+  }) async {
+    if (token == null || token.isEmpty) {
+      print("FCM: No FCM token available for delivery person");
+      return;
+    }
+
+    try {
+      // Find delivery person by phone number
+      final deliverySnapshot = await FirebaseFirestore.instance
+          .collection('delivery')
+          .where('phoneNumber', isEqualTo: phoneNumber)
+          .limit(1)
+          .get();
+
+      print("FCM: Ensuring delivery person token is saved: $token");
+
+      if (deliverySnapshot.docs.isNotEmpty) {
+        final doc = deliverySnapshot.docs.first;
+        final currentData = doc.data();
+        final currentTokens = List<String>.from(currentData['fcmTokens'] ?? []);
+
+        // Only update if token is not already in the list
+        if (!currentTokens.contains(token)) {
+          currentTokens.add(token);
+          
+          await doc.reference.update({
+            'fcmTokens': currentTokens,
+            'lastTokenUpdate': FieldValue.serverTimestamp(),
+            'registrationToken': token, // Keep single token for backwards compatibility
+          });
+
+          print("FCM: Delivery person token saved successfully for doc: ${doc.id}");
+        } else {
+          print("FCM: Token already exists for delivery person");
+        }
+      } else {
+        print("FCM: No matching delivery person document found");
+      }
+    } catch (e) {
+      print("FCM: Error ensuring delivery person token saved: $e");
+    }
+  }
+
+  // Add the missing _sendToMultipleTokens method
+  static Future<void> _sendToMultipleTokens({
+    required List<String> tokens,
+    required String title,
+    required String body,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      // For now, we'll log the notification that would be sent
+      // In a production app, this would send via your server's Admin SDK
+      print("FCM: Would send notification to ${tokens.length} tokens");
+      print("FCM: Title: $title");
+      print("FCM: Body: $body");
+      print("FCM: Data: $data");
+      
+      // Individual token processing for logging
+      for (String token in tokens) {
+        try {
+          print("FCM: Notification prepared for token: ${token.substring(0, 20)}...");
+          // In production, this would use your server's Admin SDK
+          // await yourServerSendNotification(token, title, body, data);
+        } catch (e) {
+          print("Error processing token $token: $e");
+        }
+      }
+    } catch (e) {
+      print("Error in _sendToMultipleTokens: $e");
+    }
+  }
+
+  // Instance method wrapper for backward compatibility
   Future<void> ensureDeliveryPartnerTokenSaved() async {
     try {
       User? currentUser = _auth.currentUser;
@@ -396,91 +473,86 @@ class FcmService {
       }
 
       String? token = await _firebaseMessaging.getToken();
-      if (token == null) {
-        print("FCM: No FCM token available for delivery partner");
-        // Try to get token with retry
-        for (int i = 0; i < 3; i++) {
-          await Future.delayed(Duration(seconds: 1));
-          token = await _firebaseMessaging.getToken();
-          if (token != null) break;
-        }
-        
-        if (token == null) {
-          print("FCM: Unable to get token after retries");
-          return;
-        }
+      String? phoneNumber = currentUser.phoneNumber;
+      
+      if (phoneNumber != null) {
+        await ensureDeliveryPersonTokenSaved(
+          phoneNumber: phoneNumber,
+          token: token,
+        );
       }
-
-      print("FCM: Ensuring delivery partner token is saved: $token");
-
-      // Get all delivery documents and find the right one
-      QuerySnapshot allDelivery = await _firestore.collection('delivery').get();
-      
-      String? userPhone = currentUser.phoneNumber;
-      String uid = currentUser.uid;
-      
-      for (QueryDocumentSnapshot doc in allDelivery.docs) {
-        try {
-          Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-          
-          // Check if this document matches by UID or phone
-          bool uidMatch = data['uid']?.toString() == uid;
-          bool phoneMatch = false;
-          
-          if (userPhone != null && data['phoneNumber'] != null) {
-            String docPhone = data['phoneNumber'].toString();
-            List<String> phoneFormats = [
-              userPhone,                              // +919063290632
-              userPhone.replaceAll('+91', ''),        // 9063290632
-              '+91${userPhone.replaceAll('+91', '')}', // Ensure +91 prefix
-            ];
-            
-            phoneMatch = phoneFormats.contains(docPhone) || 
-                        docPhone == userPhone ||
-                        docPhone == userPhone.replaceAll('+91', '');
-          }
-          
-          if (uidMatch || phoneMatch) {
-            await _firestore.collection('delivery').doc(doc.id).update({
-              'fcmToken': token,
-              'uid': uid, // Update UID if matched by phone
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-            print("FCM: Delivery partner token saved successfully for doc: ${doc.id}");
-            return;
-          }
-        } catch (e) {
-          print("FCM: Error processing delivery doc ${doc.id}: $e");
-        }
-      }
-      
-      print("FCM: No matching delivery partner document found");
-      
     } catch (e) {
-      print("FCM: Error ensuring delivery partner token saved: $e");
+      print("FCM: Error in ensureDeliveryPartnerTokenSaved wrapper: $e");
     }
   }
 
-  // Static method to save delivery FCM token
-  static Future<void> saveDeliveryFcmToken(String deliveryPartnerId) async {
+  // Enhanced method to send notification to specific delivery person with order details
+  static Future<void> sendNotificationToDeliveryPerson({
+    required String deliveryPersonId,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
     try {
-      final FirebaseMessaging messaging = FirebaseMessaging.instance;
-      final FirebaseFirestore firestore = FirebaseFirestore.instance;
-      
-      String? token = await messaging.getToken();
-      if (token != null) {
-        await firestore.collection('delivery').doc(deliveryPartnerId).update({
-          'fcmToken': token,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        print("Delivery FCM token saved for: $deliveryPartnerId");
+      // Get delivery person's details and FCM token
+      DocumentSnapshot deliveryDoc = await FirebaseFirestore.instance
+          .collection('delivery')
+          .doc(deliveryPersonId)
+          .get();
+
+      if (!deliveryDoc.exists) {
+        print("Delivery person not found: $deliveryPersonId");
+        return;
       }
+
+      Map<String, dynamic>? deliveryData = deliveryDoc.data() as Map<String, dynamic>?;
+      String deliveryPersonName = deliveryData?['name'] ?? 'Delivery Person';
+
+      List<String> fcmTokens = List<String>.from(deliveryData?['fcmTokens'] ?? []);
+      
+      if (fcmTokens.isEmpty) {
+        print("No FCM token found for delivery person: $deliveryPersonId");
+        return;
+      }
+
+      // Enhanced notification data
+      Map<String, dynamic> notificationData = {
+        'type': 'order_assignment',
+        'deliveryPersonId': deliveryPersonId,
+        'deliveryPersonName': deliveryPersonName,
+        'timestamp': DateTime.now().toIso8601String(),
+        'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+        ...?data,
+      };
+
+      // Send to all tokens for this delivery person
+      await _sendToMultipleTokens(
+        tokens: fcmTokens,
+        title: title,
+        body: body,
+        data: notificationData,
+      );
+
+      // Save notification to delivery person's notifications collection
+      await FirebaseFirestore.instance
+          .collection('delivery')
+          .doc(deliveryPersonId)
+          .collection('notifications')
+          .add({
+        'title': title,
+        'body': body,
+        'data': notificationData,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      print("Enhanced order assignment notification sent to delivery person: $deliveryPersonId");
     } catch (e) {
-      print("Error saving delivery FCM token: $e");
+      print("Error sending notification to delivery person: $e");
     }
   }
 
-  // Enhanced method to send notification to specific delivery partner with order details
+  // Backward compatibility method
   static Future<void> sendOrderAssignmentNotification({
     required String deliveryPartnerId,
     required String orderId,
@@ -491,83 +563,40 @@ class FcmService {
     int? itemCount,
     String? specialInstructions,
   }) async {
-    try {
-      final FirebaseFirestore firestore = FirebaseFirestore.instance;
-      
-      // Get delivery partner's details and FCM token
-      DocumentSnapshot deliveryDoc = await firestore
-          .collection('delivery')
-          .doc(deliveryPartnerId)
-          .get();
-      
-      if (deliveryDoc.exists) {
-        Map<String, dynamic>? deliveryData = deliveryDoc.data() as Map<String, dynamic>?;
-        String? fcmToken = deliveryData?['fcmToken'];
-        String deliveryPartnerName = deliveryData?['name'] ?? 'Delivery Partner';
-        
-        if (fcmToken != null) {
-          // Create notification title and body with order details
-          String title = 'New Order Assignment #$orderNumber';
-          String body = 'You have been assigned a new order';
-          
-          if (customerName != null && deliveryAddress != null) {
-            body += '\nCustomer: $customerName';
-            body += '\nAddress: ${deliveryAddress.length > 50 ? deliveryAddress.substring(0, 50) + '...' : deliveryAddress}';
-          }
-          
-          if (totalAmount != null) {
-            body += '\nAmount: ₹${totalAmount.toStringAsFixed(2)}';
-          }
-          
-          if (itemCount != null) {
-            body += '\nItems: $itemCount piece${itemCount > 1 ? 's' : ''}';
-          }
-
-          // Prepare notification data
-          Map<String, String> notificationData = {
-            'type': 'order_assignment',
-            'orderId': orderId,
-            'orderNumber': orderNumber,
-            'deliveryPartnerId': deliveryPartnerId,
-            'deliveryPartnerName': deliveryPartnerName,
-            'clickAction': 'FLUTTER_NOTIFICATION_CLICK',
-            'route': '/task_details',
-          };
-
-          if (customerName != null) notificationData['customerName'] = customerName;
-          if (deliveryAddress != null) notificationData['deliveryAddress'] = deliveryAddress;
-          if (totalAmount != null) notificationData['totalAmount'] = totalAmount.toString();
-          if (itemCount != null) notificationData['itemCount'] = itemCount.toString();
-          if (specialInstructions != null) notificationData['specialInstructions'] = specialInstructions;
-
-          // Save notification to delivery partner's notifications collection
-          await firestore
-              .collection('delivery')
-              .doc(deliveryPartnerId)
-              .collection('notifications')
-              .add({
-            'title': title,
-            'body': body,
-            'data': notificationData,
-            'timestamp': FieldValue.serverTimestamp(),
-            'read': false,
-            'type': 'order_assignment',
-            'orderId': orderId,
-            'orderNumber': orderNumber,
-            'priority': 'high',
-          });
-          
-          print("Enhanced order assignment notification sent to delivery partner: $deliveryPartnerId");
-          print("Order details: #$orderNumber, Customer: $customerName, Amount: ₹$totalAmount");
-        } else {
-          print("No FCM token found for delivery partner: $deliveryPartnerId");
-        }
-      } else {
-        print("Delivery partner not found: $deliveryPartnerId");
-      }
-    } catch (e) {
-      print("Error sending order assignment notification: $e");
+    String title = 'New Order Assignment #$orderNumber';
+    String body = 'You have been assigned a new order';
+    
+    if (customerName != null && deliveryAddress != null) {
+      body += '\nCustomer: $customerName';
+      body += '\nAddress: ${deliveryAddress.length > 50 ? deliveryAddress.substring(0, 50) + '...' : deliveryAddress}';
     }
+    
+    if (totalAmount != null) {
+      body += '\nAmount: ₹${totalAmount.toStringAsFixed(2)}';
+    }
+    
+    if (itemCount != null) {
+      body += '\nItems: $itemCount piece${itemCount > 1 ? 's' : ''}';
+    }
+
+    Map<String, dynamic> data = {
+      'orderId': orderId,
+      'orderNumber': orderNumber,
+      'deliveryPartnerId': deliveryPartnerId,
+    };
+
+    if (customerName != null) data['customerName'] = customerName;
+    if (deliveryAddress != null) data['deliveryAddress'] = deliveryAddress;
+    if (totalAmount != null) data['totalAmount'] = totalAmount.toString();
+    if (itemCount != null) data['itemCount'] = itemCount.toString();
+    if (specialInstructions != null) data['specialInstructions'] = specialInstructions;
+
+    await sendNotificationToDeliveryPerson(
+      deliveryPersonId: deliveryPartnerId,
+      title: title,
+      body: body,
+      data: data,
+    );
   }
 
   // Static method to send notification to specific delivery partner
@@ -725,7 +754,15 @@ class FcmService {
       }
 
       // Save the new token
-      await ensureDeliveryPartnerTokenSaved();
+      if (currentUser != null) {
+        String? phoneNumber = currentUser.phoneNumber;
+        if (phoneNumber != null) {
+          await ensureDeliveryPersonTokenSaved(
+            phoneNumber: phoneNumber,
+            token: newToken,
+          );
+        }
+      }
       
       return {
         'success': true, 
@@ -943,7 +980,7 @@ class FcmService {
             String actualOrderNumber = orderData['orderNumber'] ?? orderNumber;
 
             // Step 3: Send enhanced notification
-            await sendOrderAssignmentNotification(
+            await FcmService.sendOrderAssignmentNotification(
               deliveryPartnerId: deliveryPartnerId,
               orderId: orderId,
               orderNumber: actualOrderNumber,
@@ -973,7 +1010,7 @@ class FcmService {
       }
 
       // Step 3: Send sample enhanced notification if no real order found
-      await sendOrderAssignmentNotification(
+      await FcmService.sendOrderAssignmentNotification(
         deliveryPartnerId: deliveryPartnerId,
         orderId: orderId,
         orderNumber: orderNumber,

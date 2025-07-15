@@ -54,9 +54,8 @@ class MyApp extends StatelessWidget {
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
         navigatorKey: navigatorKey, // Set the navigator key
-        initialRoute: AppRoutes.splash, // Always start with the splash screen
+        home: const AuthWrapper(), // Use AuthWrapper as the main entry point
         onGenerateRoute: AppRoutes.generateRoute,
-        home: const AuthWrapper(),
       ),
     );
   }

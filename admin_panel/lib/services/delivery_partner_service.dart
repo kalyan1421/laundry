@@ -7,7 +7,7 @@ import '../models/delivery_partner_model.dart';
 class DeliveryPartnerService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Toggle delivery partner active status
+  // Toggle delivery person active status
   Future<bool> toggleDeliveryPartnerStatus(String id, bool isActive) async {
     try {
       await _firestore.collection('delivery').doc(id).update({
@@ -16,12 +16,12 @@ class DeliveryPartnerService {
       });
       return true;
     } catch (e) {
-      print('Error toggling delivery partner status: $e');
+      print('Error toggling delivery person status: $e');
       return false;
     }
   }
 
-  // Delete delivery partner (soft delete)
+  // Delete delivery person (soft delete)
   Future<bool> deleteDeliveryPartner(String id) async {
     try {
       await _firestore.collection('delivery').doc(id).update({
@@ -32,12 +32,12 @@ class DeliveryPartnerService {
       });
       return true;
     } catch (e) {
-      print('Error deleting delivery partner: $e');
+      print('Error deleting delivery person: $e');
       return false;
     }
   }
 
-  // Get delivery partner statistics
+  // Get delivery person statistics
   Future<Map<String, dynamic>> getDeliveryPartnerStats() async {
     try {
       final snapshot = await _firestore
@@ -61,7 +61,7 @@ class DeliveryPartnerService {
         'available': available,
       };
     } catch (e) {
-      print('Error getting delivery partner stats: $e');
+      print('Error getting delivery person stats: $e');
       return {
         'total': 0,
         'active': 0,
@@ -72,7 +72,7 @@ class DeliveryPartnerService {
     }
   }
 
-  // Create delivery partner by admin WITHOUT any Firebase Auth operations
+  // Create delivery person by admin WITHOUT any Firebase Auth operations
   Future<DeliveryPartnerModel?> createDeliveryPartnerByAdmin({
     required String name,
     required String email,
@@ -84,7 +84,7 @@ class DeliveryPartnerService {
       // Format phone number
       String formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : '+91$phoneNumber';
       
-      // Generate a unique ID for the delivery partner
+      // Generate a unique ID for the delivery person
       String deliveryPartnerId = _firestore.collection('delivery').doc().id;
       
       // Generate a secure registration token
@@ -92,7 +92,7 @@ class DeliveryPartnerService {
       var values = List<int>.generate(4, (i) => random.nextInt(255));
       String registrationToken = base64UrlEncode(values).substring(0, 6).toUpperCase();
       
-      // Create delivery partner data
+      // Create delivery person data
       final deliveryPartnerData = {
         'id': deliveryPartnerId,
         'uid': deliveryPartnerId, // Will be updated when they first login
@@ -131,14 +131,14 @@ class DeliveryPartnerService {
       // Save to Firestore
       await _firestore.collection('delivery').doc(deliveryPartnerId).set(deliveryPartnerData);
       
-      print('✅ Delivery partner created successfully with ID: $deliveryPartnerId');
+      print('✅ Delivery person created successfully with ID: $deliveryPartnerId');
       
-      // Return the created delivery partner
+      // Return the created delivery person
       return DeliveryPartnerModel.fromMap(deliveryPartnerData);
       
     } catch (e) {
-      print('❌ Error creating delivery partner: $e');
-      throw Exception('Failed to create delivery partner: ${e.toString()}');
+      print('❌ Error creating delivery person: $e');
+      throw Exception('Failed to create delivery person: ${e.toString()}');
     }
   }
 
@@ -230,7 +230,7 @@ class DeliveryPartnerService {
     }
   }
 
-  // Get all delivery partners
+  // Get all delivery persons
   Stream<List<DeliveryPartnerModel>> getDeliveryPartners() {
     return _firestore
         .collection('delivery')
@@ -246,12 +246,12 @@ class DeliveryPartnerService {
               }))
           .toList();
     }).handleError((error) {
-      print('Error in delivery partners stream: $error');
+      print('Error in delivery persons stream: $error');
       return <DeliveryPartnerModel>[];
     });
   }
 
-  // Get active delivery partners
+  // Get active delivery persons
   Stream<List<DeliveryPartnerModel>> getActiveDeliveryPartners() {
     return _firestore
         .collection('delivery')
@@ -268,12 +268,12 @@ class DeliveryPartnerService {
               }))
           .toList();
     }).handleError((error) {
-      print('Error in active delivery partners stream: $error');
+      print('Error in active delivery persons stream: $error');
       return <DeliveryPartnerModel>[];
     });
   }
 
-  // Get delivery partner by ID
+  // Get delivery person by ID
   Future<DeliveryPartnerModel?> getDeliveryPartnerById(String id) async {
     try {
       final doc = await _firestore.collection('delivery').doc(id).get();
@@ -285,12 +285,12 @@ class DeliveryPartnerService {
       }
       return null;
     } catch (e) {
-      print('Error getting delivery partner: $e');
+      print('Error getting delivery person: $e');
       return null;
     }
   }
 
-  // Update delivery partner
+  // Update delivery person
   Future<bool> updateDeliveryPartner(String id, Map<String, dynamic> data) async {
     try {
       await _firestore.collection('delivery').doc(id).update({
@@ -299,7 +299,7 @@ class DeliveryPartnerService {
       });
       return true;
     } catch (e) {
-      print('Error updating delivery partner: $e');
+      print('Error updating delivery person: $e');
       return false;
     }
   }

@@ -196,6 +196,10 @@ class Address {
   final bool isPrimary;
   final Timestamp? createdAt;
   final Timestamp? updatedAt;
+  final String? preBuiltFullAddress; // For Firebase fullAddress field
+  
+  // Store original structured data for getters
+  final Map<String, dynamic>? _originalData;
 
   Address({
     required this.id,
@@ -211,24 +215,218 @@ class Address {
     required this.isPrimary,
     this.createdAt,
     this.updatedAt,
-  });
+    this.preBuiltFullAddress,
+    Map<String, dynamic>? originalData,
+  }) : _originalData = originalData;
+
+  // Getters for structured address components
+  String get doorNumber {
+    // First try to get from original data
+    if (_originalData != null && _originalData!['doorNumber'] != null) {
+      return _originalData!['doorNumber'].toString().trim();
+    }
+    
+    // Try to extract from addressLine1
+    if (addressLine1.contains('Door:')) {
+      RegExp doorRegex = RegExp(r'Door:\s*([^,]+)');
+      Match? doorMatch = doorRegex.firstMatch(addressLine1);
+      if (doorMatch != null) {
+        return doorMatch.group(1)?.trim() ?? '';
+      }
+    }
+    
+    return '';
+  }
+
+  String get floorNumber {
+    // First try to get from original data
+    if (_originalData != null && _originalData!['floorNumber'] != null) {
+      return _originalData!['floorNumber'].toString().trim();
+    }
+    
+    // Try to extract from addressLine1
+    if (addressLine1.contains('Floor:')) {
+      RegExp floorRegex = RegExp(r'Floor:\s*([^,]+)');
+      Match? floorMatch = floorRegex.firstMatch(addressLine1);
+      if (floorMatch != null) {
+        return floorMatch.group(1)?.trim() ?? '';
+      }
+    }
+    
+    return '';
+  }
+
+  String get apartmentName {
+    // First try to get from original data
+    if (_originalData != null && _originalData!['apartmentName'] != null) {
+      return _originalData!['apartmentName'].toString().trim();
+    }
+    
+    // Try to extract from addressLine1
+    if (addressLine1.contains('Floor:') && addressLine1.contains(',')) {
+      RegExp apartmentRegex = RegExp(r'Floor:\s*[^,]+,\s*([^,]+)');
+      Match? apartmentMatch = apartmentRegex.firstMatch(addressLine1);
+      if (apartmentMatch != null) {
+        String apartment = apartmentMatch.group(1)?.trim() ?? '';
+        // Don't include the main address part
+        if (!apartment.toLowerCase().contains('road') && 
+            !apartment.toLowerCase().contains('street') &&
+            !apartment.toLowerCase().contains('lane') &&
+            !apartment.toLowerCase().contains('avenue')) {
+          return apartment;
+        }
+      }
+    }
+    
+    return '';
+  }
 
   // Create Address from Map
   factory Address.fromMap(Map<String, dynamic> map) {
+    // Helper function to get first non-empty value
+    String getFirstNonEmpty(List<String?> values) {
+      for (String? value in values) {
+        if (value != null && value.trim().isNotEmpty) {
+          return value.trim();
+        }
+      }
+      return '';
+    }
+
+    // Helper function to safely convert to double
+    double? safeToDouble(dynamic value) {
+      if (value == null) return null;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) {
+        try {
+          return double.parse(value);
+        } catch (e) {
+          return null;
+        }
+      }
+      return null;
+    }
+
+    // Helper function to safely convert to bool
+    bool safeToBool(dynamic value) {
+      if (value == null) return false;
+      if (value is bool) return value;
+      if (value is String) {
+        return value.toLowerCase() == 'true';
+      }
+      if (value is int) return value == 1;
+      return false;
+    }
+
+    // For standardized address format, we directly use the fields
+    String doorNumber = getFirstNonEmpty([
+      map['doorNumber'] as String?,
+    ]);
+    
+    String floorNumber = getFirstNonEmpty([
+      map['floorNumber'] as String?,
+    ]);
+    
+    String apartmentName = getFirstNonEmpty([
+      map['apartmentName'] as String?,
+    ]);
+
+    // Primary address line - use addressLine1 directly for standardized format
+    String addressLine1 = getFirstNonEmpty([
+      map['addressLine1'] as String?,
+      map['address'] as String?,
+      map['street'] as String?,
+    ]);
+
+    // Build comprehensive address line 1 for display if we have structured data
+    if (doorNumber.isNotEmpty || floorNumber.isNotEmpty || apartmentName.isNotEmpty) {
+      List<String> structuredParts = [];
+      
+      if (doorNumber.isNotEmpty) {
+        structuredParts.add('Door: $doorNumber');
+      }
+      if (floorNumber.isNotEmpty) {
+        structuredParts.add('Floor: $floorNumber');
+      }
+      if (apartmentName.isNotEmpty) {
+        structuredParts.add(apartmentName);
+      }
+      
+      // Combine structured parts with address line
+      if (structuredParts.isNotEmpty) {
+        if (addressLine1.isNotEmpty) {
+          addressLine1 = '${structuredParts.join(', ')}, $addressLine1';
+        } else {
+          addressLine1 = structuredParts.join(', ');
+        }
+      }
+    }
+
     return Address(
       id: map['id'] ?? '',
-      type: map['type'] ?? 'home',
-      addressLine1: map['addressLine1'] ?? '',
-      addressLine2: map['addressLine2'] ?? '',
-      city: map['city'] ?? '',
-      state: map['state'] ?? '',
-      pincode: map['pincode'] ?? '',
-      landmark: map['landmark'] ?? '',
-      latitude: map['latitude']?.toDouble(),
-      longitude: map['longitude']?.toDouble(),
-      isPrimary: map['isPrimary'] ?? false,
+      
+      // Address type handling
+      type: getFirstNonEmpty([
+        map['type'] as String?,
+        map['addressType'] as String?,
+      ]).toLowerCase().isEmpty ? 'home' : getFirstNonEmpty([
+        map['type'] as String?,
+        map['addressType'] as String?,
+      ]).toLowerCase(),
+      
+      // Use the built address line 1 (may include structured data)
+      addressLine1: addressLine1,
+      
+      // Secondary address line
+      addressLine2: getFirstNonEmpty([
+        map['addressLine2'] as String?,
+        map['floor'] as String?,
+        map['apartment'] as String?,
+      ]),
+      
+      // City handling
+      city: getFirstNonEmpty([
+        map['city'] as String?,
+        map['locality'] as String?,
+      ]),
+      
+      // State handling
+      state: getFirstNonEmpty([
+        map['state'] as String?,
+        map['administrativeArea'] as String?,
+      ]),
+      
+      // Pincode handling
+      pincode: getFirstNonEmpty([
+        map['pincode'] as String?,
+        map['postalCode'] as String?,
+        map['zip'] as String?,
+      ]),
+      
+      // Landmark handling - use standardized field first
+      landmark: getFirstNonEmpty([
+        map['landmark'] as String?,
+        map['nearbyLandmark'] as String?,
+        map['nearby'] as String?,
+      ]),
+      
+      // Coordinate handling with safety checks
+      latitude: safeToDouble(map['latitude']),
+      longitude: safeToDouble(map['longitude']),
+      
+      // Primary flag handling
+      isPrimary: safeToBool(map['isPrimary']),
+      
+      // Timestamp handling
       createdAt: map['createdAt'] is Timestamp ? map['createdAt'] : null,
       updatedAt: map['updatedAt'] is Timestamp ? map['updatedAt'] : null,
+      
+      // Pre-built full address
+      preBuiltFullAddress: map['fullAddress'] as String?,
+      
+      // Pass original data for getters
+      originalData: map,
     );
   }
 
@@ -248,21 +446,107 @@ class Address {
       'isPrimary': isPrimary,
       if (createdAt != null) 'createdAt': createdAt,
       if (updatedAt != null) 'updatedAt': updatedAt,
+      if (preBuiltFullAddress != null) 'fullAddress': preBuiltFullAddress,
     };
   }
 
-  // Get full address string
+  // Get full formatted address
   String get fullAddress {
+    // If pre-built full address exists, use it
+    if (preBuiltFullAddress != null && preBuiltFullAddress!.trim().isNotEmpty) {
+      return preBuiltFullAddress!;
+    }
+    
+    // Build comprehensive address from components
     List<String> parts = [];
     
-    if (addressLine1.isNotEmpty) parts.add(addressLine1);
-    if (addressLine2.isNotEmpty) parts.add(addressLine2);
-    if (landmark.isNotEmpty) parts.add('Near $landmark');
-    if (city.isNotEmpty) parts.add(city);
-    if (state.isNotEmpty) parts.add(state);
-    if (pincode.isNotEmpty) parts.add(pincode);
+    // Check if addressLine1 already contains door/floor info (from profile setup)
+    String cleanAddressLine1 = addressLine1;
+    bool hasStructuredInfo = false;
     
-    return parts.join(', ');
+    // Extract structured info if present in addressLine1
+    if (addressLine1.contains('Door:') || addressLine1.contains('Floor:')) {
+      hasStructuredInfo = true;
+      // Use the structured format as-is
+      parts.add(addressLine1);
+    } else {
+      // Build structured format from individual components
+      List<String> buildingParts = [];
+      
+      // Add door number if available
+      if (addressLine1.trim().isNotEmpty && 
+          !addressLine1.toLowerCase().contains('door') &&
+          !addressLine1.toLowerCase().contains('floor')) {
+        // Check if addressLine1 looks like a door number (short and alphanumeric)
+        if (addressLine1.trim().length <= 10 && 
+            RegExp(r'^[a-zA-Z0-9\-/\s]+$').hasMatch(addressLine1.trim())) {
+          buildingParts.add('Door: ${addressLine1.trim()}');
+        } else {
+          // It's a regular address line
+          buildingParts.add(addressLine1.trim());
+        }
+      } else if (addressLine1.trim().isNotEmpty) {
+        buildingParts.add(addressLine1.trim());
+      }
+      
+      // Add floor number if available and not already in addressLine1
+      if (addressLine2.trim().isNotEmpty && 
+          !addressLine2.toLowerCase().contains('floor') &&
+          !hasStructuredInfo) {
+        // Check if addressLine2 looks like a floor number
+        if (addressLine2.trim().length <= 10 && 
+            RegExp(r'^[a-zA-Z0-9\-/\s]+$').hasMatch(addressLine2.trim())) {
+          buildingParts.add('Floor: ${addressLine2.trim()}');
+        } else {
+          // It's additional address info
+          buildingParts.add(addressLine2.trim());
+        }
+      } else if (addressLine2.trim().isNotEmpty) {
+        buildingParts.add(addressLine2.trim());
+      }
+      
+      if (buildingParts.isNotEmpty) {
+        parts.add(buildingParts.join(', '));
+      }
+    }
+    
+    // Add addressLine2 if it's not already processed and not empty
+    if (addressLine2.trim().isNotEmpty && !hasStructuredInfo) {
+      // Only add if it's not already included above
+      if (!parts.any((part) => part.contains(addressLine2.trim()))) {
+        parts.add(addressLine2.trim());
+      }
+    }
+    
+    // Add landmark if available
+    if (landmark.trim().isNotEmpty) {
+      String landmarkText = landmark.trim();
+      // Add "Near" prefix if not already present
+      if (!landmarkText.toLowerCase().startsWith('near')) {
+        landmarkText = 'Near $landmarkText';
+      }
+      parts.add(landmarkText);
+    }
+    
+    // Add location details
+    if (city.trim().isNotEmpty) parts.add(city.trim());
+    if (state.trim().isNotEmpty) parts.add(state.trim());
+    if (pincode.trim().isNotEmpty) parts.add(pincode.trim());
+    
+    // Join all parts with commas
+    String result = parts.where((part) => part.trim().isNotEmpty).join(', ');
+    
+    // Debug logging
+    print('🏠 Address.fullAddress: Building address from components');
+    print('🏠 AddressLine1: "$addressLine1"');
+    print('🏠 AddressLine2: "$addressLine2"');
+    print('🏠 Landmark: "$landmark"');
+    print('🏠 City: "$city"');
+    print('🏠 State: "$state"');
+    print('🏠 Pincode: "$pincode"');
+    print('🏠 Result: "$result"');
+    
+    return result.isNotEmpty ? result : 'Address not available';
   }
 
   // Get short address (first line + city)

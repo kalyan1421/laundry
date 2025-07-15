@@ -147,13 +147,14 @@ class AuthWrapper extends StatelessWidget {
           final role = authProvider.userRole!;
           print('🔥 AuthWrapper: Authenticated user with role: $role');
 
-          // Ensure FCM token is saved for delivery partners
+          // Ensure FCM token is saved for delivery persons
           if (role == UserRole.delivery) {
             _ensureDeliveryFCMToken(authProvider);
           }
 
           switch (role) {
             case UserRole.admin:
+            case UserRole.supervisor:
               return const AdminHome();
             case UserRole.delivery:
               return const DeliveryHome();

@@ -6,6 +6,7 @@ import 'package:customer_app/presentation/providers/address_provider.dart';
 import 'package:customer_app/data/models/address_model.dart';
 import 'package:customer_app/core/theme/app_colors.dart';
 import 'package:customer_app/core/theme/app_text_theme.dart';
+import 'package:customer_app/core/utils/address_formatter.dart';
 
 class ManageAddressesScreen extends StatefulWidget {
   const ManageAddressesScreen({super.key});
@@ -134,11 +135,11 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Manage Addresses'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.white,
+        foregroundColor: AppColors.primary,
         actions: [
           IconButton(
-            icon: const Icon(Icons.bug_report),
+            icon: const Icon(Icons.bug_report,),
             onPressed: _testCoordinateSaving,
           ),
           IconButton(
@@ -150,20 +151,34 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _addresses.isEmpty
-              ? const Center(
+              ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.location_off, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text(
+                      const SizedBox(height: 16),
+                      const Text(
                         'No addresses found',
                         style: TextStyle(fontSize: 18, color: Colors.grey),
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Complete your profile setup to add addresses',
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Add your first address to get started',
                         style: TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/add-address-screen').then((_) {
+                            _loadAddresses();
+                          });
+                        },
+                        icon: const Icon(Icons.add_location, color: Colors.white),
+                        label: const Text('Add Address', style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
                       ),
                     ],
                   ),
@@ -179,7 +194,7 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.pushNamed(context, '/add-address').then((_) {
+          Navigator.pushNamed(context, '/add-address-screen').then((_) {
             _loadAddresses();
           });
         },
@@ -257,57 +272,14 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Address Lines
-            if (addressData['addressLine1']?.toString().isNotEmpty == true)
-              Text(
-                addressData['addressLine1'].toString(),
-                style: AppTextTheme.bodyMedium.copyWith(fontWeight: FontWeight.w500),
+            // Formatted Address Display (Door Number, Floor Number, Full Address)
+            Text(
+              AddressFormatter.formatAddressLayout(addressData),
+              style: AppTextTheme.bodyMedium.copyWith(
+                fontWeight: FontWeight.w500,
+                height: 1.4,
               ),
-            if (addressData['addressLine2']?.toString().isNotEmpty == true) ...[
-              const SizedBox(height: 4),
-              Text(
-                addressData['addressLine2'].toString(),
-                style: AppTextTheme.bodySmall.copyWith(color: Colors.grey[600]),
-              ),
-            ],
-
-            // City, State, Pincode
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                if (addressData['city']?.toString().isNotEmpty == true)
-                  Text(
-                    addressData['city'].toString(),
-                    style: AppTextTheme.bodySmall.copyWith(fontWeight: FontWeight.w500),
-                  ),
-                if (addressData['state']?.toString().isNotEmpty == true) ...[
-                  const Text(', '),
-                  Text(
-                    addressData['state'].toString(),
-                    style: AppTextTheme.bodySmall.copyWith(fontWeight: FontWeight.w500),
-                  ),
-                ],
-                if (addressData['pincode']?.toString().isNotEmpty == true) ...[
-                  const Text(' - '),
-                  Text(
-                    addressData['pincode'].toString(),
-                    style: AppTextTheme.bodySmall.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ],
             ),
-
-            // Landmark
-            if (addressData['landmark']?.toString().isNotEmpty == true) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Near: ${addressData['landmark']}',
-                style: AppTextTheme.bodySmall.copyWith(
-                  color: Colors.grey[600],
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
 
             // Coordinates Debug Info
             const SizedBox(height: 12),
@@ -366,8 +338,91 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
               ),
             ),
 
+            // Action buttons replaced with PopupMenuButton
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Primary badge (if applicable)
+                if (addressData['isPrimary'] == true)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.star, size: 12, color: Colors.green[700]),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Primary',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const Spacer(),
+                // Three-dot menu
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'set_primary':
+                        _setPrimaryAddress(addressId);
+                        break;
+                      case 'edit':
+                        _editAddress(addressId, addressData);
+                        break;
+                      case 'delete':
+                        _deleteAddress(addressId);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (addressData['isPrimary'] != true)
+                      const PopupMenuItem<String>(
+                        value: 'set_primary',
+                        child: Row(
+                          children: [
+                            Icon(Icons.star_outline, size: 20, color: Colors.orange),
+                            SizedBox(width: 12),
+                            Text('Set as Primary'),
+                          ],
+                        ),
+                      ),
+                    const PopupMenuItem<String>(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 20, color: Colors.blue),
+                          SizedBox(width: 12),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          SizedBox(width: 12),
+                          Text('Delete'),
+                        ],
+                      ),
+                    ),
+                  ],
+                  icon: const Icon(Icons.more_vert, color: Colors.grey),
+                ),
+              ],
+            ),
+            
             // Timestamps
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
@@ -382,6 +437,111 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _setPrimaryAddress(String addressId) async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.userModel == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not authenticated')),
+        );
+        return;
+      }
+
+      // First, remove primary status from all addresses
+      final batch = FirebaseFirestore.instance.batch();
+      final addressesRef = FirebaseFirestore.instance
+          .collection('customer')
+          .doc(authProvider.userModel!.uid)
+          .collection('addresses');
+
+      for (var addressDoc in _addresses) {
+        batch.update(addressDoc.reference, {'isPrimary': false});
+      }
+
+      // Then set the selected address as primary
+      batch.update(addressesRef.doc(addressId), {
+        'isPrimary': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+      await _loadAddresses();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Primary address updated successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating primary address: $e')),
+      );
+    }
+  }
+
+  Future<void> _editAddress(String addressId, Map<String, dynamic> addressData) async {
+    // Navigate to edit address screen
+    Navigator.pushNamed(
+      context,
+      '/edit-address',
+      arguments: {
+        'addressId': addressId,
+        'addressData': addressData,
+      },
+    ).then((_) {
+      _loadAddresses();
+    });
+  }
+
+  Future<void> _deleteAddress(String addressId) async {
+    // Show confirmation dialog
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Address'),
+        content: const Text('Are you sure you want to delete this address? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        if (authProvider.userModel == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('User not authenticated')),
+          );
+          return;
+        }
+
+        await FirebaseFirestore.instance
+            .collection('customer')
+            .doc(authProvider.userModel!.uid)
+            .collection('addresses')
+            .doc(addressId)
+            .delete();
+
+        await _loadAddresses();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Address deleted successfully')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting address: $e')),
+        );
+      }
+    }
   }
 
   String _formatTimestamp(dynamic timestamp) {

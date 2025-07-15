@@ -261,7 +261,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _submitProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Validate all required fields manually to avoid form key issues
+    
+    // Check basic info fields
+    if (_nameController.text.trim().isEmpty) {
+      _showSnackBar('Please enter your full name', isError: true);
+      return;
+    }
+    if (_emailController.text.trim().isEmpty || !Validators.isValidEmail(_emailController.text.trim())) {
+      _showSnackBar('Please enter a valid email address', isError: true);
+      return;
+    }
 
     // Check if location is available
     if (_currentPosition == null) {
@@ -285,7 +295,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _showSnackBar('Invalid longitude detected. Please try getting location again.', isError: true);
       return;
     }
-
+    
     // Validate required address fields
     if (_addressLine1Controller.text.trim().isEmpty) {
       _showSnackBar('Please enter address line 1', isError: true);
@@ -475,33 +485,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             const SizedBox(height: 40),
             
             // Profile picture placeholder
-            Center(
-              child: GestureDetector(
-                onTap: () {
-                  // TODO: Implement image picker
-                },
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.primary.withOpacity(0.1),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                  ),
-                  child: Icon(
-                    Icons.add_a_photo,
-                    size: 40,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tap to add profile picture (optional)',
-              style: AppTextTheme.bodySmall.copyWith(color: AppColors.textSecondary),
-              textAlign: TextAlign.center,
-            ),
+            
             const SizedBox(height: 40),
             
             CustomTextField(

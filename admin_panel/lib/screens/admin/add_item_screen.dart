@@ -4,6 +4,7 @@ import 'package:admin_panel/providers/item_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 
 class AddItemScreen extends StatefulWidget {
@@ -19,11 +20,15 @@ class _AddItemScreenState extends State<AddItemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
+  final _originalPriceController = TextEditingController();
+  final _offerPriceController = TextEditingController();
+  final _positionController = TextEditingController();
   
   bool _isActive = true;
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
+  bool _removeCurrentImage = false;
 
   // Predefined ironing items
   final List<String> _ironingItems = [
@@ -49,14 +54,24 @@ class _AddItemScreenState extends State<AddItemScreen> {
       // Pre-fill form for editing
       _nameController.text = widget.item!.name;
       _priceController.text = widget.item!.price.toString();
+      _originalPriceController.text = widget.item!.originalPrice?.toString() ?? '';
+      _offerPriceController.text = widget.item!.offerPrice?.toString() ?? '';
+      _positionController.text = widget.item!.sortOrder.toString();
       _isActive = widget.item!.isActive;
     }
+    
+    // Add listeners to update the calculator when prices change
+    _originalPriceController.addListener(() => setState(() {}));
+    _offerPriceController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
+    _originalPriceController.dispose();
+    _offerPriceController.dispose();
+    _positionController.dispose();
     super.dispose();
   }
 
@@ -72,6 +87,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
       if (pickedFile != null) {
         setState(() {
           _selectedImage = File(pickedFile.path);
+          _removeCurrentImage = false; // Reset removal flag when new image is selected
         });
       }
     } catch (e) {
@@ -93,6 +109,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
       if (pickedFile != null) {
         setState(() {
           _selectedImage = File(pickedFile.path);
+          _removeCurrentImage = false; // Reset removal flag when new image is selected
         });
       }
     } catch (e) {
@@ -128,12 +145,13 @@ class _AddItemScreenState extends State<AddItemScreen> {
               ),
               if (_selectedImage != null || widget.item?.imageUrl != null)
                 ListTile(
-                  leading: const Icon(Icons.delete),
-                  title: const Text('Remove Image'),
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text('Remove Image', style: TextStyle(color: Colors.red)),
                   onTap: () {
                     Navigator.pop(context);
                     setState(() {
                       _selectedImage = null;
+                      _removeCurrentImage = true;
                     });
                   },
                 ),
@@ -160,17 +178,19 @@ class _AddItemScreenState extends State<AddItemScreen> {
           id: '', // Will be set by Firestore
           name: _nameController.text.trim(),
           price: double.parse(_priceController.text),
+          originalPrice: _originalPriceController.text.isNotEmpty ? double.parse(_originalPriceController.text) : null,
+          offerPrice: _offerPriceController.text.isNotEmpty ? double.parse(_offerPriceController.text) : null,
           category: 'Ironing', // Fixed category for ironing service
           unit: 'piece', // Fixed unit for ironing items
           isActive: _isActive,
           updatedAt: DateTime.now(),
-          sortOrder: 0, // Default sort order
+          sortOrder: _positionController.text.isNotEmpty ? int.parse(_positionController.text) : 0,
         );
 
         final success = await itemProvider.addItem(newItem, imageFile: _selectedImage);
         
         if (success) {
-          Navigator.pop(context);
+          Navigator.pop(context, true); // Return true to indicate success
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Item added successfully!'),
@@ -185,6 +205,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
         final updateData = {
           'name': _nameController.text.trim(),
           'price': double.parse(_priceController.text),
+          'originalPrice': _originalPriceController.text.isNotEmpty ? double.parse(_originalPriceController.text) : null,
+          'offerPrice': _offerPriceController.text.isNotEmpty ? double.parse(_offerPriceController.text) : null,
+          'sortOrder': _positionController.text.isNotEmpty ? int.parse(_positionController.text) : 0,
           'isActive': _isActive,
           'updatedAt': DateTime.now(),
         };
@@ -193,10 +216,11 @@ class _AddItemScreenState extends State<AddItemScreen> {
           widget.item!.id,
           updateData,
           newImageFile: _selectedImage,
+          removeImage: _removeCurrentImage,
         );
 
         if (success) {
-          Navigator.pop(context);
+          Navigator.pop(context, true); // Return true to indicate success
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Item updated successfully!'),
@@ -219,6 +243,27 @@ class _AddItemScreenState extends State<AddItemScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  String _calculateSavings() {
+    if (_originalPriceController.text.isNotEmpty && _offerPriceController.text.isNotEmpty) {
+      final originalPrice = double.tryParse(_originalPriceController.text) ?? 0;
+      final offerPrice = double.tryParse(_offerPriceController.text) ?? 0;
+      return (originalPrice - offerPrice).toStringAsFixed(2);
+    }
+    return '0.00';
+  }
+
+  String _calculateDiscountPercentage() {
+    if (_originalPriceController.text.isNotEmpty && _offerPriceController.text.isNotEmpty) {
+      final originalPrice = double.tryParse(_originalPriceController.text) ?? 0;
+      final offerPrice = double.tryParse(_offerPriceController.text) ?? 0;
+      if (originalPrice > 0) {
+        final discount = ((originalPrice - offerPrice) / originalPrice) * 100;
+        return discount.toStringAsFixed(1);
+      }
+    }
+    return '0.0';
   }
 
   @override
@@ -274,19 +319,20 @@ class _AddItemScreenState extends State<AddItemScreen> {
                                     fit: BoxFit.cover,
                                   ),
                                 )
-                              : widget.item?.imageUrl != null
+                              : widget.item?.imageUrl != null && !_removeCurrentImage
                                   ? ClipRRect(
                                       borderRadius: BorderRadius.circular(10),
-                                      child: Image.network(
-                                        widget.item!.imageUrl!,
+                                      child: CachedNetworkImage(
+                                        imageUrl: widget.item!.imageUrl!,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return const Icon(
-                                            Icons.iron,
-                                            size: 50,
-                                            color: Colors.grey,
-                                          );
-                                        },
+                                        placeholder: (context, url) => const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                        errorWidget: (context, url, error) => const Icon(
+                                          Icons.iron,
+                                          size: 50,
+                                          color: Colors.grey,
+                                        ),
                                       ),
                                     )
                                   : const Column(
@@ -392,6 +438,119 @@ class _AddItemScreenState extends State<AddItemScreen> {
                           return null;
                         },
                       ),
+
+                      const SizedBox(height: 16),
+
+                      // Original Price Field
+                      TextFormField(
+                        controller: _originalPriceController,
+                        decoration: InputDecoration(
+                          labelText: 'Original Price (₹) - Optional',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: const Icon(Icons.money, color: Colors.orange),
+                          helperText: 'Enter original price for discount display',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value != null && value.trim().isNotEmpty) {
+                            if (double.tryParse(value) == null) {
+                              return 'Please enter valid price';
+                            }
+                            if (double.parse(value) <= 0) {
+                              return 'Original price must be greater than 0';
+                            }
+                          }
+                          return null;
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Offer Price Field
+                      TextFormField(
+                        controller: _offerPriceController,
+                        decoration: InputDecoration(
+                          labelText: 'Offer Price (₹) - Optional',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: const Icon(Icons.local_offer, color: Colors.red),
+                          helperText: 'Enter special offer price',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value != null && value.trim().isNotEmpty) {
+                            if (double.tryParse(value) == null) {
+                              return 'Please enter valid price';
+                            }
+                            if (double.parse(value) <= 0) {
+                              return 'Offer price must be greater than 0';
+                            }
+                          }
+                          return null;
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Position Field
+                      TextFormField(
+                        controller: _positionController,
+                        decoration: InputDecoration(
+                          labelText: 'Display Position',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: const Icon(Icons.sort, color: Colors.blue),
+                          helperText: 'Enter position number for item ordering (e.g., 1, 2, 3...)',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value != null && value.trim().isNotEmpty) {
+                            if (int.tryParse(value) == null) {
+                              return 'Please enter valid position number';
+                            }
+                          }
+                          return null;
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Calculate Available Price Button
+                      if (_originalPriceController.text.isNotEmpty && _offerPriceController.text.isNotEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green.shade300),
+                          ),
+                          child: Column(
+                            children: [
+                              const Icon(Icons.calculate, color: Colors.green),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Savings: ₹${_calculateSavings()}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                              Text(
+                                '${_calculateDiscountPercentage()}% OFF',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
 
                       const SizedBox(height: 16),
 

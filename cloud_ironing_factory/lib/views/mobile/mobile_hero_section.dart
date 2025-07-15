@@ -61,7 +61,7 @@ class MobileHeroSection extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
 
                 child: Image.asset(
-                  'images/hero-image.png',
+                                                'assets/images/hero-image.png',
                   height: 250,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {

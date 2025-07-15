@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/order_model.dart';
 import '../models/user_model.dart'; // Import UserModel if not already imported
+import '../utils/phone_formatter.dart';
 
 class OrderCard extends StatelessWidget {
   final OrderModel order;
@@ -25,9 +26,25 @@ class OrderCard extends StatelessWidget {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Text(
               'Order #${order.id.substring(0, 8)}',
               style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Customer: ${PhoneFormatter.getClientId(order.customer?.phoneNumber)}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
             Chip(
               label: Text(
@@ -41,7 +58,8 @@ class OrderCard extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Customer: ${order.customer?.name ?? "N/A"}'),
+            if (order.customer?.name != null)
+              Text('Name: ${order.customer!.name}'),
             Text('Date: ${DateFormat('dd/MM/yyyy HH:mm').format(order.orderTimestamp.toDate())}'),
           ],
         ),
@@ -57,11 +75,9 @@ class OrderCard extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                Text('Phone: ${order.customer?.phoneNumber ?? "N/A"}'),
+                Text('Client ID: ${PhoneFormatter.getClientId(order.customer?.phoneNumber)}'),
                 if (order.customer?.email != null && order.customer!.email.isNotEmpty)
                   Text('Email: ${order.customer!.email}'),
-                if (order.customer?.clientId != null && order.customer!.clientId!.isNotEmpty)
-                  Text('Client ID: ${order.customer!.clientId}'),
                 Text('Payment: ${order.paymentMethod ?? "N/A"}'),
                 const SizedBox(height: 16),
 
@@ -132,16 +148,27 @@ class OrderCard extends StatelessWidget {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return Colors.orange.shade100;
+        return Colors.orange[100]!;
+      case 'confirmed':
+        return Colors.blue[100]!;
       case 'assigned':
-      case 'in_progress':
-        return Colors.blue.shade100;
+        return Colors.purple[100]!;
+      case 'picked_up':
+        return Colors.indigo[100]!;
+      case 'processing':
+        return Colors.amber[100]!;
+      case 'ready_for_delivery':
+        return Colors.teal[100]!;
+      case 'out_for_delivery':
+        return Colors.cyan[100]!;
+      case 'delivered':
+        return Colors.green[100]!;
       case 'completed':
-        return Colors.green.shade100;
+        return Colors.green[200]!;
       case 'cancelled':
-        return Colors.red.shade100;
+        return Colors.red[100]!;
       default:
-        return Colors.grey.shade100;
+        return Colors.grey[100]!;
     }
   }
 

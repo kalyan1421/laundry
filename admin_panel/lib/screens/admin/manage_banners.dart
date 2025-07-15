@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/banner_provider.dart';
 import '../../models/banner_model.dart';
-import '../../widgets/custom_text_field.dart';
 
 class ManageBanners extends StatefulWidget {
   const ManageBanners({super.key});
@@ -17,15 +16,6 @@ class ManageBanners extends StatefulWidget {
 
 class _ManageBannersState extends State<ManageBanners> {
   File? _selectedImage;
-  final _mainTaglineController = TextEditingController();
-  final _subTaglineController = TextEditingController();
-
-  @override
-  void dispose() {
-    _mainTaglineController.dispose();
-    _subTaglineController.dispose();
-    super.dispose();
-  }
 
   Future<void> _pickImage() async {
     final bannerProvider = Provider.of<BannerProvider>(context, listen: false);
@@ -44,18 +34,15 @@ class _ManageBannersState extends State<ManageBanners> {
   }
 
   void _showAddBannerDialog(BuildContext context) {
-    _clearSelectedImage(); // Clear previous selection
-    _mainTaglineController.clear();
-    _subTaglineController.clear();
+    _clearSelectedImage();
 
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        // Use a new context for the dialog to avoid issues with provider
         final bannerProvider = Provider.of<BannerProvider>(dialogContext, listen: false);
         bool isLoading = false;
 
-        return StatefulBuilder( // To update dialog state for loading and image preview
+        return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
               title: const Text('Add New Banner'),
@@ -66,7 +53,19 @@ class _ManageBannersState extends State<ManageBanners> {
                     _selectedImage != null
                         ? Column(
                             children: [
-                              Image.file(_selectedImage!, height: 150, fit: BoxFit.cover),
+                              Container(
+                                height: 200,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
                               TextButton.icon(
                                 icon: const Icon(Icons.clear, color: Colors.red),
                                 label: const Text('Remove Image', style: TextStyle(color: Colors.red)),
@@ -74,35 +73,40 @@ class _ManageBannersState extends State<ManageBanners> {
                                   setDialogState(() {
                                     _selectedImage = null;
                                   });
-                                  // Also update the state in the main widget if dialog is popped without saving
-                                  // This is tricky, direct update is better: _clearSelectedImage(); inside this if needed
                                 },
                               ),
                             ],
                           )
-                        : CustomButton(
-                            text:'Pick Image',
-                            onPressed: () async {
+                        : Container(
+                            height: 200,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: InkWell(
+                              onTap: () async {
                                 final File? pickedImage = await bannerProvider.pickImage();
                                 if (pickedImage != null) {
                                   setDialogState(() {
-                                     _selectedImage = pickedImage;
+                                    _selectedImage = pickedImage;
                                   });
                                 }
-                            },
+                              },
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_photo_alternate, size: 50, color: Colors.grey[600]),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Tap to select banner image',
+                                    style: TextStyle(color: Colors.grey[600]),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                    const SizedBox(height: 16),
-                    CustomTextField(
-                      controller: _mainTaglineController,
-                      label: 'Main Tagline',
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 16),
-                    CustomTextField(
-                      controller: _subTaglineController,
-                      label: 'Sub Tagline',
-                      maxLines: 3,
-                    ),
                   ],
                 ),
               ),
@@ -120,33 +124,122 @@ class _ManageBannersState extends State<ManageBanners> {
                       );
                       return;
                     }
-                    if (_mainTaglineController.text.isEmpty || _subTaglineController.text.isEmpty) {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        const SnackBar(content: Text('Please fill in all taglines.')),
-                      );
-                      return;
-                    }
                     setDialogState(() => isLoading = true);
                     try {
                       await bannerProvider.addBanner(
-                        mainTagline: _mainTaglineController.text,
-                        subTagline: _subTaglineController.text,
                         imageFile: _selectedImage!,
                       );
-                      if (mounted) Navigator.of(dialogContext).pop(); // Close dialog
+                      if (mounted) Navigator.of(dialogContext).pop();
                       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Banner added successfully!')),
                       );
-                      _clearSelectedImage(); // Clear image for next time
+                      _clearSelectedImage();
                     } catch (e) {
                       if (mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
                         SnackBar(content: Text('Failed to add banner: $e')),
                       );
                     } finally {
-                       if(mounted) setDialogState(() => isLoading = false);
+                      if(mounted) setDialogState(() => isLoading = false);
                     }
                   },
-                  child: isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white,)) : const Text('Add Banner'),
+                  child: isLoading 
+                    ? const SizedBox(
+                        width: 20, 
+                        height: 20, 
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                      ) 
+                    : const Text('Add Banner'),
+                ),
+              ],
+            );
+          }
+        );
+      },
+    );
+  }
+
+  void _showEditBannerDialog(BuildContext context, BannerModel banner) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        final bannerProvider = Provider.of<BannerProvider>(dialogContext, listen: false);
+        bool isActive = banner.isActive;
+        bool isLoading = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Edit Banner'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    height: 150,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: banner.imageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                        errorWidget: (context, url, error) => const Icon(
+                          Icons.error, 
+                          color: Colors.red, 
+                          size: 40
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SwitchListTile(
+                    title: const Text('Active Status'),
+                    subtitle: Text(isActive ? 'Banner is visible to customers' : 'Banner is hidden'),
+                    value: isActive,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        isActive = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isLoading ? null : () async {
+                    setDialogState(() => isLoading = true);
+                    try {
+                      await bannerProvider.updateBanner(banner.id, {
+                        'isActive': isActive,
+                      });
+                      if (mounted) Navigator.of(dialogContext).pop();
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Banner updated successfully!')),
+                      );
+                    } catch (e) {
+                      if (mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        SnackBar(content: Text('Failed to update banner: $e')),
+                      );
+                    } finally {
+                      if(mounted) setDialogState(() => isLoading = false);
+                    }
+                  },
+                  child: isLoading 
+                    ? const SizedBox(
+                        width: 20, 
+                        height: 20, 
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                      ) 
+                    : const Text('Update'),
                 ),
               ],
             );
@@ -161,7 +254,6 @@ class _ManageBannersState extends State<ManageBanners> {
     final bannerProvider = Provider.of<BannerProvider>(context);
 
     return Scaffold(
-      
       body: StreamBuilder<List<BannerModel>>(
         stream: bannerProvider.getBannersStream(),
         builder: (context, snapshot) {
@@ -182,31 +274,31 @@ class _ManageBannersState extends State<ManageBanners> {
             itemBuilder: (context, index) {
               final banner = banners[index];
               return Card(
-                elevation: 3,
+                elevation: 2,
                 margin: const EdgeInsets.symmetric(vertical: 8.0),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(
-                  padding: const EdgeInsets.all(12.0),
+                  padding: const EdgeInsets.all(16.0),
                   child: Row(
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8.0),
                         child: CachedNetworkImage(
                           imageUrl: banner.imageUrl,
-                          width: 100,
-                          height: 100,
+                          width: 120,
+                          height: 80,
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
-                            width: 100,
-                            height: 100,
+                            width: 120,
+                            height: 80,
                             color: Colors.grey[200],
                             child: const Center(child: CircularProgressIndicator()),
                           ),
                           errorWidget: (context, url, error) => Container(
-                            width: 100,
-                            height: 100,
+                            width: 120,
+                            height: 80,
                             color: Colors.grey[200],
-                            child: const Icon(Icons.error, color: Colors.red, size: 40),
+                            child: const Icon(Icons.error, color: Colors.red, size: 30),
                           ),
                         ),
                       ),
@@ -216,59 +308,79 @@ class _ManageBannersState extends State<ManageBanners> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              banner.mainTagline,
+                              'Banner ${index + 1}',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              banner.subTagline,
-                              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: banner.isActive 
+                                  ? Colors.green.withOpacity(0.1) 
+                                  : Colors.grey.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                banner.isActive ? 'ACTIVE' : 'INACTIVE',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: banner.isActive ? Colors.green : Colors.grey,
+                                ),
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.redAccent),
-                        onPressed: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (BuildContext dialogContext) => AlertDialog(
-                              title: const Text('Confirm Delete'),
-                              content: const Text('Are you sure you want to delete this banner?'),
-                              actions: <Widget>[
-                                TextButton(
-                                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                                  child: const Text('Cancel'),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () => _showEditBannerDialog(context, banner),
+                            tooltip: 'Edit Banner',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (BuildContext dialogContext) => AlertDialog(
+                                  title: const Text('Confirm Delete'),
+                                  content: const Text('Are you sure you want to delete this banner?'),
+                                  actions: <Widget>[
+                                    TextButton(
+                                      onPressed: () => Navigator.of(dialogContext).pop(false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                      onPressed: () => Navigator.of(dialogContext).pop(true),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
                                 ),
-                                TextButton(
-                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
-                                  onPressed: () => Navigator.of(dialogContext).pop(true),
-                                  child: const Text('Delete'),
-                                ),
-                              ],
-                            ),
-                          );
+                              );
 
-                          if (confirm == true) {
-                            try {
-                              await bannerProvider.deleteBanner(banner.id, banner.imageUrl);
-                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Banner deleted successfully')),
-                              );
-                            } catch (e) {
-                               if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Failed to delete banner: $e')),
-                              );
-                            }
-                          }
-                        },
+                              if (confirm == true) {
+                                try {
+                                  await bannerProvider.deleteBanner(banner.id, banner.imageUrl);
+                                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Banner deleted successfully')),
+                                  );
+                                } catch (e) {
+                                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Failed to delete banner: $e')),
+                                  );
+                                }
+                              }
+                            },
+                            tooltip: 'Delete Banner',
+                          ),
+                        ],
                       ),
                     ],
                   ),

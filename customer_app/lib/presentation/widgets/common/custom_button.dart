@@ -58,7 +58,7 @@ class CustomButton extends StatelessWidget {
     final bool isButtonDisabled = isDisabled || onPressed == null || isLoading;
     
     // Default colors
-    final Color defaultBackgroundColor = backgroundColor ?? const Color(0xFF4A5568);
+    final Color defaultBackgroundColor = backgroundColor ?? const Color(0xFF0F3057); // Primary color
     final Color defaultTextColor = textColor ?? Colors.white;
     final Color defaultDisabledBgColor = disabledBackgroundColor ?? Colors.grey[300]!;
     final Color defaultDisabledTextColor = disabledTextColor ?? Colors.grey[600]!;
@@ -256,7 +256,7 @@ class PrimaryButton extends StatelessWidget {
       onPressed: onPressed,
       isLoading: isLoading,
       isDisabled: isDisabled,
-      backgroundColor: const Color(0xFF4A5568),
+      backgroundColor: const Color(0xFF0F3057), // Primary color
       textColor: Colors.white,
       width: width,
       height: height ?? 50,
@@ -296,8 +296,8 @@ class SecondaryButton extends StatelessWidget {
       isLoading: isLoading,
       isDisabled: isDisabled,
       backgroundColor: Colors.white,
-      textColor: const Color(0xFF4A5568),
-      border: Border.all(color: const Color(0xFF4A5568)),
+      textColor: const Color(0xFF0F3057), // Primary color
+      border: Border.all(color: const Color(0xFF0F3057)), // Primary color
       width: width,
       height: height ?? 50,
       icon: icon,
@@ -464,7 +464,7 @@ class AppTextButton extends StatelessWidget {
       isLoading: isLoading,
       isDisabled: isDisabled,
       backgroundColor: Colors.transparent,
-      textColor: textColor ?? const Color(0xFF4299E1),
+      textColor: textColor ?? const Color(0xFF0F3057), // Primary color
       elevation: 0,
       width: width,
       height: height ?? 40,
@@ -505,7 +505,7 @@ class FloatingButton extends StatelessWidget {
       onPressed: onPressed,
       isLoading: isLoading,
       isDisabled: isDisabled,
-      backgroundColor: backgroundColor ?? const Color(0xFF4299E1),
+      backgroundColor: backgroundColor ?? const Color(0xFF0F3057), // Primary color
       textColor: Colors.white,
       borderRadius: BorderRadius.circular(25),
       elevation: 4,

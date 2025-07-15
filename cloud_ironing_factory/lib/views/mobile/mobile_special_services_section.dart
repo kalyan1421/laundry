@@ -37,7 +37,7 @@ class MobileServicesSection extends StatelessWidget {
           Transform(
             alignment: Alignment.center,
             transform: Matrix4.rotationY(3.1416),
-            child: Image.asset('images/air_symbol.png', width: 30, height: 30),
+                                    child: Image.asset('assets/images/air_symbol.png', width: 30, height: 30),
           ),
           SizedBox(width: 10),
           Text(
@@ -50,7 +50,7 @@ class MobileServicesSection extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           SizedBox(width: 10),
-          Image.asset('images/air_symbol.png', width: 30, height: 30),
+                          Image.asset('assets/images/air_symbol.png', width: 30, height: 30),
         ],
       ),
     );

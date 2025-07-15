@@ -22,7 +22,7 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
     {
       'id': 'bed_sheet',
       'name': 'Bed Sheet',
-      'description': 'Professional cleaning and ironing',
+      'description': 'Professional washing and ironing',
       'price': 100.0,
       'unit': 'piece',
       'icon': Icons.bed,
@@ -32,7 +32,7 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
     {
       'id': 'pillow_cover',
       'name': 'Pillow Cover',
-      'description': 'Deep cleaning and fresh ironing',
+      'description': 'Deep washing and fresh ironing',
       'price': 20.0,
       'unit': 'piece',
       'icon': Icons.airline_seat_individual_suite,
@@ -45,7 +45,7 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
       'description': 'Price will be notified after inspection',
       'price': 0.0,
       'unit': 'item',
-      'icon': Icons.cleaning_services,
+      'icon': Icons.local_laundry_service,
       'color': Colors.orange,
       'hasPrice': false,
     },
@@ -137,12 +137,9 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Header Section
@@ -183,7 +180,7 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Professional cleaning and care for your bedding and special stain removal',
+                          'Professional washing and care for your bedding and special stain removal',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 14,
@@ -400,95 +397,151 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 100), // Space for bottom sheet
+                  const SizedBox(height: 24),
+                  
+                  // Space for bottom sheet
+                  if (totalItems > 0) const SizedBox(height: 120),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-      bottomSheet: totalItems > 0 ? _buildBottomSheet() : null,
+      bottomSheet: totalItems > 0 ? _buildStickyCartSummary() : null,
     );
   }
 
-  Widget _buildBottomSheet() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
+  Widget _buildStickyCartSummary() {
+    return Padding(padding: const EdgeInsets.only(bottom: 50),
+    child: 
+    Container(
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
-            offset: Offset(0, -2),
+            color: Colors.black.withOpacity(0.1),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20), // 20px from bottom
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Cart Summary Row
+              Row(
+                children: [
+                  // Cart Icon with Badge
+                  Stack(
                     children: [
-                      Text(
-                        '$totalItems item${totalItems > 1 ? 's' : ''} selected',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F3057).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.shopping_cart,
+                          color: Color(0xFF0F3057),
+                          size: 24,
                         ),
                       ),
-                      if (totalAmount > 0)
-                        Text(
-                          '₹${totalAmount.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green,
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
                           ),
-                        )
-                      else
-                        const Text(
-                          'Quote on inspection',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.orange,
+                          child: Text(
+                            '$totalItems',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                Flexible(
-                  child: ElevatedButton(
-                    onPressed: _proceedToSchedule,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      // padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      'Schedule Pickup',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  const SizedBox(width: 16),
+                  
+                  // Amount Details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$totalItems item${totalItems > 1 ? 's' : ''} selected',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (totalAmount > 0)
+                          Text(
+                            '₹${totalAmount.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          )
+                        else
+                          const Text(
+                            'Quote on inspection',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
+                  
+                  // Schedule Button
+                  Padding(padding: const EdgeInsets.all(8),
+                  child: 
+                  ElevatedButton(
+                    onPressed: _proceedToSchedule,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F3057),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.schedule, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'Schedule',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_ios, size: 14),
+                      ],
+                    ),
+                    ),
+                  ),
+                    ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

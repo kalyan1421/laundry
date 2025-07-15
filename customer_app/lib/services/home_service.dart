@@ -45,8 +45,7 @@ class HomeService {
   Stream<List<ItemModel>> getItems({String? categoryFilter}) {
     Query query = _firestore
         .collection('items')
-        .where('isActive', isEqualTo: true)
-        .orderBy('order', descending: false);
+        .where('isActive', isEqualTo: true);
 
     if (categoryFilter != null && categoryFilter.isNotEmpty) {
       query = query.where('category', isEqualTo: categoryFilter);
@@ -54,7 +53,17 @@ class HomeService {
 
     return query.snapshots().map((snapshot) {
       try {
-        return snapshot.docs.map((doc) => ItemModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>)).toList();
+        final items = snapshot.docs.map((doc) => ItemModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>)).toList();
+        
+        // Sort items by position (order), then by name
+        items.sort((a, b) {
+          if (a.order != b.order) {
+            return a.order.compareTo(b.order);
+          }
+          return a.name.compareTo(b.name);
+        });
+        
+        return items;
       } catch (e) {
         print('Error fetching items (category: $categoryFilter): $e');
         return [];

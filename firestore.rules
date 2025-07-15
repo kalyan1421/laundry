@@ -21,20 +21,15 @@ service cloud.firestore {
       return isAuthenticated() && exists(deliveryPath) && get(deliveryPath).data.isActive == true;
     }
     
-    function isCustomer() {
-      let customerPath = /databases/$(database)/documents/customer/$(request.auth.uid);
-      return isAuthenticated() && exists(customerPath);
+    function isWorkshopWorker() {
+      let workshopPath = /databases/$(database)/documents/workshop_workers/$(request.auth.uid);
+      return isAuthenticated() && exists(workshopPath) && get(workshopPath).data.isActive == true;
     }
     
     // Helper function to validate notification data
     function isValidNotificationCreate() {
       return request.resource.data.keys().hasAll(['title', 'body', 'type']) &&
              request.resource.data.read == false;
-    }
-    
-    // Helper function to validate customer data on create - simplified
-    function isValidCustomerCreate() {
-      return request.resource.data.uid == request.auth.uid;
     }
     
     // ========== COLLECTION RULES ==========
@@ -102,16 +97,48 @@ service cloud.firestore {
       }
     }
     
+    // WORKSHOP WORKERS: Admins create. Workers can link their profile once and then edit.
+    match /workshop_workers/{workerId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      // Allow updates by admin, document owner, or UID match
+      allow update: if isAdmin() || 
+                      isOwner(workerId) ||
+                      (isAuthenticated() && resource.data.uid == request.auth.uid);
+      allow list: if isAuthenticated();
+      
+      // WORKSHOP WORKER NOTIFICATIONS SUBCOLLECTION
+      match /notifications/{notificationId} {
+        allow create, update, delete: if isAdmin();
+        allow create: if isAuthenticated() && isValidNotificationCreate();
+        allow read, list: if isOwner(workerId);
+        allow update: if isOwner(workerId) && 
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+        allow read, list: if isAdmin();
+      }
+    }
+    
     // CUSTOMERS: Can create their own account and update their own data
     match /customer/{customerId} { 
-      allow read, write: if isAdmin();
-      // FIXED: Allow customer creation - simplified for debugging
+      // Admins have full access to all customer data including queries and searches
+      allow read, write, list: if isAdmin();
+  
+      // Allow customer creation - customer can create their own document
       allow create: if isAuthenticated() && request.auth.uid == customerId;
+  
+      // Allow customer to read and update their own data
       allow read, update: if isOwner(customerId);
+  
+      // IMPORTANT: Additional explicit read permission for queries
+      allow read: if isAuthenticated() && request.auth.uid == customerId;
+  
       // Allow delivery partners to read customer info (for delivery purposes)
       allow read: if isDeliveryPartner();
+  
+      // Allow listing for admins and delivery partners
       allow list: if isAdmin() || isDeliveryPartner();
-      
+  
+      // Customer addresses subcollection
       match /addresses/{addressId} {
         allow read, write: if isAdmin();
         allow create, read, update, delete: if isOwner(customerId);
@@ -121,32 +148,13 @@ service cloud.firestore {
       }
     }
     
-    // LEGACY: Support for users collection - FIXED with same validation
-    match /users/{userId} { 
-      allow read, write: if isAdmin();
-      // FIXED: Allow user creation - simplified for debugging
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow read, update: if isOwner(userId);
-      // Allow delivery partners to read user info (for delivery purposes)
-      allow read: if isDeliveryPartner();
-      allow list: if isAdmin() || isDeliveryPartner();
-      
-      match /addresses/{addressId} {
-        allow read, write: if isAdmin();
-        allow create, read, update, delete: if isOwner(userId);
-        // Allow delivery partners to read user addresses (for delivery)
-        allow read: if isDeliveryPartner();
-        allow list: if isOwner(userId) || isDeliveryPartner();
-      }
-    }
-    
     // ORDERS: Customers can create and manage their orders
     match /orders/{orderId} { 
       allow read, write: if isAdmin();
       allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
       allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid;
-      // Delivery partners can read all orders
-      allow read, list: if isDeliveryPartner();
+      // Delivery partners and workshop workers can read all orders
+      allow read, list: if isDeliveryPartner() || isWorkshopWorker();
       allow list: if isAuthenticated();
       
       // Customer update permissions (multiple rules for different scenarios)
@@ -168,6 +176,10 @@ service cloud.firestore {
       // 4. Delivery partners can update delivery-related fields
       allow update: if isDeliveryPartner() && 
         request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'deliveryStatus', 'updatedAt', 'completedAt', 'deliveredAt', 'notificationSentToDeliveryPerson']);
+      
+      // 5. Workshop workers can update order processing-related fields
+      allow update: if isWorkshopWorker() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'processingStatus', 'updatedAt', 'completedAt', 'processedAt', 'notificationSentToWorkshopWorker']);
     }
     
     // Publicly readable collections for the customer app. Admins have write access.

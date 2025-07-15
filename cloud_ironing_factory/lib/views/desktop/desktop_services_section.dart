@@ -39,7 +39,7 @@ class DesktopServicesSection extends StatelessWidget {
           Transform(
             alignment: Alignment.center,
             transform: Matrix4.rotationY(3.1416),
-            child: Image.asset('images/air_symbol.png', width: 50, height: 50),
+                                    child: Image.asset('assets/images/air_symbol.png', width: 50, height: 50),
           ),
           const SizedBox(width: 16),
           Text(
@@ -50,7 +50,7 @@ class DesktopServicesSection extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          Image.asset('images/air_symbol.png', width: 50, height: 50),
+                          Image.asset('assets/images/air_symbol.png', width: 50, height: 50),
         ],
       ),
     );

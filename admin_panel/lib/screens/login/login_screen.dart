@@ -122,14 +122,20 @@ class _LoginScreenState extends State<LoginScreen> {
                                 children: [
                                   Icon(
                                     role == UserRole.admin 
-                                        ? Icons.admin_panel_settings 
-                                        : Icons.delivery_dining,
+                                        ? Icons.admin_panel_settings
+                                        : role == UserRole.supervisor
+                                            ? Icons.supervisor_account
+                                            : Icons.delivery_dining,
                                     size: 20,
                                     color: Colors.blue,
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    role == UserRole.admin ? 'Admin' : 'Delivery Partner',
+                                    role == UserRole.admin 
+                                        ? 'Admin' 
+                                        : role == UserRole.supervisor
+                                            ? 'Supervisor'
+                                            : 'Delivery Person',
                                     style: const TextStyle(fontSize: 16),
                                   ),
                                 ],

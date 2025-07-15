@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.1+3
+version: 1.1.0+12
 
 environment:
   sdk: ">=3.2.0 <4.0.0" # Updated SDK constraint
@@ -37,7 +37,8 @@ dependencies:
   provider: ^6.1.1
   intl: ^0.19.0 # For date/time formatting
   uuid: ^4.3.3 # For generating unique IDs
-  cached_network_image: ^3.4.0 # For caching network images
+  cached_network_image: ^3.4.0
+  flutter_cache_manager: ^3.3.2 # For caching network images
   flutter_carousel_widget: ^2.2.0 # For image carousels
   flutter_svg: ^2.0.9 # For SVG images
   # permission_handler: ^11.1.0 # For handling permissions
@@ -57,6 +58,7 @@ dependencies:
   google_maps_flutter: ^2.5.3 # For Google Maps
   geocoding: ^2.1.1 # Uncommented geocoding
   qr_flutter: ^4.1.0
+
   carousel_slider: ^5.0.0
   url_launcher: ^6.2.6 # Added url_launcher
   timelines_plus: ^1.0.7 # Replaced timelines with timelines_plus

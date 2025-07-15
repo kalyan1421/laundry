@@ -38,7 +38,7 @@ class DesktopWhyChooseUsSection extends StatelessWidget {
         children: [
           // Logo and Title
           Image.asset(
-            'images/logo.png',
+                              'assets/images/logo.png',
             fit: BoxFit.contain,
             width: 200,
             height: 200,
@@ -175,7 +175,7 @@ class DesktopWhyChooseUsSection extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(15),
                     child: Image.asset(
-                      'images/Rectangle_1.jpeg', // Replace with your image
+                      'assets/images/Rectangle_1.jpeg', // Replace with your image
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
@@ -241,7 +241,7 @@ class DesktopWhyChooseUsSection extends StatelessWidget {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(15),
                         child: Image.asset(
-                          'images/Rectangle_2.jpg', // Replace with your image
+                          'assets/images/Rectangle_2.jpg', // Replace with your image
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
                             return Container(

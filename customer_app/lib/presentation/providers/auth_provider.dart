@@ -6,9 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
-import '../../core/errors/app_exceptions.dart';
 import '../../core/errors/error_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:customer_app/core/utils/address_utils.dart';
+import 'package:flutter/material.dart';
 
 enum AuthStatus {
   unknown,
@@ -109,7 +110,12 @@ class AuthProvider extends ChangeNotifier {
   // Safe notify listeners
   void _safeNotifyListeners() {
     if (!_isDisposed) {
-      _logger.d("Notifying listeners. AuthStatus: $_authStatus, Current UserModel: ${_userModel != null}");
+      // Only log significant state changes to reduce noise
+      if (_authStatus == AuthStatus.authenticated || 
+          _authStatus == AuthStatus.unauthenticated ||
+          _authStatus == AuthStatus.failed) {
+        _logger.d("Notifying listeners. AuthStatus: $_authStatus, Current UserModel: ${_userModel != null}");
+      }
       notifyListeners();
     } else {
       _logger.w("Attempted to notify listeners after dispose.");
@@ -293,10 +299,10 @@ class AuthProvider extends ChangeNotifier {
       _safeNotifyListeners();
       return true;
 
-    } on AuthException catch (e) { 
+    } on FirebaseAuthException catch (e) { 
       if (_isDisposed) return false;
-      _logger.w('AuthException: ${e.message}');
-      _setError(e.message); 
+      _logger.w('FirebaseAuthException: ${e.message}');
+      _setError(e.message ?? 'Authentication failed'); 
       _setOTPStatus(OTPStatus.failed);
       _isVerifying = false;
       _safeNotifyListeners();
@@ -353,6 +359,14 @@ class AuthProvider extends ChangeNotifier {
     await _loadUserDataWithRetry(user.uid);
   }
 
+  // Method to refresh user data (useful after address changes)
+  Future<void> refreshUserData() async {
+    if (_userModel != null) {
+      _logger.i("Refreshing user data for UID: ${_userModel!.uid}");
+      await _loadUserDataWithRetry(_userModel!.uid);
+    }
+  }
+
   Future<bool> updateProfile({
     required String name,
     required String email,
@@ -399,13 +413,17 @@ class AuthProvider extends ChangeNotifier {
     String? landmark,
     required double latitude,
     required double longitude,
+    String? doorNumber,
+    String? floorNumber,
+    String? apartmentName,
   }) async {
     if (_userModel == null) return false;
 
     _setLoading(true);
     try {
-      _logger.i('Starting profile update with address');
+      _logger.i('Starting profile update with address using standardized format');
       _logger.i('User ID: ${_userModel!.uid}');
+      _logger.i('Phone Number: ${_userModel!.phoneNumber}');
       _logger.i('Latitude: $latitude, Longitude: $longitude');
       
       // First update the user profile
@@ -419,60 +437,117 @@ class AuthProvider extends ChangeNotifier {
       await _authService.updateProfile(_userModel!.uid, updatedData);
       _logger.i('User profile updated successfully');
 
-      // Then save the address with detailed information
-      final addressData = {
-        'type': 'home',
-        'addressLine1': addressLine1,
-        'addressLine2': addressLine2 ?? '',
-        'city': city,
-        'state': state,
-        'pincode': pincode,
-        'landmark': landmark ?? '',
-        'latitude': latitude,
-        'longitude': longitude,
-        'isPrimary': true,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        // Additional metadata for better delivery experience
-        'fullAddress': _buildFullAddress(addressLine1, addressLine2, city, state, pincode),
-        'searchableText': _buildSearchableText(addressLine1, addressLine2, city, state, pincode, landmark),
-      };
+      // Parse the addressLine1 to extract door number, floor number, and apartment name if not provided
+      String extractedDoorNumber = doorNumber ?? '';
+      String extractedFloorNumber = floorNumber ?? '';
+      String extractedApartmentName = apartmentName ?? '';
+      String cleanAddressLine1 = addressLine1;
 
-      _logger.i('Address data to be saved:');
-      _logger.i('Type: ${addressData['type']}');
-      _logger.i('AddressLine1: ${addressData['addressLine1']}');
-      _logger.i('AddressLine2: ${addressData['addressLine2']}');
-      _logger.i('City: ${addressData['city']}');
-      _logger.i('State: ${addressData['state']}');
-      _logger.i('Pincode: ${addressData['pincode']}');
-      _logger.i('Landmark: ${addressData['landmark']}');
-      _logger.i('Latitude: ${addressData['latitude']} (Type: ${addressData['latitude'].runtimeType})');
-      _logger.i('Longitude: ${addressData['longitude']} (Type: ${addressData['longitude'].runtimeType})');
-      _logger.i('IsPrimary: ${addressData['isPrimary']}');
-
-      // Save address to Firestore
-      _logger.i('Saving address to Firestore...');
-      final docRef = await FirebaseFirestore.instance
-          .collection('customer')
-          .doc(_userModel!.uid)
-          .collection('addresses')
-          .add(addressData);
-      
-      _logger.i('Address saved successfully with document ID: ${docRef.id}');
-
-      // Verify the saved data by reading it back
-      try {
-        final savedDoc = await docRef.get();
-        if (savedDoc.exists) {
-          final savedData = savedDoc.data();
-          _logger.i('Verified saved address data:');
-          _logger.i('Saved Latitude: ${savedData?['latitude']} (Type: ${savedData?['latitude'].runtimeType})');
-          _logger.i('Saved Longitude: ${savedData?['longitude']} (Type: ${savedData?['longitude'].runtimeType})');
-        } else {
-          _logger.e('Document was not saved properly - does not exist');
+      // If door/floor/apartment not provided, try to extract from addressLine1
+      if (extractedDoorNumber.isEmpty || extractedFloorNumber.isEmpty) {
+        // Extract door number
+        if (addressLine1.contains('Door:')) {
+          RegExp doorRegex = RegExp(r'Door:\s*([^,]+)');
+          Match? doorMatch = doorRegex.firstMatch(addressLine1);
+          if (doorMatch != null) {
+            extractedDoorNumber = doorMatch.group(1)?.trim() ?? '';
+          }
         }
-      } catch (e) {
-        _logger.e('Error verifying saved data: $e');
+
+        // Extract floor number
+        if (addressLine1.contains('Floor:')) {
+          RegExp floorRegex = RegExp(r'Floor:\s*([^,]+)');
+          Match? floorMatch = floorRegex.firstMatch(addressLine1);
+          if (floorMatch != null) {
+            extractedFloorNumber = floorMatch.group(1)?.trim() ?? '';
+          }
+        }
+
+        // Extract apartment name (between Floor and the remaining address)
+        if (addressLine1.contains('Floor:') && addressLine1.contains(',')) {
+          RegExp apartmentRegex = RegExp(r'Floor:\s*[^,]+,\s*([^,]+)');
+          Match? apartmentMatch = apartmentRegex.firstMatch(addressLine1);
+          if (apartmentMatch != null) {
+            extractedApartmentName = apartmentMatch.group(1)?.trim() ?? '';
+          }
+        }
+
+        // Clean the address line by removing the extracted structured info
+        cleanAddressLine1 = addressLine1
+            .replaceAll(RegExp(r'Door:\s*[^,]+,?\s*'), '')
+            .replaceAll(RegExp(r'Floor:\s*[^,]+,?\s*'), '')
+            .replaceAll(RegExp(r'^\s*,\s*'), '') // Remove leading comma
+            .replaceAll(RegExp(r',\s*,'), ',') // Remove double commas
+            .trim();
+      }
+
+      _logger.i('Standardized address data to be saved:');
+      _logger.i('Door Number: $extractedDoorNumber');
+      _logger.i('Floor Number: $extractedFloorNumber');
+      _logger.i('Apartment Name: $extractedApartmentName');
+      _logger.i('Address Line 1: $cleanAddressLine1');
+      _logger.i('Address Line 2: ${addressLine2 ?? ''}');
+      _logger.i('Landmark: ${landmark ?? ''}');
+      _logger.i('City: $city');
+      _logger.i('State: $state');
+      _logger.i('Pincode: $pincode');
+      _logger.i('Latitude: $latitude (Type: ${latitude.runtimeType})');
+      _logger.i('Longitude: $longitude (Type: ${longitude.runtimeType})');
+
+      // Save address using standardized format and phone number-based document ID
+      final documentId = await AddressUtils.saveAddressWithStandardFormat(
+        userId: _userModel!.uid,
+        phoneNumber: _userModel!.phoneNumber,
+        doorNumber: extractedDoorNumber,
+        floorNumber: extractedFloorNumber,
+        addressLine1: cleanAddressLine1,
+        landmark: landmark ?? '',
+        city: city,
+        state: state,
+        pincode: pincode,
+        addressLine2: addressLine2,
+        apartmentName: extractedApartmentName,
+        addressType: 'home',
+        latitude: latitude,
+        longitude: longitude,
+        isPrimary: true, // First address is always primary
+      );
+
+      if (documentId != null) {
+        _logger.i('Address saved successfully with standardized format and ID: $documentId');
+        
+        // Verify the saved data by reading it back
+        try {
+          final savedDoc = await FirebaseFirestore.instance
+              .collection('customer')
+              .doc(_userModel!.uid)
+              .collection('addresses')
+              .doc(documentId)
+              .get();
+          
+          if (savedDoc.exists) {
+            final savedData = savedDoc.data();
+            _logger.i('Verified saved address data:');
+            _logger.i('Document ID: $documentId');
+            _logger.i('Saved Door Number: ${savedData?['doorNumber']}');
+            _logger.i('Saved Floor Number: ${savedData?['floorNumber']}');
+            _logger.i('Saved Apartment Name: ${savedData?['apartmentName']}');
+            _logger.i('Saved Address Line 1: ${savedData?['addressLine1']}');
+            _logger.i('Saved Landmark: ${savedData?['landmark']}');
+            _logger.i('Saved City: ${savedData?['city']}');
+            _logger.i('Saved State: ${savedData?['state']}');
+            _logger.i('Saved Pincode: ${savedData?['pincode']}');
+            _logger.i('Saved Latitude: ${savedData?['latitude']} (Type: ${savedData?['latitude'].runtimeType})');
+            _logger.i('Saved Longitude: ${savedData?['longitude']} (Type: ${savedData?['longitude'].runtimeType})');
+          } else {
+            _logger.e('Document was not saved properly - does not exist');
+          }
+        } catch (e) {
+          _logger.e('Error verifying saved data: $e');
+        }
+      } else {
+        _logger.e('Failed to save address with standardized format');
+        throw Exception('Failed to save address');
       }
 
       // Optimistically update the local user model
@@ -482,7 +557,9 @@ class AuthProvider extends ChangeNotifier {
         isProfileComplete: true,
       );
       
-      _safeNotifyListeners();
+      // Notify admin of new customer registration
+      await _notifyAdminOfNewCustomer();
+      
       return true;
     } catch (e) {
       _logger.e('Error updating profile with address: $e');
@@ -521,6 +598,33 @@ class AuthProvider extends ChangeNotifier {
     }
     
     return searchTerms.join(' ');
+  }
+
+  // Notify admin of new customer registration
+  Future<void> _notifyAdminOfNewCustomer() async {
+    if (_userModel == null) return;
+    
+    try {
+      _logger.i('Notifying admin of new customer registration: ${_userModel!.name}');
+      
+      // Call a cloud function or service to notify admin
+      await FirebaseFirestore.instance
+          .collection('customerRegistrationNotifications')
+          .add({
+        'customerId': _userModel!.uid,
+        'customerName': _userModel!.name,
+        'customerPhone': _userModel!.phoneNumber,
+        'customerEmail': _userModel!.email,
+        'notifiedAt': FieldValue.serverTimestamp(),
+        'status': 'sent',
+        'notificationType': 'new_registration',
+      });
+      
+      _logger.i('Admin notification sent successfully for new customer');
+    } catch (e) {
+      _logger.e('Error notifying admin of new customer: $e');
+      // Don't throw error as this is not critical for user flow
+    }
   }
 
   Future<void> updateUserData(UserModel user) async {
@@ -621,10 +725,27 @@ class AuthProvider extends ChangeNotifier {
 
   // Reset OTP state
   void resetOTPState() {
-    _otpStatus = OTPStatus.initial;
-    _verificationId = null;
-    _errorMessage = null;
-    _safeNotifyListeners();
+    bool hasChanges = false;
+    
+    if (_otpStatus != OTPStatus.initial) {
+      _otpStatus = OTPStatus.initial;
+      hasChanges = true;
+    }
+    
+    if (_verificationId != null) {
+      _verificationId = null;
+      hasChanges = true;
+    }
+    
+    if (_errorMessage != null) {
+      _errorMessage = null;
+      hasChanges = true;
+    }
+    
+    // Only notify listeners if there were actual changes
+    if (hasChanges) {
+      _safeNotifyListeners();
+    }
   }
 
   // ADDED: Method to manually retry loading user data

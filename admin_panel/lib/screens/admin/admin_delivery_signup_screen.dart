@@ -83,7 +83,7 @@ class _AddDeliveryPartnerScreenState extends State<AddDeliveryPartnerScreen> {
       );
 
       if (newPartner != null && mounted) {
-        _showMessage('Delivery partner created successfully!', isError: false);
+        _showMessage('Delivery person created successfully!', isError: false);
         
         // Show instructions dialog
         _showInstructionsDialog(newPartner);
@@ -93,7 +93,7 @@ class _AddDeliveryPartnerScreenState extends State<AddDeliveryPartnerScreen> {
       }
     } catch (e) {
       if (mounted) {
-        _showMessage('Failed to create delivery partner: ${e.toString()}', isError: true);
+        _showMessage('Failed to create delivery person: ${e.toString()}', isError: true);
       }
     } finally {
       if (mounted) {
@@ -128,7 +128,7 @@ class _AddDeliveryPartnerScreenState extends State<AddDeliveryPartnerScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Delivery partner "${partner.name}" has been created successfully.',
+                'Delivery person "${partner.name}" has been created successfully.',
                 style: TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 16),

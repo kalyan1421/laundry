@@ -243,7 +243,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     const SizedBox(height: 30),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF003B73), // Dark blue color from image
+                        backgroundColor: const Color(0xFF0F3057), // Primary color
                         padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),

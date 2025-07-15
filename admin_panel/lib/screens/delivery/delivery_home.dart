@@ -10,6 +10,7 @@ import '../../services/fcm_service.dart';
 import '../../models/order_model.dart';
 import './task_detail_screen.dart';
 import './quick_order_notifications.dart';
+import '../../utils/phone_formatter.dart';
 
 class DeliveryHome extends StatefulWidget {
   const DeliveryHome({super.key});
@@ -899,6 +900,16 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
                       ),
                       const SizedBox(height: 2),
                     ],
+                    // Client ID (Phone number without +91)
+                    Text(
+                      'Client ID: ${PhoneFormatter.getClientId(order.customer?.phoneNumber)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     // Enhanced address display
                     Text(
                       _getDisplayAddress(order, isPickup),

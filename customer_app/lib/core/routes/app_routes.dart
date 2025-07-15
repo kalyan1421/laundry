@@ -13,7 +13,7 @@ import 'package:customer_app/presentation/screens/profile/help_screen.dart';
 import 'package:customer_app/presentation/screens/profile/settings_screen.dart';
 import 'package:customer_app/presentation/screens/profile/saved_items_screen.dart';
 import 'package:customer_app/presentation/screens/splash/splash_screen.dart';
-import 'package:customer_app/presentation/screens/address/add_address_screen.dart';
+import 'package:customer_app/presentation/screens/profile/add_address_screen.dart';
 import 'package:customer_app/presentation/screens/home/allied_services_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

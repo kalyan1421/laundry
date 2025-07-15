@@ -4,34 +4,34 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class BannerModel {
   final String id;
   final String imageUrl;
-  final String mainTagline;
-  final String subTagline;
+  final bool isActive;
   final Timestamp? createdAt;
+  final Timestamp? updatedAt;
 
   BannerModel({
     required this.id,
     required this.imageUrl,
-    required this.mainTagline,
-    required this.subTagline,
+    this.isActive = true,
     this.createdAt,
+    this.updatedAt,
   });
 
   factory BannerModel.fromMap(Map<String, dynamic> map, String id) {
     return BannerModel(
       id: id,
       imageUrl: map['imageUrl'] ?? '',
-      mainTagline: map['mainTagline'] ?? '',
-      subTagline: map['subTagline'] ?? '',
+      isActive: map['isActive'] ?? true,
       createdAt: map['createdAt'] as Timestamp?,
+      updatedAt: map['updatedAt'] as Timestamp?,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'imageUrl': imageUrl,
-      'mainTagline': mainTagline,
-      'subTagline': subTagline,
+      'isActive': isActive,
       'createdAt': createdAt ?? Timestamp.now(),
+      'updatedAt': updatedAt ?? Timestamp.now(),
     };
   }
 }

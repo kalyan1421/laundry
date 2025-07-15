@@ -146,7 +146,7 @@ class DesktopHeroSection extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   image: DecorationImage(
-                    image: AssetImage('images/hero-image.png'),
+                    image: AssetImage('assets/images/hero-image.png'),
                     fit: BoxFit.cover,
                   ),
                 ),

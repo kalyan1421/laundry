@@ -65,13 +65,31 @@ class UserModel {
     if (data == null) {
       throw Exception("User document data is null for doc ID: ${doc.id}");
     }
+    
+    // Add debug logging
+    print('UserModel.fromFirestore - Document ID: ${doc.id}');
+    print('UserModel.fromFirestore - Raw data: $data');
+    print('UserModel.fromFirestore - Available keys: ${data.keys.toList()}');
+    
+    // Extract fields with debug logging
+    final name = data['name'] as String? ?? '';
+    final email = data['email'] as String? ?? '';
+    final phoneNumber = data['phoneNumber'] as String? ?? '';
+    final role = data['role'] as String? ?? 'customer';
+    
+    print('UserModel.fromFirestore - Extracted fields:');
+    print('  name: "$name"');
+    print('  email: "$email"');
+    print('  phoneNumber: "$phoneNumber"');
+    print('  role: "$role"');
+    
     return UserModel(
       uid: doc.id,
       clientId: data['clientId'] as String?,
-      name: data['name'] as String? ?? '',
-      email: data['email'] as String? ?? '',
-      phoneNumber: data['phoneNumber'] as String? ?? '',
-      role: data['role'] as String? ?? 'customer',
+      name: name,
+      email: email,
+      phoneNumber: phoneNumber,
+      role: role,
       isProfileComplete: data['isProfileComplete'] as bool?,
       profileImageUrl: data['profileImageUrl'] as String?,
       qrCodeUrl: data['qrCodeUrl'] as String?,

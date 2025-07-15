@@ -52,8 +52,6 @@ class BannerProvider with ChangeNotifier {
   }
   
   Future<void> addBanner({
-    required String mainTagline,
-    required String subTagline,
     required File imageFile,
   }) async {
     try {
@@ -68,8 +66,7 @@ class BannerProvider with ChangeNotifier {
       BannerModel newBanner = BannerModel(
         id: bannerId,
         imageUrl: imageUrl,
-        mainTagline: mainTagline,
-        subTagline: subTagline,
+        isActive: true,
         createdAt: Timestamp.now(),
       );
       await docRef.set(newBanner.toMap());
@@ -82,7 +79,9 @@ class BannerProvider with ChangeNotifier {
   
   Future<void> updateBanner(String bannerId, Map<String, dynamic> data) async {
     try {
-      await _firestore.collection('banners').doc(bannerId).update(data);
+      data['updatedAt'] = Timestamp.now();
+      await _firestore.collection(_bannersCollection).doc(bannerId).update(data);
+      notifyListeners();
     } catch (e) {
       _error = e.toString();
       notifyListeners();

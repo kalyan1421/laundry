@@ -30,7 +30,7 @@ class MobileAboutSection extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: Image.asset(
-                'assets/images/about us.jpeg',
+                                    'assets/images/about_us.jpeg',
                 height: 200,
                 width: double.infinity,
                 fit: BoxFit.cover,

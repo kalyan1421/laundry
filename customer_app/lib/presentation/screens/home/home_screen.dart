@@ -12,6 +12,9 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:customer_app/data/models/order_model.dart' as customer_order_model;
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -64,7 +67,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return itemQuantities.entries.fold<double>(0.0, (sum, entry) {
       try {
         final item = itemProvider.items.firstWhere((i) => i.id == entry.key);
-        return sum + (item.pricePerPiece * entry.value);
+        final effectivePrice = item.offerPrice ?? item.pricePerPiece;
+        return sum + (effectivePrice * entry.value);
       } catch (e) {
         return sum;
       }
@@ -156,9 +160,10 @@ class _HomeScreenState extends State<HomeScreen> {
             // _buildSearchBar(),
             _buildBanners(),
             _buildQuickActions(),
+            // _buildRevenueTracking(),
             // _buildSpecialOffers(),
             _buildItemsSection(),
-            _buildActiveOrders(),
+            // _buildActiveOrders(),
             // _buildRecentOrders(),
             const SizedBox(height: 100), // Space for bottom sheet
           ],
@@ -227,7 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   image: DecorationImage(
-                    image: NetworkImage(banner.imageUrl),
+                    image: CachedNetworkImageProvider(banner.imageUrl),
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -257,30 +262,30 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        banner.description ?? 'Crisp & Fresh Clothes',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const Spacer(),
+                      // Text(
+                      //   banner.description ?? 'Crisp & Fresh Clothes',
+                      //   style: const TextStyle(
+                      //     color: Colors.white,
+                      //     fontSize: 14,
+                      //   ),
+                      // ),
+                      // const Spacer(),
                       // Add offer text if available in your banner model
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          '30% OFF First Order',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                      // Container(
+                      //   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      //   decoration: BoxDecoration(
+                      //     color: Colors.blue,
+                      //     borderRadius: BorderRadius.circular(20),
+                      //   ),
+                      //   child: const Text(
+                      //     '30% OFF First Order',
+                      //     style: TextStyle(
+                      //       color: Colors.white,
+                      //       fontSize: 12,
+                      //       fontWeight: FontWeight.w600,
+                      //     ),
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),
@@ -440,6 +445,136 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildRevenueTracking() {
+    final firebase_auth.User? currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+    
+    if (currentUser == null) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<List<QuerySnapshot>>(
+      future: Future.wait([
+        FirebaseFirestore.instance
+            .collection('orders')
+            .where('customerId', isEqualTo: currentUser.uid)
+            .where('status', whereIn: ['completed', 'delivered'])
+            .get(),
+        FirebaseFirestore.instance
+            .collection('orders')
+            .where('userId', isEqualTo: currentUser.uid)
+            .where('status', whereIn: ['completed', 'delivered'])
+            .get(),
+      ]),
+      builder: (context, snapshot) {
+        double totalRevenue = 0.0;
+        int completedOrdersCount = 0;
+        Set<String> processedOrderIds = {};
+
+        if (snapshot.hasData) {
+          // Process both query results and avoid duplicates
+          for (QuerySnapshot querySnapshot in snapshot.data!) {
+            for (QueryDocumentSnapshot doc in querySnapshot.docs) {
+              if (!processedOrderIds.contains(doc.id)) {
+                processedOrderIds.add(doc.id);
+                final data = doc.data() as Map<String, dynamic>;
+                final amount = (data['totalAmount'] ?? 0.0).toDouble();
+                totalRevenue += amount;
+                completedOrdersCount++;
+              }
+            }
+          }
+        }
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.purple.shade50,
+                    Colors.white,
+                  ],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.account_balance_wallet,
+                          color: Colors.purple[600],
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Total Spending',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '₹${totalRevenue.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.purple[700],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'From $completedOrdersCount completed orders',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (snapshot.connectionState == ConnectionState.waiting)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildSpecialOffers() {
     return Consumer<SpecialOfferProvider>(
       builder: (context, specialOfferProvider, child) {
@@ -503,7 +638,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               decoration: BoxDecoration(
                                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                                 image: DecorationImage(
-                                  image: NetworkImage(offer.imageUrl ?? ''),
+                                  image: CachedNetworkImageProvider(offer.imageUrl ?? ''),
                                   fit: BoxFit.cover,
                                 ),
                               ),
@@ -637,10 +772,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: item.imageUrl != null && item.imageUrl!.isNotEmpty
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  item.imageUrl!,
+                                child: CachedNetworkImage(
+                                  imageUrl: item.imageUrl!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
+                                  errorWidget: (context, url, error) {
                                     return Icon(_getItemIcon(item.name), color: Colors.grey[400]);
                                   },
                                 ),
@@ -659,13 +794,60 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontSize: 16,
                               ),
                             ),
-                            Text(
-                              '₹${item.pricePerPiece.toInt()} per piece',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 14,
-                              ),
+                            // Price display with original and offer prices
+                            Row(
+                              children: [
+                                // Original Price (strikethrough) - Show first if there's an offer
+                                if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
+                                  Text(
+                                    '₹${item.originalPrice!.toInt()}',
+                                    style: const TextStyle(
+                                      decoration: TextDecoration.lineThrough,
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                // Add spacing between original and offer price
+                                if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
+                                  const SizedBox(width: 8),
+                                // Current/Offer Price
+                                Text(
+                                  '₹${(item.offerPrice ?? item.pricePerPiece).toInt()} per piece',
+                                  style: TextStyle(
+                                    color: item.offerPrice != null ? Colors.green[700] : Colors.grey[600],
+                                    fontSize: 14,
+                                    fontWeight: item.offerPrice != null ? FontWeight.w600 : FontWeight.normal,
+                                  ),
+                                ),
+                                // Offer badge
+                                // if (item.offerPrice != null && item.originalPrice != null && item.originalPrice! > item.offerPrice!)
+                                //   Container(
+                                //     margin: const EdgeInsets.only(left: 8),
+                                //     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                //     decoration: BoxDecoration(
+                                //       color: Colors.red,
+                                //       borderRadius: BorderRadius.circular(4),
+                                //     ),
+                                //     child: Text(
+                                //       '${(((item.originalPrice! - item.offerPrice!) / item.originalPrice!) * 100).toInt()}% OFF',
+                                //       style: const TextStyle(
+                                //         color: Colors.white,
+                                //         fontSize: 10,
+                                //         fontWeight: FontWeight.bold,
+                                //       ),
+                                //     ),
+                                //   ),
+                              ],
                             ),
+                            // Position indicator (if needed)
+                            // if (item.order > 0)
+                            //   Text(
+                            //     'Position: ${item.order}',
+                            //     style: TextStyle(
+                            //       color: Colors.blue[600],
+                            //       fontSize: 10,
+                            //     ),
+                            //   ),
                           ],
                         ),
                       ),
@@ -716,51 +898,51 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildActiveOrders() {
-    return Consumer<HomeProvider>(
-      builder: (context, homeProvider, child) {
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Active Orders',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text('View All'),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: Column(
-                children: [
-                  Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey[400]),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Your orders will appear here',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  // Widget _buildActiveOrders() {
+  //   return Consumer<HomeProvider>(
+  //     builder: (context, homeProvider, child) {
+  //       return Column(
+  //         children: [
+  //           Padding(
+  //             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+  //             child: Row(
+  //               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //               children: [
+  //                 const Text(
+  //                   'Active Orders',
+  //                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+  //                 ),
+  //                 TextButton(
+  //                   onPressed: () {},
+  //                   child: const Text('View All'),
+  //                 ),
+  //               ],
+  //             ),
+  //           ),
+  //           Container(
+  //             margin: const EdgeInsets.symmetric(horizontal: 16),
+  //             padding: const EdgeInsets.all(32),
+  //             decoration: BoxDecoration(
+  //               color: Colors.white,
+  //               borderRadius: BorderRadius.circular(8),
+  //               border: Border.all(color: Colors.grey[200]!),
+  //             ),
+  //             child: Column(
+  //               children: [
+  //                 Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey[400]),
+  //                 const SizedBox(height: 12),
+  //                 Text(
+  //                   'Your orders will appear here',
+  //                   style: TextStyle(color: Colors.grey[600]),
+  //                 ),
+  //               ],
+  //             ),
+  //           ),
+  //         ],
+  //       );
+  //     },
+  //   );
+  // }
 
   Widget _buildRecentOrders() {
     return Column(
@@ -873,7 +1055,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBottomSheet() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 20), // 20px from bottom
       decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -916,7 +1098,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ElevatedButton(
                 onPressed: _navigateToSchedulePickup,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
+                  backgroundColor: const Color(0xFF0F3057),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
                 child: const Text(

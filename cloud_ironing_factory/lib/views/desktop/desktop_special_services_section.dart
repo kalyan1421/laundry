@@ -23,7 +23,7 @@ class DesktopSpecialServicesSection extends StatelessWidget {
             'Perfumed',
             'Ironing',
             'Elevate Your Ironing Experience With Our Perfumed Ironing Service. We Infuse Your Clothes With A Delicate, Long-Lasting Fragrance, Leaving Them Fresh And Beautifully Scented. Choose From Our Selection Of Premium, Garment-Safe Perfumes For A Truly Luxurious Finish.',
-            'images/perfumed-ironoing.png',
+            'assets/images/perfumed-ironoing.png',
             Icons.local_florist,
             isImageLeft: true,
           ),

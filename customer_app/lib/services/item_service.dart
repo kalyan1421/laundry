@@ -20,11 +20,11 @@ class ItemService {
 
       // Define orderBy clauses based on whether a category filter is applied
       if (category != null && category.isNotEmpty) {
-        query = query.orderBy('name');
-        print('[ItemService] Ordering by name (for specific category).');
+        query = query.orderBy('sortOrder').orderBy('name');
+        print('[ItemService] Ordering by sortOrder, then name (for specific category).');
       } else {
-        query = query.orderBy('category').orderBy('name');
-        print('[ItemService] Ordering by category, then name (for all items).');
+        query = query.orderBy('category').orderBy('sortOrder').orderBy('name');
+        print('[ItemService] Ordering by category, sortOrder, then name (for all items).');
       }
       
       print('[ItemService] Executing Firestore query...');

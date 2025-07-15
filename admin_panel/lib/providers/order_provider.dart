@@ -20,19 +20,39 @@ class OrderProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   
-  Stream<List<OrderModel>> getAllOrdersStream() {
-    // Try ordering by different timestamp fields, fallback to no ordering
+  // Optimized stream with pagination and filtering
+  Stream<List<OrderModel>> getAllOrdersStream({String? statusFilter, int limit = 50}) {
     Query query = _firestore.collection('orders');
     
-    // Try to order by available timestamp fields
-    try {
-      query = query.orderBy('orderTimestamp', descending: true);
-    } catch (e) {
-      print('Warning: Could not order by orderTimestamp, trying createdAt: $e');
+    // Apply different query strategies based on filter
+    if (statusFilter != null && statusFilter != 'all') {
       try {
-        query = query.orderBy('createdAt', descending: true);
-      } catch (e2) {
-        print('Warning: Could not order by any timestamp field: $e2');
+        // Try optimized query with index
+        query = query.where('status', isEqualTo: statusFilter);
+        
+        // Try to order by timestamp with limit
+        try {
+          query = query.orderBy('orderTimestamp', descending: true).limit(limit);
+        } catch (e) {
+          print('Info: Using basic query without ordering for status filter');
+          query = query.limit(limit);
+        }
+      } catch (e) {
+        print('Info: Falling back to basic query: $e');
+        // Fallback to basic query without status filter
+        query = _firestore.collection('orders').limit(limit);
+      }
+    } else {
+      // For 'all' orders, use basic query
+      try {
+        query = query.orderBy('orderTimestamp', descending: true).limit(limit);
+      } catch (e) {
+        try {
+          query = query.orderBy('createdAt', descending: true).limit(limit);
+        } catch (e2) {
+          print('Using basic query without ordering');
+          query = query.limit(limit);
+        }
       }
     }
     
@@ -43,7 +63,85 @@ class OrderProvider extends ChangeNotifier {
         try {
           OrderModel order = OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
           
+          // Apply status filter in code if database query failed
+          if (statusFilter != null && statusFilter != 'all' && order.status != statusFilter) {
+            continue;
+          }
+          
           // Fetch customer information if customerId exists
+          if (order.customerId != null) {
+            try {
+              OrderModel? orderWithCustomer = await _orderService.getOrderWithCustomerInfo(doc.id);
+              if (orderWithCustomer != null) {
+                order = orderWithCustomer;
+              }
+            } catch (e) {
+              print('Error fetching customer info for order ${doc.id}: $e');
+            }
+          }
+          
+          orders.add(order);
+        } catch (e) {
+          print('Error processing order ${doc.id}: $e');
+        }
+      }
+      
+      // Sort orders manually by timestamp (most recent first)
+      orders.sort((a, b) {
+        DateTime aTime = a.createdAt?.toDate() ?? a.orderTimestamp.toDate();
+        DateTime bTime = b.createdAt?.toDate() ?? b.orderTimestamp.toDate();
+        return bTime.compareTo(aTime);
+      });
+      
+      // Apply limit in code if needed
+      if (orders.length > limit) {
+        orders = orders.take(limit).toList();
+      }
+      
+      _allOrders = orders;
+      return _allOrders;
+    });
+  }
+
+  // Separate method for getting full order details when needed
+  Future<OrderModel?> getOrderWithFullDetails(String orderId) async {
+    try {
+      DocumentSnapshot orderDoc = await _firestore.collection('orders').doc(orderId).get();
+      if (!orderDoc.exists) return null;
+      
+      OrderModel order = OrderModel.fromFirestore(orderDoc as DocumentSnapshot<Map<String, dynamic>>);
+      
+      // Fetch customer information if needed
+      if (order.customerId != null) {
+        OrderModel? orderWithCustomer = await _orderService.getOrderWithCustomerInfo(orderId);
+        if (orderWithCustomer != null) {
+          return orderWithCustomer;
+        }
+      }
+      
+      return order;
+    } catch (e) {
+      print('Error getting order with full details: $e');
+      return null;
+    }
+  }
+  
+  // Search orders by customer ID
+  Future<List<OrderModel>> searchOrdersByCustomerId(String customerId) async {
+    List<OrderModel> orders = [];
+    
+    try {
+      QuerySnapshot snapshot = await _firestore
+          .collection('orders')
+          .where('customerId', isEqualTo: customerId)
+          .orderBy('orderTimestamp', descending: true)
+          .get();
+      
+      for (QueryDocumentSnapshot doc in snapshot.docs) {
+        try {
+          OrderModel order = OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+          
+          // Fetch customer information
           if (order.customerId != null) {
             OrderModel? orderWithCustomer = await _orderService.getOrderWithCustomerInfo(doc.id);
             if (orderWithCustomer != null) {
@@ -55,17 +153,96 @@ class OrderProvider extends ChangeNotifier {
         } catch (e) {
           print('Error processing order ${doc.id}: $e');
         }
-             }
-       
-       // Sort orders manually by timestamp (most recent first)
-       orders.sort((a, b) {
-         DateTime aTime = a.createdAt?.toDate() ?? a.orderTimestamp.toDate();
-         DateTime bTime = b.createdAt?.toDate() ?? b.orderTimestamp.toDate();
-         return bTime.compareTo(aTime);
-       });
-       
-       _allOrders = orders;
-       return _allOrders;
+      }
+    } catch (e) {
+      print('Error searching orders by customer ID: $e');
+    }
+    
+    return orders;
+  }
+  
+  // Search orders by order ID (partial match)
+  Future<List<OrderModel>> searchOrdersByOrderId(String orderId) async {
+    List<OrderModel> orders = [];
+    
+    try {
+      // First try exact match
+      DocumentSnapshot exactDoc = await _firestore.collection('orders').doc(orderId).get();
+      if (exactDoc.exists) {
+        OrderModel order = OrderModel.fromFirestore(exactDoc as DocumentSnapshot<Map<String, dynamic>>);
+        
+        // Fetch customer information
+        if (order.customerId != null) {
+          OrderModel? orderWithCustomer = await _orderService.getOrderWithCustomerInfo(exactDoc.id);
+          if (orderWithCustomer != null) {
+            order = orderWithCustomer;
+          }
+        }
+        
+        orders.add(order);
+        return orders;
+      }
+      
+      // If no exact match, search by orderNumber field
+      QuerySnapshot snapshot = await _firestore
+          .collection('orders')
+          .where('orderNumber', isGreaterThanOrEqualTo: orderId)
+          .where('orderNumber', isLessThan: orderId + '\uf8ff')
+          .get();
+      
+      for (QueryDocumentSnapshot doc in snapshot.docs) {
+        try {
+          OrderModel order = OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+          
+          // Fetch customer information
+          if (order.customerId != null) {
+            OrderModel? orderWithCustomer = await _orderService.getOrderWithCustomerInfo(doc.id);
+            if (orderWithCustomer != null) {
+              order = orderWithCustomer;
+            }
+          }
+          
+          orders.add(order);
+        } catch (e) {
+          print('Error processing order ${doc.id}: $e');
+        }
+      }
+    } catch (e) {
+      print('Error searching orders by order ID: $e');
+    }
+    
+    return orders;
+  }
+  
+  // Get orders for a specific customer
+  Stream<List<OrderModel>> getOrdersForCustomer(String customerId) {
+    return _firestore
+        .collection('orders')
+        .where('customerId', isEqualTo: customerId)
+        .orderBy('orderTimestamp', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      List<OrderModel> orders = [];
+      
+      for (QueryDocumentSnapshot doc in snapshot.docs) {
+        try {
+          OrderModel order = OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+          
+          // Fetch customer information
+          if (order.customerId != null) {
+            OrderModel? orderWithCustomer = await _orderService.getOrderWithCustomerInfo(doc.id);
+            if (orderWithCustomer != null) {
+              order = orderWithCustomer;
+            }
+          }
+          
+          orders.add(order);
+        } catch (e) {
+          print('Error processing order ${doc.id}: $e');
+        }
+      }
+      
+      return orders;
     });
   }
   
@@ -103,6 +280,8 @@ class OrderProvider extends ChangeNotifier {
         newStatus: status,
         notes: notes,
       );
+      // Clear any cached error after successful update
+      _error = null;
     } catch (e) {
       _error = e.toString();
       notifyListeners();

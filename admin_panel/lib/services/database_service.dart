@@ -16,12 +16,21 @@ class DatabaseService {
   Stream<List<ItemModel>> getItems() {
     return _firestore
         .collection('items')
-        .orderBy('name')
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
+      final items = snapshot.docs
           .map((doc) => ItemModel.fromMap(doc.id, doc.data()))
           .toList();
+      
+      // Sort items by position (sortOrder), then by name
+      items.sort((a, b) {
+        if (a.sortOrder != b.sortOrder) {
+          return a.sortOrder.compareTo(b.sortOrder);
+        }
+        return a.name.compareTo(b.name);
+      });
+      
+      return items;
     });
   }
 
@@ -74,7 +83,7 @@ class DatabaseService {
     }
   }
 
-  Future<void> updateItem(String itemId, Map<String, dynamic> data, {File? newImageFile, String? oldImageUrl}) async {
+  Future<void> updateItem(String itemId, Map<String, dynamic> data, {File? newImageFile, String? oldImageUrl, bool removeImage = false}) async {
     try {
       // If new image is provided
       if (newImageFile != null) {
@@ -89,6 +98,12 @@ class DatabaseService {
         if (newImageUrl != null) {
           data['imageUrl'] = newImageUrl;
         }
+      } else if (removeImage) {
+        // Remove image if requested
+        if (oldImageUrl != null && oldImageUrl.isNotEmpty) {
+          await deleteItemImage(oldImageUrl);
+        }
+        data['imageUrl'] = null; // Remove image URL from document
       }
       
       data['updatedAt'] = Timestamp.now();

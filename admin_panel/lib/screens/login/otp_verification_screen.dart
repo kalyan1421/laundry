@@ -300,7 +300,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'Logging in as ${widget.expectedRole == UserRole.admin ? 'Admin' : 'Delivery Partner'}',
+                              'Logging in as ${widget.expectedRole == UserRole.admin ? 'Admin' : 'Delivery Person'}',
                               style: TextStyle(
                                 color: Colors.blue[700],
                                 fontWeight: FontWeight.w500,

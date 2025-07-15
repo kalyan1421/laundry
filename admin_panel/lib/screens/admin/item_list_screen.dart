@@ -720,9 +720,15 @@ class _ItemListScreenState extends State<ItemListScreen> {
                 // Item Info
                 _buildDetailRow('Name', item.name),
                 _buildDetailRow('Price', '₹${item.price.toStringAsFixed(2)} per ${item.unit}'),
+                if (item.originalPrice != null)
+                  _buildDetailRow('Original Price', '₹${item.originalPrice!.toStringAsFixed(2)} per ${item.unit}'),
+                if (item.offerPrice != null)
+                  _buildDetailRow('Offer Price', '₹${item.offerPrice!.toStringAsFixed(2)} per ${item.unit}'),
                 _buildDetailRow('Category', item.category),
                 _buildDetailRow('Status', item.isActive ? 'Active' : 'Inactive'),
                 _buildDetailRow('Unit', item.unit),
+                if (item.sortOrder > 0)
+                  _buildDetailRow('Display Position', item.sortOrder.toString()),
                 // _buildDetailRow('Created', '${item.createdAt.day}/${item.createdAt.month}/${item.createdAt.year}'),
                 _buildDetailRow('Last Updated', '${item.updatedAt.day}/${item.updatedAt.month}/${item.updatedAt.year}'),
                 

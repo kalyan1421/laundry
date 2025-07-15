@@ -78,6 +78,130 @@ class _UPIPaymentScreenState extends State<UPIPaymentScreen> {
         ),
       ),
       body: _buildBody(),
+      bottomSheet: _buildStickyCartSummary(),
+    );
+  }
+
+  Widget _buildStickyCartSummary() {
+    final totalItems = widget.orderDetails['itemCount'] ?? 0;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20), // 20px from bottom
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Cart Summary Row
+              Row(
+                children: [
+                  // Cart Icon with Badge
+                  Stack(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F3057).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.payment,
+                          color: Color(0xFF0F3057),
+                          size: 24,
+                        ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '$totalItems',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  
+                  // Amount Details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$totalItems item${totalItems > 1 ? 's' : ''} selected',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '₹${widget.amount.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Back Button
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F3057),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.arrow_back, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'Back',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -265,6 +389,9 @@ class _UPIPaymentScreenState extends State<UPIPaymentScreen> {
               ],
             ),
           ),
+          
+          // Space for sticky cart
+          const SizedBox(height: 120),
         ],
       ),
     );

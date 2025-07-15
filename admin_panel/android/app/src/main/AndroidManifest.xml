@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <application
-        android:label="admin_panel"
+        android:label="Cloud Ironing Admin"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

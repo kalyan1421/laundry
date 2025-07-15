@@ -1,5 +1,4 @@
 // screens/admin/admin_home.dart
-import 'package:admin_panel/screens/admin/item_list_screen.dart';
 import 'package:admin_panel/screens/admin/manage_clients_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +10,8 @@ import 'manage_banners.dart';
 import 'all_orders.dart';
 import 'admin_delivery_signup_screen.dart';
 import 'admin_token_debug_screen.dart';
+import 'add_workshop_worker_screen.dart';
+import 'manage_workshop_workers_screen.dart';
 import 'package:intl/intl.dart';
 
 class AdminHome extends StatefulWidget {
@@ -29,10 +30,13 @@ class _AdminHomeState extends State<AdminHome> {
     const ManageClientsScreen(roleFilter: 'customer', pageTitle: 'Customers'),
     const ManageClientsScreen(roleFilter: 'delivery', pageTitle: 'Delivery Staff'),
     const ManageClientsScreen(roleFilter: 'admin', pageTitle: 'Administrators'),
+    const ManageClientsScreen(roleFilter: 'supervisor', pageTitle: 'Supervisors'),
     const ManageItems(),
     const ManageBanners(),
     const OffersListScreen(),
     const AddDeliveryPartnerScreen(),
+    const AddWorkshopWorkerScreen(),
+    const ManageWorkshopWorkersScreen(),
   ];
 
   static final List<String> _titles = <String>[
@@ -41,10 +45,13 @@ class _AdminHomeState extends State<AdminHome> {
     'Customers',
     'Delivery Staff',
     'Administrators',
+    'Supervisors',
     'Manage Items',
     'Manage Banners',
     'Special Offers',
-    'Add Delivery Partner',
+    'Add Delivery Person',
+    'Add Workshop Worker',
+    'Manage Workshop Workers',
   ];
 
   void _onItemTapped(int index) {
@@ -138,9 +145,10 @@ class _AdminHomeState extends State<AdminHome> {
             _buildDrawerItem(Icons.people_alt_rounded, 'Customers', 2),
             _buildDrawerItem(Icons.delivery_dining_rounded, 'Delivery Staff', 3),
             _buildDrawerItem(Icons.admin_panel_settings_rounded, 'Administrators', 4),
-            _buildDrawerItem(Icons.inventory_2_rounded, 'Manage Items', 5),
-            _buildDrawerItem(Icons.photo_library_rounded, 'Manage Banners', 6),
-            _buildDrawerItem(Icons.local_offer_rounded, 'Special Offers', 7),
+            _buildDrawerItem(Icons.groups_rounded, 'Supervisors', 5),
+            _buildDrawerItem(Icons.inventory_2_rounded, 'Manage Items', 6),
+            _buildDrawerItem(Icons.photo_library_rounded, 'Manage Banners', 7),
+            _buildDrawerItem(Icons.local_offer_rounded, 'Special Offers', 8),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.notifications_active),
@@ -155,7 +163,21 @@ class _AdminHomeState extends State<AdminHome> {
               },
             ),
             // _buildDrawerItem(Icons.receipt_long_rounded, 'All Orders', 7),
-            _buildDrawerItem(Icons.person_add_alt_1_rounded, 'Add Delivery Partner', 8),
+            _buildDrawerItem(Icons.person_add_alt_1_rounded, 'Add Delivery Person', 9),
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 4.0),
+              child: Text(
+                'Workshop Management',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+            _buildDrawerItem(Icons.engineering_rounded, 'Add Workshop Worker', 10),
+            _buildDrawerItem(Icons.groups_rounded, 'Manage Workshop Workers', 11),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.exit_to_app_rounded),
@@ -243,15 +265,7 @@ class AdminDashboard extends StatelessWidget {
                 color: Colors.green.shade700,
                 iconBgColor: Colors.green.shade100,
               ),
-              _buildStreamDashboardCard(
-                stream: dashboardProvider.totalRevenueStream,
-                title: 'Total Revenue',
-                icon: Icons.monetization_on_rounded,
-                color: Colors.purple.shade700,
-                iconBgColor: Colors.purple.shade100,
-                isCurrency: true,
-                formatter: currencyFormatter,
-              ),
+
               _buildStreamDashboardCard(
                 stream: dashboardProvider.pendingQuickOrdersCountStream,
                 title: 'Pending Quick Orders',

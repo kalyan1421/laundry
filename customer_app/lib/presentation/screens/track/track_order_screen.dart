@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:customer_app/data/models/order_model.dart';
+import 'package:customer_app/presentation/screens/orders/edit_order_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class TrackOrderScreen extends StatefulWidget {
@@ -16,84 +17,75 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Stream<OrderModel?>? _latestOrderStream;
-
   // Support phone number
-  final String supportPhoneNumber = '+919876543210'; // Replace with actual support number
+  final String supportPhoneNumber = '+919566654788'; // Replace with actual support number
 
   @override
   void initState() {
     super.initState();
+    // No need to fetch manually, StreamBuilder will handle it
+  }
+
+  // Create a stream that listens to real-time order updates
+  Stream<OrderModel?> _getLatestOrderStream() {
     User? currentUser = _auth.currentUser;
-    if (currentUser != null) {
-      print('TrackOrderScreen: Current user ID: ${currentUser.uid}');
-      
-      // First try with customerId
-      _latestOrderStream = _firestore
-          .collection('orders')
-          .where('customerId', isEqualTo: currentUser.uid)
-          .snapshots()
-          .map((snapshot) {
-            print('TrackOrderScreen: Received ${snapshot.docs.length} orders with customerId query');
-            if (snapshot.docs.isEmpty) {
-              print('TrackOrderScreen: No orders found with customerId, trying userId...');
-              // If no results with customerId, this will trigger the handleError
-              throw Exception('No orders found with customerId');
-            }
-            
-            return _processOrders(snapshot.docs, currentUser.uid);
-          })
-          .handleError((error) {
-            print('TrackOrderScreen: customerId query failed: $error, trying userId...');
-            
-            // Fallback to userId query
-            return _firestore
+    if (currentUser == null) {
+      return Stream.value(null);
+    }
+
+    print('TrackOrderScreen: Creating stream for user ID: ${currentUser.uid}');
+
+    // Create a stream that listens to both customerId and userId fields
+    return _firestore
+        .collection('orders')
+        .where('customerId', isEqualTo: currentUser.uid)
+        .orderBy('orderTimestamp', descending: true)
+        .limit(1)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          List<QueryDocumentSnapshot> docs = snapshot.docs;
+          
+          // If no results with customerId, try with userId
+          if (docs.isEmpty) {
+            print('TrackOrderScreen: No orders found with customerId, trying userId...');
+            QuerySnapshot userIdQuery = await _firestore
                 .collection('orders')
                 .where('userId', isEqualTo: currentUser.uid)
-                .get()
-                .then((snapshot) {
-                  print('TrackOrderScreen: Received ${snapshot.docs.length} orders with userId query');
-                  if (snapshot.docs.isEmpty) {
-                    print('TrackOrderScreen: No orders found with userId either');
-                    return null;
-                  }
-                  return _processOrders(snapshot.docs, currentUser.uid);
-                })
-                .catchError((e) {
-                  print('TrackOrderScreen: Both queries failed: $e');
-                  return null;
-                });
-          });
-    } else {
-      print('TrackOrderScreen: No current user found');
-    }
+                .orderBy('orderTimestamp', descending: true)
+                .limit(1)
+                .get();
+            docs = userIdQuery.docs;
+          }
+
+          print('TrackOrderScreen: Found ${docs.length} orders in stream');
+
+          if (docs.isEmpty) {
+            return null;
+          }
+
+          // Process orders and get the latest one
+          return _processOrderFromDoc(docs.first, currentUser.uid);
+        })
+        .handleError((error) {
+          print('TrackOrderScreen: Stream error: $error');
+          return null;
+        });
   }
   
-  OrderModel? _processOrders(List<QueryDocumentSnapshot> docs, String userId) {
-    // Debug: Print all order IDs and timestamps
-    for (var doc in docs) {
+  OrderModel? _processOrderFromDoc(QueryDocumentSnapshot doc, String userId) {
+    try {
+      print('TrackOrderScreen: Processing order ${doc.id}');
       Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-      print('TrackOrderScreen: Order ${doc.id}, timestamp: ${data['orderTimestamp']}, status: ${data['status']}, customerId: ${data['customerId']}, userId: ${data['userId']}');
+      print('TrackOrderScreen: Order status: ${data['status']}, customerId: ${data['customerId']}, userId: ${data['userId']}');
+      
+      OrderModel order = OrderModel.fromFirestore(doc);
+      print('TrackOrderScreen: Processed order: ${order.id}, status: ${order.status}');
+      
+      return order;
+    } catch (e) {
+      print('TrackOrderScreen: Error processing order document: $e');
+      return null;
     }
-    
-    // Get all orders and sort them to find the latest one
-    List<OrderModel> orders = docs
-        .map((doc) => OrderModel.fromFirestore(doc))
-        .toList();
-    
-    print('TrackOrderScreen: Parsed ${orders.length} OrderModel objects');
-    
-    // Sort by orderTimestamp in descending order to get the latest order
-    orders.sort((a, b) {
-      Timestamp timeA = a.orderTimestamp;
-      Timestamp timeB = b.orderTimestamp;
-      return timeB.compareTo(timeA); // Descending order
-    });
-    
-    OrderModel latestOrder = orders.first;
-    print('TrackOrderScreen: Latest order: ${latestOrder.id}, status: ${latestOrder.status}');
-    
-    return latestOrder;
   }
 
   // Function to make phone call
@@ -200,55 +192,106 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   // Function to check if order can be cancelled
   bool _canCancelOrder(String status) {
+    // Customer can cancel order until processing starts
+    // Allow cancellation even after pickup
+    
+    String orderStatus = status.toLowerCase().trim();
+    
     List<String> cancellableStatuses = [
       'pending',
       'confirmed',
-      'picked_up',
+      'placed',
+      'accepted',
+      'order_placed',
+      'order_confirmed',
+      'picked_up',  // Allow cancellation even after pickup
     ];
-    return cancellableStatuses.contains(status.toLowerCase());
+    
+    // Block cancellation after processing starts
+    List<String> nonCancellableStatuses = [
+      'processing',
+      'in_progress',
+      'ready',
+      'delivered',
+      'completed',
+      'cancelled',
+      'rejected',
+    ];
+    
+    // If already in non-cancellable state, block cancellation
+    if (nonCancellableStatuses.contains(orderStatus)) {
+      return false;
+    }
+    
+    return cancellableStatuses.contains(orderStatus);
   }
 
   // Function to edit order (navigate to edit screen)
   void _editOrder(OrderModel order) {
     // Check if order can be edited
-    if (!_canEditOrder(order.status)) {
+    if (!_canEditOrder(order)) {
       _showErrorSnackBar('This order cannot be edited at this stage');
       return;
     }
 
-    // TODO: Navigate to edit order screen
-    // For now, show a placeholder dialog
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Edit Order'),
-          content: const Text('Edit order functionality will be implemented here. You can modify pickup/delivery times, add special instructions, etc.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _showSuccessSnackBar('Edit functionality coming soon!');
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
+    // Navigate to edit order screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditOrderScreen(order: order),
+      ),
+    ).then((result) {
+      if (result == true) {
+        // Refresh the order data if edit was successful
+        setState(() {
+          // This will trigger a rebuild and refresh the stream
+        });
+        _showSuccessSnackBar('Order updated successfully!');
+      }
+    });
   }
 
   // Function to check if order can be edited
-  bool _canEditOrder(String status) {
+  bool _canEditOrder(OrderModel order) {
+    // Customer can edit order until delivery person starts processing
+    // Allow editing for pending, confirmed, and picked_up statuses
+    
+    String orderStatus = order.status.toLowerCase().trim();
+    
+    // Allow editing for these statuses (before processing starts)
     List<String> editableStatuses = [
       'pending',
       'confirmed',
+      'placed',
+      'accepted',
+      'order_placed',
+      'order_confirmed',
+      'picked_up',  // Allow editing even after pickup
     ];
-    return editableStatuses.contains(status.toLowerCase());
+    
+    // Block editing for these statuses (after processing starts)
+    List<String> nonEditableStatuses = [
+      'processing',
+      'in_progress',
+      'ready',
+      'delivered',
+      'completed',
+      'cancelled',
+      'rejected',
+    ];
+    
+    // If status is in non-editable list, block editing
+    if (nonEditableStatuses.contains(orderStatus)) {
+      return false;
+    }
+    
+    // If status is in editable list, allow editing
+    if (editableStatuses.contains(orderStatus)) {
+      return true;
+    }
+    
+    // For any unknown status, default to not allowing editing
+    return false;
   }
 
   // Function to contact support
@@ -630,7 +673,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   color: Color(0xFF0F3057),
                 ),
               ),
-              if (_canEditOrder(order.status))
+              // if (_canEditOrder(order))
                 TextButton.icon(
                   onPressed: () => _editOrder(order),
                   icon: const Icon(Icons.edit, size: 16),
@@ -879,10 +922,51 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   }
 
   Widget _buildActionButtons(OrderModel order) {
+    bool canEdit = _canEditOrder(order);
+    
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
+          // Edit Order Button (only show if order can be edited)
+          if (canEdit)
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => _editOrder(order),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F3057),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.edit,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Edit Order',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          
+          // Add spacing if edit button is shown
+          if (canEdit) const SizedBox(height: 12),
+          
           // Contact Support Button
           SizedBox(
             width: double.infinity,
@@ -958,131 +1042,214 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    User? currentUser = _auth.currentUser;
-
-    if (currentUser == null) {
-      return const Scaffold(
-        body: Center(
-          child: Text('Please log in to track your orders.'),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: StreamBuilder<OrderModel?>(
-          stream: _latestOrderStream,
+      body: SafeArea(
+        child: StreamBuilder<OrderModel?>(
+          stream: _getLatestOrderStream(),
           builder: (context, snapshot) {
-            if (snapshot.hasData && snapshot.data != null) {
-              return Text(
-                'Order #${snapshot.data!.orderNumber}',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF0F3057),
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 80,
+                        color: Colors.red[300],
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Error',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.red[700],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        snapshot.error.toString(),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () => setState(() {}), // Retry by rebuilding
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F3057),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }
-            return const Text(
-              'Track Order',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0F3057),
+
+            if (snapshot.data == null) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.track_changes_outlined,
+                        size: 100,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'No orders to track',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F3057),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Place an order to track its progress here.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // Navigate to home screen by popping all routes and going to home
+                            Navigator.of(context).pushNamedAndRemoveUntil(
+                              '/home',
+                              (route) => false,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F3057),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.add_shopping_cart, size: 20),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Place Your First Order',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton(
+                        onPressed: _contactSupport,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF0F3057)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.headset_mic_outlined,
+                              color: Color(0xFF0F3057),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Contact Support',
+                              style: TextStyle(
+                                color: Color(0xFF0F3057),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            // Show order tracking UI
+            return SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Header with order number and support button
+                  Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Order #${snapshot.data!.orderNumber}',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0F3057),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.headset_mic_outlined,
+                            color: Color(0xFF0F3057),
+                          ),
+                          onPressed: _contactSupport,
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Horizontal Progress Timeline
+                  Container(
+                    color: Colors.white,
+                    child: _buildHorizontalProgressTimeline(snapshot.data!),
+                  ),
+                  const SizedBox(height: 8),
+                  // Status Updates
+                  _buildStatusUpdates(snapshot.data!),
+                  const SizedBox(height: 8),
+                  // Order Details
+                  _buildOrderDetails(snapshot.data!),
+                  const SizedBox(height: 8),
+                  // Pickup & Delivery
+                  _buildPickupDelivery(snapshot.data!),
+                  const SizedBox(height: 8),
+                  // Action Buttons
+                  _buildActionButtons(snapshot.data!),
+                  const SizedBox(height: 20),
+                ],
               ),
             );
           },
         ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.headset_mic_outlined,
-              color: Color(0xFF0F3057),
-            ),
-            onPressed: _contactSupport,
-          ),
-        ],
       ),
-      body: StreamBuilder<OrderModel?>(
-        stream: _latestOrderStream,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Error loading order: ${snapshot.error}'),
-            );
-          }
-          
-          if (!snapshot.hasData || snapshot.data == null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.track_changes_outlined,
-                      size: 100,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'No orders to track',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F3057),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Place an order to track its progress here.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 15, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          OrderModel order = snapshot.data!;
-          
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                // Horizontal Progress Timeline
-                Container(
-                  color: Colors.white,
-                  child: _buildHorizontalProgressTimeline(order),
-                ),
-                const SizedBox(height: 8),
-                // Status Updates
-                _buildStatusUpdates(order),
-                const SizedBox(height: 8),
-                // Order Details
-                _buildOrderDetails(order),
-                const SizedBox(height: 8),
-                // Pickup & Delivery
-                _buildPickupDelivery(order),
-                const SizedBox(height: 8),
-                // Action Buttons
-                _buildActionButtons(order),
-                const SizedBox(height: 20),
-              ],
-            ),
-          );
-        },
-      ),
-      
     );
   }
 } 

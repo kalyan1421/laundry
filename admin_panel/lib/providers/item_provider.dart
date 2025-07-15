@@ -28,12 +28,19 @@ class ItemProvider extends ChangeNotifier {
 
       final snapshot = await FirebaseFirestore.instance
           .collection('items')
-          .orderBy('name')
           .get();
 
       _items = snapshot.docs
           .map((doc) => ItemModel.fromMap(doc.id, doc.data()))
           .toList();
+
+      // Sort items by position (sortOrder), then by name
+      _items.sort((a, b) {
+        if (a.sortOrder != b.sortOrder) {
+          return a.sortOrder.compareTo(b.sortOrder);
+        }
+        return a.name.compareTo(b.name);
+      });
 
       _isLoading = false;
       notifyListeners();
@@ -62,7 +69,7 @@ class ItemProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateItem(String itemId, Map<String, dynamic> data, {File? newImageFile}) async {
+  Future<bool> updateItem(String itemId, Map<String, dynamic> data, {File? newImageFile, bool removeImage = false}) async {
     try {
       _error = null;
       notifyListeners();
@@ -78,7 +85,8 @@ class ItemProvider extends ChangeNotifier {
         itemId, 
         data, 
         newImageFile: newImageFile, 
-        oldImageUrl: oldImageUrl
+        oldImageUrl: oldImageUrl,
+        removeImage: removeImage
       );
 
       // Reload items to get updated data

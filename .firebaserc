@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "laundry-management-57453"
-  }
+  },
+  "targets": {
+    "laundry-management-57453": {
+      "hosting": {
+        "website": [
+          "laundry-management-57453"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

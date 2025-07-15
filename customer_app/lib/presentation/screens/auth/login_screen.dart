@@ -122,17 +122,17 @@ class _LoginScreenState extends State<LoginScreen> {
       
       // Show snackbar for additional feedback
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              authProvider.errorMessage ?? 'Failed to send OTP',
-              style: AppTypography.bodyMedium.copyWith(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(
+        //     content: Text(
+        //       authProvider.errorMessage ?? 'Failed to send OTP',
+        //       style: AppTypography.bodyMedium.copyWith(color: Colors.white),
+        //     ),
+        //     backgroundColor: Colors.red,
+        //     behavior: SnackBarBehavior.floating,
+        //     duration: const Duration(seconds: 4),
+        //   ),
+        // );
       }
     }
   }
@@ -196,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
               if (authProvider.errorMessage != null && 
                   authProvider.errorMessage!.isNotEmpty &&
                   authProvider.otpStatus != OTPStatus.sent) {
-                _showErrorDialog(authProvider.errorMessage!);
+                // _showErrorDialog(authProvider.errorMessage!);
                 authProvider.clearError();
               }
             });

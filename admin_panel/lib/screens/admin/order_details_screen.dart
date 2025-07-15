@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 import '../../models/order_model.dart';
 import '../../services/fcm_service.dart';
+import '../../utils/phone_formatter.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final String orderId;
@@ -20,8 +22,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   
   OrderModel? _order;
   List<DocumentSnapshot> _deliveryPersons = [];
+  Map<String, dynamic>? _customerDetails;
   bool _isLoading = true;
   bool _isUpdating = false;
+  StreamSubscription<DocumentSnapshot>? _orderSubscription;
   
   final List<String> _orderStatuses = [
     'pending',
@@ -38,8 +42,44 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadOrderDetails();
+    _setupOrderListener();
     _loadDeliveryPersons();
+  }
+
+  @override
+  void dispose() {
+    _orderSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _setupOrderListener() {
+    _orderSubscription = _firestore
+        .collection('orders')
+        .doc(widget.orderId)
+        .snapshots()
+        .listen((orderDoc) async {
+      if (orderDoc.exists) {
+        setState(() {
+          _order = OrderModel.fromFirestore(orderDoc as DocumentSnapshot<Map<String, dynamic>>);
+        });
+        
+        // Load customer details after order is loaded
+        await _loadCustomerDetails();
+        
+        setState(() {
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }, onError: (e) {
+      print('Error listening to order updates: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    });
   }
 
   Future<void> _loadOrderDetails() async {
@@ -52,6 +92,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       if (orderDoc.exists) {
         setState(() {
           _order = OrderModel.fromFirestore(orderDoc as DocumentSnapshot<Map<String, dynamic>>);
+        });
+        
+        // Load customer details after order is loaded
+        await _loadCustomerDetails();
+        
+        setState(() {
           _isLoading = false;
         });
       } else {
@@ -64,6 +110,88 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadCustomerDetails() async {
+    if (_order == null) return;
+    
+    try {
+      String? customerId = _order!.customerId ?? _order!.userId;
+      if (customerId == null) return;
+      
+      // Try to get customer from customer collection
+      try {
+        DocumentSnapshot customerDoc = await _firestore
+            .collection('customer')  // Changed from 'customers' to 'customer'
+            .doc(customerId)
+            .get();
+        
+        if (customerDoc.exists) {
+          Map<String, dynamic> customerData = customerDoc.data() as Map<String, dynamic>;
+          setState(() {
+            _customerDetails = customerData;
+          });
+          print('Customer details loaded from customer collection: ${customerData['name']}');
+          return;
+        }
+      } catch (e) {
+        print('Error loading from customer collection: $e');
+      }
+      
+      // If not found in customer collection, try legacy users collection
+      try {
+        DocumentSnapshot userDoc = await _firestore
+            .collection('users')
+            .doc(customerId)
+            .get();
+        
+        if (userDoc.exists) {
+          Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+          setState(() {
+            _customerDetails = userData;
+          });
+          print('Customer details loaded from users collection: ${userData['name']}');
+          return;
+        }
+      } catch (e) {
+        print('Error loading from users collection: $e');
+      }
+      
+      // Fallback: Try to extract customer info from the order data itself
+      // Check if customer details are embedded in the order
+      if (_order!.customer != null) {
+        setState(() {
+          _customerDetails = {
+            'name': _order!.customer!.name ?? 'Unknown Customer',
+            'phoneNumber': _order!.customer!.phoneNumber ?? 'N/A',
+            'email': _order!.customer!.email ?? 'N/A',
+          };
+        });
+        print('Customer details loaded from order customer object');
+        return;
+      }
+      
+      // Check if customer info is in order properties
+      Map<String, dynamic> fallbackCustomerData = {};
+      
+      // Create a basic placeholder with customer ID
+      String fallbackCustomerId = _order!.customerId ?? _order!.userId;
+      fallbackCustomerData = {
+        'name': 'Customer #${fallbackCustomerId.substring(0, 8)}',
+        'phoneNumber': 'N/A (Details not loaded)',
+        'email': 'N/A (Details not loaded)',
+        'isPlaceholder': true,
+      };
+      
+      setState(() {
+        _customerDetails = fallbackCustomerData;
+      });
+      print('Using basic customer placeholder with ID: $fallbackCustomerId');
+      return;
+      
+    } catch (e) {
+      print('Error loading customer details: $e');
     }
   }
 
@@ -255,27 +383,342 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Icon(Icons.person, color: Colors.blue[600], size: 20),
+                const SizedBox(width: 8),
             const Text(
               'Customer Information',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Customer Name
+            Row(
+              children: [
+                SizedBox(
+                  width: 120,
+                  child: Text(
+                    'Name:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _customerDetails == null
+                      ? Row(
+                          children: [
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Loading customer details...',
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            if (_customerDetails!['hasError'] == true)
+                              Icon(Icons.error_outline, size: 16, color: Colors.red[600])
+                            else if (_customerDetails!['isPlaceholder'] == true)
+                              Icon(Icons.info_outline, size: 16, color: Colors.orange[600])
+                            else
+                              Icon(Icons.person, size: 16, color: Colors.blue[600]),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _customerDetails!['name'] ?? 'N/A',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: _customerDetails!['hasError'] == true 
+                                      ? Colors.red[600]
+                                      : _customerDetails!['isPlaceholder'] == true
+                                          ? Colors.orange[600]
+                                          : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
-            Text('Customer ID: ${_order!.userId}'),
+            
+            // Phone Number
+            Row(
+              children: [
+                SizedBox(
+                  width: 120,
+                  child: Text(
+                    'Phone:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _customerDetails == null
+                      ? Row(
+                          children: [
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Loading...',
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Icon(
+                              _customerDetails!['hasError'] == true || _customerDetails!['isPlaceholder'] == true
+                                  ? Icons.phone_disabled
+                                  : Icons.phone, 
+                              size: 16, 
+                              color: _customerDetails!['hasError'] == true 
+                                  ? Colors.red[600]
+                                  : _customerDetails!['isPlaceholder'] == true
+                                      ? Colors.orange[600]
+                                      : Colors.green[600]
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _customerDetails!['phoneNumber'] ?? 'N/A',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: _customerDetails!['hasError'] == true 
+                                      ? Colors.red[600]
+                                      : _customerDetails!['isPlaceholder'] == true
+                                          ? Colors.orange[600]
+                                          : Colors.green[600],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            // Email
+            Row(
+              children: [
+                SizedBox(
+                  width: 120,
+                  child: Text(
+                    'Email:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _customerDetails == null
+                      ? Row(
+                          children: [
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Loading...',
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Icon(
+                              _customerDetails!['hasError'] == true || _customerDetails!['isPlaceholder'] == true
+                                  ? Icons.email_outlined
+                                  : Icons.email, 
+                              size: 16, 
+                              color: _customerDetails!['hasError'] == true 
+                                  ? Colors.red[600]
+                                  : _customerDetails!['isPlaceholder'] == true
+                                      ? Colors.orange[600]
+                                      : Colors.blue[600]
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _customerDetails!['email'] ?? 'N/A',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: _customerDetails!['hasError'] == true 
+                                      ? Colors.red[600]
+                                      : _customerDetails!['isPlaceholder'] == true
+                                          ? Colors.orange[600]
+                                          : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            // Permission notice if applicable
+            if (_customerDetails?['isPlaceholder'] == true) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.orange[600]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Customer details are restricted. Check Firestore security rules to allow admin access to customer data.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            
+            // Client ID (Phone Number)
+            Row(
+              children: [
+                SizedBox(
+                  width: 120,
+                  child: Text(
+                    'Client ID:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    PhoneFormatter.getClientId(_customerDetails?['phoneNumber']),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
             if (_order!.specialInstructions != null && _order!.specialInstructions!.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: Colors.blue[600]),
+                        const SizedBox(width: 4),
               Text(
-                'Special Instructions: ${_order!.specialInstructions}',
+                          'Special Instructions:',
                 style: TextStyle(
-                  fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.w600,
                   color: Colors.blue[700],
                 ),
               ),
             ],
-            const SizedBox(height: 8),
-            Text('Payment Method: ${_order!.paymentMethod}'),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _order!.specialInstructions!,
+                      style: TextStyle(
+                        color: Colors.blue[700],
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                SizedBox(
+                  width: 120,
+                  child: Text(
+                    'Payment:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green[200]!),
+                    ),
+                    child: Text(
+                      (_order!.paymentMethod ?? 'N/A').toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[700],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -343,49 +786,85 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ),
             ),
             const SizedBox(height: 12),
+            
+            // Pickup Address
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(Icons.location_on, color: Colors.blue[600]),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    'Pickup: ${_order!.pickupAddress}',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Pickup Address:',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatAddress(_order!.pickupAddress),
+                        style: const TextStyle(height: 1.4),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Delivery Address
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(Icons.location_on, color: Colors.green[600]),
                 const SizedBox(width: 8),
                 Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Delivery Address:',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatAddress(_order!.deliveryAddress),
+                        style: const TextStyle(height: 1.4),
+                ),
+              ],
+            ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Schedule Information
+            Row(
+              children: [
+                Icon(Icons.schedule, color: Colors.orange[600]),
+                const SizedBox(width: 8),
+                Expanded(
                   child: Text(
-                    'Delivery: ${_order!.deliveryAddress}',
+                  'Pickup: ${_order!.pickupDate != null ? DateFormat('MMM d, yyyy').format(_order!.pickupDate!.toDate()) : 'TBD'} (${_order!.pickupTimeSlot ?? 'TBD'})',
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.schedule, color: Colors.orange[600]),
-                const SizedBox(width: 8),
-                Text(
-                  'Pickup: ${_order!.pickupDate != null ? DateFormat('MMM d, yyyy').format(_order!.pickupDate!.toDate()) : 'TBD'} (${_order!.pickupTimeSlot ?? 'TBD'})',
-                ),
-              ],
-            ),
             if (_order!.deliveryDate != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Icon(Icons.schedule, color: Colors.purple[600]),
                   const SizedBox(width: 8),
-                  Text(
+                  Expanded(
+                    child: Text(
                     'Delivery: ${DateFormat('MMM d, yyyy').format(_order!.deliveryDate!.toDate())} (${_order!.deliveryTimeSlot ?? 'TBD'})',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
                   ),
                 ],
               ),
@@ -582,11 +1061,19 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     try {
       await _firestore.collection('orders').doc(widget.orderId).update({
         'status': newStatus,
-        'updatedAt': Timestamp.now(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'statusHistory': FieldValue.arrayUnion([
+          {
+            'status': newStatus,
+            'timestamp': Timestamp.now(),
+            'updatedBy': 'admin',
+            'title': 'Status Updated',
+            'description': 'Order status updated to ${newStatus.replaceAll('_', ' ')}',
+          }
+        ]),
       });
       
-      // Reload order details
-      await _loadOrderDetails();
+      // No need to reload - real-time listener will handle the update
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -707,17 +1194,26 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         'assignedDeliveryPerson': deliveryPersonDoc.id,
         'assignedDeliveryPersonName': person['name'] ?? 'Unknown',
         'assignedBy': _auth.currentUser?.uid,
-        'assignedAt': Timestamp.now(),
+        'assignedAt': FieldValue.serverTimestamp(),
         'isAcceptedByDeliveryPerson': false,
         'status': 'assigned',
-        'updatedAt': Timestamp.now(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'statusHistory': FieldValue.arrayUnion([
+          {
+            'status': 'assigned',
+            'timestamp': Timestamp.now(),
+            'updatedBy': 'admin',
+            'title': 'Order Assigned',
+            'description': 'Order assigned to delivery partner: ${person['name'] ?? 'Unknown'}',
+            'assignedTo': deliveryPersonDoc.id,
+          }
+        ]),
       });
       
       // Send notification to delivery person
       await _sendNotificationToDeliveryPerson(deliveryPersonDoc.id, person['name'] ?? 'Unknown');
       
-      // Reload order details
-      await _loadOrderDetails();
+      // No need to reload - real-time listener will handle the update
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -826,9 +1322,90 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           'amount': _order!.totalAmount.toString(),
         },
       );
-      print('Notification sent to delivery partner: $deliveryPartnerName');
+      print('Notification sent to delivery person: $deliveryPartnerName');
     } catch (e) {
-      print('Error sending notification to delivery partner: $e');
+      print('Error sending notification to delivery person: $e');
     }
+  }
+
+  Widget _buildInfoRow(String label, String? value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value ?? 'N/A',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatAddress(String? address) {
+    if (address == null || address.isEmpty) {
+      return 'Address not provided';
+    }
+
+    // Try to parse address if it's in JSON format
+    try {
+      // If address contains structured data, format it nicely
+      if (address.contains('"doorNumber"') || address.contains('"floorNumber"')) {
+        // This would be a JSON string, parse it
+        final Map<String, dynamic> addressData = {};
+        
+        // Extract key-value pairs using regex or simple parsing
+        final doorMatch = RegExp(r'"doorNumber"\s*:\s*"([^"]*)"').firstMatch(address);
+        final floorMatch = RegExp(r'"floorNumber"\s*:\s*"([^"]*)"').firstMatch(address);
+        final landmarkMatch = RegExp(r'"landmark"\s*:\s*"([^"]*)"').firstMatch(address);
+        final streetMatch = RegExp(r'"street"\s*:\s*"([^"]*)"').firstMatch(address);
+        final areaMatch = RegExp(r'"area"\s*:\s*"([^"]*)"').firstMatch(address);
+        final cityMatch = RegExp(r'"city"\s*:\s*"([^"]*)"').firstMatch(address);
+        final pincodeMatch = RegExp(r'"pincode"\s*:\s*"([^"]*)"').firstMatch(address);
+
+        List<String> addressParts = [];
+        
+        if (doorMatch != null && doorMatch.group(1)!.isNotEmpty) {
+          addressParts.add('Door: ${doorMatch.group(1)}');
+        }
+        if (floorMatch != null && floorMatch.group(1)!.isNotEmpty) {
+          addressParts.add('Floor: ${floorMatch.group(1)}');
+        }
+        if (streetMatch != null && streetMatch.group(1)!.isNotEmpty) {
+          addressParts.add(streetMatch.group(1)!);
+        }
+        if (landmarkMatch != null && landmarkMatch.group(1)!.isNotEmpty) {
+          addressParts.add('Near ${landmarkMatch.group(1)}');
+        }
+        if (areaMatch != null && areaMatch.group(1)!.isNotEmpty) {
+          addressParts.add(areaMatch.group(1)!);
+        }
+        if (cityMatch != null && cityMatch.group(1)!.isNotEmpty) {
+          addressParts.add(cityMatch.group(1)!);
+        }
+        if (pincodeMatch != null && pincodeMatch.group(1)!.isNotEmpty) {
+          addressParts.add('PIN: ${pincodeMatch.group(1)}');
+        }
+
+        return addressParts.isNotEmpty ? addressParts.join('\n') : address;
+      }
+    } catch (e) {
+      // If parsing fails, return the original address
+    }
+
+    return address;
   }
 } 

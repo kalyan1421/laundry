@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/order_model.dart';
 import '../../providers/order_provider.dart';
 import '../../models/user_model.dart';
+import '../../utils/phone_formatter.dart';
 import 'map_navigation.dart';
 
 class OrderDetails extends StatelessWidget {
@@ -45,6 +46,8 @@ class OrderDetails extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text('Name: ${order.customer?.name ?? "N/A"}'),
+                    const SizedBox(height: 4),
+                    Text('Client ID: ${PhoneFormatter.getClientId(order.customer?.phoneNumber)}'),
                     const SizedBox(height: 4),
                     Text('Phone: ${order.customer?.phoneNumber ?? "N/A"}'),
                     if (order.customer?.email != null && order.customer!.email.isNotEmpty)

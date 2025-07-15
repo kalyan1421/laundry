@@ -5,7 +5,7 @@ import '../models/user_model.dart';
 class OrderService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Get orders for delivery partner with enhanced customer information
+  // Get orders for delivery person with enhanced customer information
   Stream<List<OrderModel>> getOrdersForDeliveryPartner(String deliveryPartnerId) {
     return _firestore
         .collection('orders')
@@ -152,7 +152,7 @@ class OrderService {
     }
   }
 
-  // Update order status and notify delivery partner
+  // Update order status and notify delivery person
   Future<bool> updateOrderStatus({
     required String orderId,
     required String newStatus,
@@ -200,7 +200,7 @@ class OrderService {
     }
   }
 
-  // Accept order by delivery partner
+  // Accept order by delivery person
   Future<bool> acceptOrderByDeliveryPartner({
     required String orderId,
     required String deliveryPartnerId,
@@ -216,13 +216,13 @@ class OrderService {
           {
             'status': 'accepted',
             'timestamp': Timestamp.now(), // Fixed: Use Timestamp.now() instead of FieldValue.serverTimestamp()
-            'notes': 'Order accepted by delivery partner',
+            'notes': 'Order accepted by delivery person',
             'deliveryPartnerId': deliveryPartnerId,
           }
         ]),
       });
 
-      print('Order $orderId accepted by delivery partner: $deliveryPartnerId');
+      print('Order $orderId accepted by delivery person: $deliveryPartnerId');
       return true;
     } catch (e) {
       print('Error accepting order: $e');
@@ -230,7 +230,7 @@ class OrderService {
     }
   }
 
-  // Reject order by delivery partner
+  // Reject order by delivery person
   Future<bool> rejectOrderByDeliveryPartner({
     required String orderId,
     required String deliveryPartnerId,
@@ -242,7 +242,7 @@ class OrderService {
         'status': 'rejected_by_delivery_partner',
         'rejectedAt': FieldValue.serverTimestamp(),
         'rejectionReason': reason,
-        'assignedDeliveryPerson': null, // Unassign from this delivery partner
+        'assignedDeliveryPerson': null, // Unassign from this delivery person
         'assignedDeliveryPersonName': null,
         'statusHistory': FieldValue.arrayUnion([
           {
@@ -254,7 +254,7 @@ class OrderService {
         ]),
       });
 
-      print('Order $orderId rejected by delivery partner: $deliveryPartnerId');
+      print('Order $orderId rejected by delivery person: $deliveryPartnerId');
       return true;
     } catch (e) {
       print('Error rejecting order: $e');
@@ -262,10 +262,10 @@ class OrderService {
     }
   }
 
-  // Get order statistics for delivery partner
+  // Get order statistics for delivery person
   Future<Map<String, int>> getDeliveryPartnerOrderStats(String deliveryPartnerId) async {
     try {
-      // Get all orders for this delivery partner
+      // Get all orders for this delivery person
       QuerySnapshot ordersSnapshot = await _firestore
           .collection('orders')
           .where('assignedDeliveryPerson', isEqualTo: deliveryPartnerId)
@@ -291,7 +291,7 @@ class OrderService {
 
       return stats;
     } catch (e) {
-      print('Error getting delivery partner stats: $e');
+      print('Error getting delivery person stats: $e');
       return {
         'total': 0,
         'pending': 0,

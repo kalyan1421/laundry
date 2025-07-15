@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/fcm_service.dart';
 import 'dart:async';
 
-enum UserRole { admin, delivery }
+enum UserRole { admin, delivery, supervisor }
 enum AuthStatus { loading, authenticated, unauthenticated }
 enum OTPStatus { idle, sending, sent, verifying, verified, failed }
 
@@ -77,9 +77,15 @@ class AuthProvider extends ChangeNotifier {
         print('🔥 Admin doc found for UID: $data');
         if (data['isActive'] == true) {
           _userData = data;
-          _userRole = UserRole.admin;
+          // Set role based on the role field in the document
+          String roleString = data['role'] ?? 'admin';
+          if (roleString == 'supervisor') {
+            _userRole = UserRole.supervisor;
+          } else {
+            _userRole = UserRole.admin;
+          }
           _authStatus = AuthStatus.authenticated;
-          print('🔥 ✅ Admin user authenticated with UID: $uid');
+          print('🔥 ✅ Admin/Supervisor user authenticated with UID: $uid, Role: $roleString');
           return;
         }
       }
@@ -140,9 +146,15 @@ class AuthProvider extends ChangeNotifier {
             }
             
             _userData = data;
-            _userRole = UserRole.admin;
+            // Set role based on the role field in the document
+            String roleString = data['role'] ?? 'admin';
+            if (roleString == 'supervisor') {
+              _userRole = UserRole.supervisor;
+            } else {
+              _userRole = UserRole.admin;
+            }
             _authStatus = AuthStatus.authenticated;
-            print('🔥 ✅ Admin user found and authenticated: ${doc.id}');
+            print('🔥 ✅ Admin/Supervisor user found and authenticated: ${doc.id}, Role: $roleString');
             return;
           }
         } catch (e) {
@@ -226,10 +238,10 @@ class AuthProvider extends ChangeNotifier {
       _phoneNumber = formattedPhone;
       print('🔥 Formatted phone: $formattedPhone');
 
-      // For ADMIN: Check if admin exists with this phone number
-      if (roleToCheck == UserRole.admin) {
+      // For ADMIN or SUPERVISOR: Check if admin/supervisor exists with this phone number
+      if (roleToCheck == UserRole.admin || roleToCheck == UserRole.supervisor) {
         try {
-          print('🔥 Checking if admin exists with phone: $formattedPhone');
+          print('🔥 Checking if admin/supervisor exists with phone: $formattedPhone');
           
           // Get ALL documents from admins collection and check each one
           final QuerySnapshot allAdmins = await _firestore
@@ -246,52 +258,56 @@ class AuthProvider extends ChangeNotifier {
           ];
           
           bool adminFound = false;
+          String? foundRole;
           
           // Check each admin document
           for (var doc in allAdmins.docs) {
             try {
               final data = doc.data() as Map<String, dynamic>;
-              print('🔥 Checking admin doc ${doc.id}: $data');
+              final docPhone = data['phoneNumber']?.toString();
+              final docRole = data['role']?.toString() ?? 'admin';
               
-              // Check if this admin is active
-              final isActive = data['isActive'] ?? false;
-              print('🔥 Admin ${doc.id} isActive: $isActive');
+              print('🔥 Checking admin doc ${doc.id}: Phone=$docPhone, Role=$docRole, Active=${data['isActive']}');
               
-              if (isActive == true) {
-                // Get phone number from this document
-                final docPhone = data['phoneNumber']?.toString();
-                print('🔥 Admin ${doc.id} phone: "$docPhone"');
+              if (docPhone != null && data['isActive'] == true) {
+                // Check if phone matches in any format
+                bool phoneMatches = phoneFormats.any((format) => 
+                  docPhone == format || 
+                  docPhone.replaceAll('+91', '') == format.replaceAll('+91', '')
+                );
                 
-                // Check if any of our phone formats match this document's phone
-                for (String format in phoneFormats) {
-                  if (docPhone != null && docPhone == format) {
-                    print('🔥 ✅ MATCH FOUND! Admin ${doc.id} has phone "$docPhone" matching format "$format"');
+                if (phoneMatches) {
+                  print('🔥 📞 ADMIN/SUPERVISOR PHONE MATCH! Doc Phone: "$docPhone", Role: "$docRole"');
+                  
+                  // Check if the role matches what we're looking for
+                  if ((roleToCheck == UserRole.admin && docRole == 'admin') ||
+                      (roleToCheck == UserRole.supervisor && docRole == 'supervisor')) {
                     adminFound = true;
+                    foundRole = docRole;
                     break;
                   }
                 }
-                
-                if (adminFound) break;
               }
             } catch (e) {
-              print('🔥 Error processing admin doc ${doc.id}: $e');
+              print('🔥 Error checking admin doc ${doc.id}: $e');
             }
           }
           
           if (!adminFound) {
-            print('🔥 ❌ No active admin found with any of these phone formats: $phoneFormats');
-            _error = 'No admin account found with this phone number';
+            String roleText = roleToCheck == UserRole.admin ? 'admin' : 'supervisor';
+            print('🔥 ❌ No active $roleText found with phone: $formattedPhone');
+            _error = 'No active $roleText account found with this phone number';
             _otpStatus = OTPStatus.failed;
             _isLoading = false;
             notifyListeners();
             return false;
-          } else {
-            print('🔥 ✅ Admin verification successful!');
           }
           
+          print('🔥 ✅ ${foundRole?.toUpperCase()} account found with phone: $formattedPhone');
+          
         } catch (e) {
-          print('🔥 Error checking admin existence: $e');
-          _error = 'Error verifying admin account: ${e.toString()}';
+          print('🔥 Error checking admin/supervisor: $e');
+          _error = 'Error checking account: $e';
           _otpStatus = OTPStatus.failed;
           _isLoading = false;
           notifyListeners();
