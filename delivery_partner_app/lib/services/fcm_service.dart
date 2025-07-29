@@ -54,28 +54,28 @@ class FcmService {
           final snackBar = SnackBar(
             content: Container(
               child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                   Row(
                     children: [
                       Icon(Icons.local_shipping, color: Colors.white),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          notification.title ?? 'New Order Assignment',
+                  notification.title ?? 'New Order Assignment',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
+                ),
                       ),
                     ],
                   ),
                   SizedBox(height: 4),
-                  Text(notification.body ?? 'You have a new order assigned'),
+                Text(notification.body ?? 'You have a new order assigned'),
                   if (message.data['orderNumber'] != null) ...[
                     SizedBox(height: 4),
                     Text('Order: #${message.data['orderNumber']}', 
                          style: TextStyle(color: Colors.yellow)),
-                  ],
+              ],
                   if (message.data['customerName'] != null) ...[
                     SizedBox(height: 2),
                     Text('Customer: ${message.data['customerName']}'),

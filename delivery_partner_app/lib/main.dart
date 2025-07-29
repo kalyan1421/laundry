@@ -37,7 +37,7 @@ class DeliveryPartnerApp extends StatelessWidget {
         navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         title: 'Delivery Partner - Cloud Ironing Factory',
-        theme: ThemeData(
+      theme: ThemeData(
           primarySwatch: Colors.blue,
           fontFamily: 'SFProDisplay',
           visualDensity: VisualDensity.adaptivePlatformDensity,
@@ -81,9 +81,9 @@ class AuthWrapper extends StatelessWidget {
         if (authProvider.authStatus == AuthStatus.loading) {
           return const Scaffold(
             backgroundColor: Color(0xFF1E3A8A),
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(
                     width: 60,
@@ -94,17 +94,17 @@ class AuthWrapper extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: 24),
-                  Text(
+            Text(
                     'Loading...',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontFamily: 'SFProDisplay',
                     ),
-                  ),
-                ],
-              ),
             ),
+          ],
+        ),
+      ),
           );
         }
 

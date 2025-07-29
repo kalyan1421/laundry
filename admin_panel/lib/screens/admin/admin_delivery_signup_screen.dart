@@ -132,43 +132,43 @@ class _AddDeliveryPartnerScreenState extends State<AddDeliveryPartnerScreen> {
                 style: TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green[200]!),
-                ),
-                child: Column(
-                  children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green[200]!),
+                  ),
+                  child: Column(
+                    children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.phone_android, color: Colors.green[700], size: 20),
                         const SizedBox(width: 8),
-                        Text(
+                      Text(
                           'Authentication Setup Complete',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green[800],
-                            fontSize: 14,
-                          ),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[800],
+                          fontSize: 14,
+                        ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 8),
+                      ),
+                      const SizedBox(height: 8),
                     Text(
                       'Phone number ${partner.phoneNumber} is now registered for delivery partner login.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.green[700],
                         fontSize: 12,
+                          ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 16),
               Container(
                 padding: EdgeInsets.all(12),
