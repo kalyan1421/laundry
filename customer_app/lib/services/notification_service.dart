@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
+import '../main.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -37,6 +38,13 @@ class NotificationService {
 
       // Try to initialize local notifications, but don't fail if it's not available
       await _initializeLocalNotifications();
+
+      // Handle FCM token refresh
+      messaging.onTokenRefresh.listen((newToken) {
+        print('FCM Token refreshed: $newToken');
+        // Save the new token to Firestore
+        _saveRefreshedTokenToFirestore(newToken);
+      });
 
       // Handle foreground messages
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -124,6 +132,29 @@ class NotificationService {
       print('Token saved to Firestore');
     } catch (e) {
       print('Error saving token to Firestore: $e');
+    }
+  }
+
+  // Save refreshed FCM token to Firestore
+  static Future<void> _saveRefreshedTokenToFirestore(String newToken) async {
+    try {
+      User? customer = FirebaseAuth.instance.currentUser;
+      if (customer == null) {
+        print('No authenticated user found for token refresh');
+        return;
+      }
+
+      await FirebaseFirestore.instance
+          .collection('customer')
+          .doc(customer.uid)
+          .update({
+        'fcmToken': newToken,
+        'lastTokenUpdate': Timestamp.now(),
+      });
+      
+      print('Refreshed FCM token saved to Firestore');
+    } catch (e) {
+      print('Error saving refreshed FCM token: $e');
     }
   }
 
@@ -292,7 +323,7 @@ class NotificationService {
           'type': 'status_update',
           'orderId': orderId,
           'status': status,
-          'route': '/orders/track',
+          'route': '/track-order',
         },
       );
       
@@ -308,29 +339,33 @@ class NotificationService {
     required String body,
     Map<String, String>? data,
   }) async {
-    // For now, we'll use topic-based messaging which is more reliable
-    // In production, you would use Firebase Cloud Functions or a server
-    // with Firebase Admin SDK for token-based messaging
-    
-    for (String token in tokens) {
-      try {
-        print('Sending notification to token: $token');
-        print('Title: $title');
-        print('Body: $body');
-        print('Data: $data');
-        
-        // Since we don't have a backend server, we'll use topic-based messaging
-        // as a workaround. Admins should subscribe to the 'admin_notifications' topic
-        await _sendTopicNotification(
-          topic: 'admin_notifications',
-          title: title,
-          body: body,
-          data: data,
-        );
-        
-      } catch (e) {
-        print('Error sending notification to token $token: $e');
+    try {
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      
+      // Create notification documents for each token
+      // This will trigger the Cloud Function to send FCM notifications
+      for (String token in tokens) {
+        try {
+          await firestore.collection('fcm_notifications').add({
+            'token': token,
+            'title': title,
+            'body': body,
+            'data': data ?? {},
+            'timestamp': FieldValue.serverTimestamp(),
+            'status': 'pending',
+            'type': 'direct_token',
+            'priority': 'high',
+          });
+          
+          print("FCM: Notification queued for token: ${token.substring(0, 20)}...");
+        } catch (e) {
+          print("Error queuing notification for token $token: $e");
+        }
       }
+      
+      print("FCM: ${tokens.length} notifications queued for sending");
+    } catch (e) {
+      print("Error in _sendNotificationToTokens: $e");
     }
   }
 
@@ -365,7 +400,7 @@ class NotificationService {
       
       // Show local notification only if available
       if (_localNotificationsAvailable) {
-        await _showLocalNotification(
+        await showLocalNotification(
           title: message.notification!.title ?? 'Notification',
           body: message.notification!.body ?? '',
           payload: jsonEncode(message.data),
@@ -385,19 +420,44 @@ class NotificationService {
   // Handle message opened app
   static Future<void> _handleMessageOpenedApp(RemoteMessage message) async {
     print('A new onMessageOpenedApp event was published!');
+    print('Message data: ${message.data}');
+    
     // Navigate to appropriate screen based on message data
     String? type = message.data['type'];
+    String? orderId = message.data['orderId'];
     String? route = message.data['route'];
     
-    if (route != null) {
+    if (type == 'status_change' && orderId != null) {
+      // Navigate to track order screen
+      _navigateToScreen('/track-order', arguments: orderId);
+    } else if (type == 'order_assignment' && orderId != null) {
+      // Navigate to track order screen
+      _navigateToScreen('/track-order', arguments: orderId);
+    } else if (route != null) {
       // Navigate to the specified route
-      // You'll need to implement navigation logic here
-      print('Navigate to: $route');
+      _navigateToScreen(route);
+    } else {
+      // Default navigation to home
+      _navigateToScreen('/home');
+    }
+  }
+
+  // Helper method to navigate to screens
+  static void _navigateToScreen(String route, {Object? arguments}) {
+    try {
+      // Use the global navigator key to navigate
+      if (navigatorKey.currentState != null) {
+        navigatorKey.currentState!.pushNamed(route, arguments: arguments);
+      } else {
+        print('Navigator not available for navigation to: $route');
+      }
+    } catch (e) {
+      print('Error navigating to $route: $e');
     }
   }
 
   // Show local notification (only if available)
-  static Future<void> _showLocalNotification({
+  static Future<void> showLocalNotification({
     required String title,
     required String body,
     String? payload,

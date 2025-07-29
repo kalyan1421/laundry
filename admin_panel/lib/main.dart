@@ -20,6 +20,8 @@ import 'providers/user_provider.dart';
 import 'services/fcm_service.dart';
 import 'services/database_service.dart';
 import 'models/order_model.dart';
+import 'services/order_notification_service.dart';
+import 'services/customer_registration_service.dart';
 
 // Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -31,6 +33,10 @@ void main() async {
   // Initialize FCM service
   final fcmService = FcmService();
   await fcmService.initialize(null);
+
+  // Initialize notification listeners
+  OrderNotificationService.setupOrderListener();
+  CustomerRegistrationService.setupCustomerRegistrationListener();
 
   runApp(const AdminPanelApp());
 }

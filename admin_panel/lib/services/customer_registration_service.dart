@@ -14,9 +14,15 @@ class CustomerRegistrationService {
     try {
       print('🔔 Sending new customer registration notification to admins');
       
+      // Format notification body with customer ID
+      String body = 'New customer registration\n'
+          'Name: $customerName\n'
+          'Customer ID: $customerId\n'
+          'Phone: $customerPhone';
+
       await NotificationService.sendNotificationToAdmins(
         title: 'New Customer Registration',
-        body: '$customerName has registered with phone: $customerPhone',
+        body: body,
         data: {
           'type': 'customer_registration',
           'customerId': customerId,
@@ -37,6 +43,7 @@ class CustomerRegistrationService {
         'customerEmail': customerEmail,
         'notifiedAt': FieldValue.serverTimestamp(),
         'status': 'sent',
+        'notificationBody': body,
       });
       
       print('✅ Customer registration notification sent successfully');
@@ -65,7 +72,7 @@ class CustomerRegistrationService {
   /// Set up listener for new customer registrations
   static void setupCustomerRegistrationListener() {
     FirebaseFirestore.instance
-        .collection('customer')
+        .collection('customers')
         .snapshots()
         .listen((snapshot) {
       for (var change in snapshot.docChanges) {

@@ -11,6 +11,7 @@ import 'core/theme/app_theme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:customer_app/services/notification_service.dart';
+import 'package:customer_app/services/order_notification_service.dart';
 import 'package:customer_app/presentation/providers/address_provider.dart';
 import 'package:customer_app/presentation/providers/banner_provider.dart';
 import 'package:customer_app/presentation/providers/home_provider.dart';

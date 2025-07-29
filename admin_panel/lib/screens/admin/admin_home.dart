@@ -1,5 +1,5 @@
 // screens/admin/admin_home.dart
-import 'package:admin_panel/screens/admin/manage_clients_screen.dart';
+import 'package:admin_panel/screens/admin/manage_customer_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -12,7 +12,12 @@ import 'admin_delivery_signup_screen.dart';
 import 'admin_token_debug_screen.dart';
 import 'add_workshop_worker_screen.dart';
 import 'manage_workshop_workers_screen.dart';
+import 'order_notifications_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/delivery_partner_service.dart';
+import 'test_delivery_notification_screen.dart';
+import 'debug_delivery_assignment_screen.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
@@ -27,6 +32,7 @@ class _AdminHomeState extends State<AdminHome> {
   static final List<Widget> _pages = <Widget>[
     const AdminDashboard(),
     const AllOrders(),
+    // const OrderNotificationsScreen(),
     const ManageClientsScreen(roleFilter: 'customer', pageTitle: 'Customers'),
     const ManageClientsScreen(roleFilter: 'delivery', pageTitle: 'Delivery Staff'),
     const ManageClientsScreen(roleFilter: 'admin', pageTitle: 'Administrators'),
@@ -34,6 +40,7 @@ class _AdminHomeState extends State<AdminHome> {
     const ManageItems(),
     const ManageBanners(),
     const OffersListScreen(),
+    AddDeliveryPartnerScreen(),
     const AddDeliveryPartnerScreen(),
     const AddWorkshopWorkerScreen(),
     const ManageWorkshopWorkersScreen(),
@@ -42,6 +49,7 @@ class _AdminHomeState extends State<AdminHome> {
   static final List<String> _titles = <String>[
     'Dashboard',
     'All Orders',
+    // 'Order Notifications',
     'Customers',
     'Delivery Staff',
     'Administrators',
@@ -142,11 +150,12 @@ class _AdminHomeState extends State<AdminHome> {
             ),
             _buildDrawerItem(Icons.dashboard_rounded, 'Dashboard', 0),
             _buildDrawerItem(Icons.shopping_cart_rounded, 'All Orders', 1),
+            // _buildDrawerItemWithBadge(Icons.notifications_rounded, 'Order Notifications', 2),
             _buildDrawerItem(Icons.people_alt_rounded, 'Customers', 2),
-            _buildDrawerItem(Icons.delivery_dining_rounded, 'Delivery Staff', 3),
+            _buildDrawerItem(Icons.delivery_dining_rounded, 'Delivery Staff',  3),
             _buildDrawerItem(Icons.admin_panel_settings_rounded, 'Administrators', 4),
             _buildDrawerItem(Icons.groups_rounded, 'Supervisors', 5),
-            _buildDrawerItem(Icons.inventory_2_rounded, 'Manage Items', 6),
+              _buildDrawerItem(Icons.inventory_2_rounded, 'Manage Items', 6),
             _buildDrawerItem(Icons.photo_library_rounded, 'Manage Banners', 7),
             _buildDrawerItem(Icons.local_offer_rounded, 'Special Offers', 8),
             const Divider(),
@@ -162,8 +171,32 @@ class _AdminHomeState extends State<AdminHome> {
                 );
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.send),
+              title: const Text('Test Delivery Notifications'),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const TestDeliveryNotificationScreen(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.bug_report),
+              title: const Text('Debug Order Assignments'),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const DebugDeliveryAssignmentScreen(),
+                  ),
+                );
+              },
+            ),
             // _buildDrawerItem(Icons.receipt_long_rounded, 'All Orders', 7),
-            _buildDrawerItem(Icons.person_add_alt_1_rounded, 'Add Delivery Person', 9),
+            _buildDrawerItem(Icons.person_add_alt_1_rounded, 'Add Delivery Person', 10),
             const Divider(),
             Padding(
               padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 4.0),
@@ -176,8 +209,8 @@ class _AdminHomeState extends State<AdminHome> {
                 ),
               ),
             ),
-            _buildDrawerItem(Icons.engineering_rounded, 'Add Workshop Worker', 10),
-            _buildDrawerItem(Icons.groups_rounded, 'Manage Workshop Workers', 11),
+            _buildDrawerItem(Icons.engineering_rounded, 'Add Workshop Worker', 11),
+            _buildDrawerItem(Icons.groups_rounded, 'Manage Workshop Workers', 12),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.exit_to_app_rounded),
@@ -206,6 +239,60 @@ class _AdminHomeState extends State<AdminHome> {
       onTap: () => _onItemTapped(index),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     );
+  }
+
+  Widget _buildDrawerItemWithBadge(IconData icon, String title, int index) {
+    return StreamBuilder<int>(
+      stream: _getUnreadNotificationsCount(),
+      builder: (context, snapshot) {
+        final unreadCount = snapshot.data ?? 0;
+        
+        return ListTile(
+          leading: Stack(
+            children: [
+              Icon(icon),
+              if (unreadCount > 0)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      unreadCount > 99 ? '99+' : unreadCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          title: Text(title),
+          selected: _selectedIndex == index,
+          onTap: () => _onItemTapped(index),
+        );
+      },
+    );
+  }
+
+  Stream<int> _getUnreadNotificationsCount() {
+    return FirebaseFirestore.instance
+        .collectionGroup('notifications')
+        .where('forAdmin', isEqualTo: true)
+        .where('read', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
   }
 }
 
@@ -265,14 +352,6 @@ class AdminDashboard extends StatelessWidget {
                 color: Colors.green.shade700,
                 iconBgColor: Colors.green.shade100,
               ),
-
-              _buildStreamDashboardCard(
-                stream: dashboardProvider.pendingQuickOrdersCountStream,
-                title: 'Pending Quick Orders',
-                icon: Icons.flash_on_rounded,
-                color: Colors.red.shade700,
-                iconBgColor: Colors.red.shade100,
-              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -284,20 +363,8 @@ class AdminDashboard extends StatelessWidget {
           _buildOrderStatusOverview(context, dashboardProvider.orderStatusOverviewStream),
           
           const SizedBox(height: 24),
-          Text(
-            'Pickup vs Delivery Comparison',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 3)],
-            ),
-            child: const Center(child: Text('Pickup vs Delivery Comparison - Coming Soon')),
-          )
+          _buildMigrationSection(context),
+
         ],
       ),
     );
@@ -453,5 +520,134 @@ class AdminDashboard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildMigrationSection(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.system_update, color: Colors.blue.shade700),
+                const SizedBox(width: 8),
+                Text(
+                  'System Migration',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Migrate existing delivery partners to the new phone index system for faster authentication.',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => _runMigration(context),
+              icon: const Icon(Icons.upgrade),
+              label: const Text('Migrate Delivery Partners'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade700,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _runMigration(BuildContext context) async {
+    // Show confirmation dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Migrate Delivery Partners'),
+        content: const Text(
+          'This will create phone index entries for existing delivery partners to enable faster authentication. This is safe to run multiple times.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Start Migration'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        // Show loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Migrating delivery partners...'),
+              ],
+            ),
+          ),
+        );
+
+                 // Run migration using the service
+         final deliveryPartnerService = DeliveryPartnerService();
+         await deliveryPartnerService.migrateExistingDeliveryPartnersToPhoneIndex();
+
+        // Close loading dialog
+        Navigator.of(context).pop();
+
+        // Show success dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Migration Completed'),
+            content: const Text('Delivery partners have been successfully migrated to the new authentication system.'),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } catch (e) {
+        // Close loading dialog
+        Navigator.of(context).pop();
+
+        // Show error dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Migration Failed'),
+            content: Text('Error: ${e.toString()}'),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 }

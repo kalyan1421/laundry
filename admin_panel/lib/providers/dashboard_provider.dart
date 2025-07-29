@@ -70,17 +70,7 @@ class DashboardProvider with ChangeNotifier {
         });
   }
 
-  Stream<int> get pendingQuickOrdersCountStream {
-    return _dbService.getQuickOrderNotifications()
-        .map((notifications) {
-          return notifications.where((notification) => 
-              notification['status'] == 'pending').length;
-        })
-        .handleError((error) {
-          print('Dashboard Error (Pending Quick Orders): $error');
-          return 0;
-        });
-  }
+
 
   // For "Order Status Overview" in the UI image
   Stream<Map<String, int>> get orderStatusOverviewStream {

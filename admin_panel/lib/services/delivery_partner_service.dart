@@ -72,7 +72,7 @@ class DeliveryPartnerService {
     }
   }
 
-  // Create delivery person by admin WITHOUT any Firebase Auth operations
+  // Create delivery person by admin with proper authentication setup
   Future<DeliveryPartnerModel?> createDeliveryPartnerByAdmin({
     required String name,
     required String email,
@@ -81,7 +81,7 @@ class DeliveryPartnerService {
     String? createdByUid,
   }) async {
     try {
-      // Format phone number
+      // Format phone number consistently
       String formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : '+91$phoneNumber';
       
       // Generate a unique ID for the delivery person
@@ -92,10 +92,10 @@ class DeliveryPartnerService {
       var values = List<int>.generate(4, (i) => random.nextInt(255));
       String registrationToken = base64UrlEncode(values).substring(0, 6).toUpperCase();
       
-      // Create delivery person data
+      // Create delivery person data with authentication setup
       final deliveryPartnerData = {
         'id': deliveryPartnerId,
-        'uid': deliveryPartnerId, // Will be updated when they first login
+        'uid': null, // Will be set when they first login and verify phone
         'name': name,
         'email': email.toLowerCase(),
         'phoneNumber': formattedPhone,
@@ -105,6 +105,9 @@ class DeliveryPartnerService {
         'isAvailable': true,
         'isOnline': false,
         'isRegistered': false, // Will be set to true on first login
+        'authenticationStatus': 'pending_verification', // New field to track auth status
+        'canLogin': true, // Allow login attempts
+        'firstLoginRequired': true, // Indicates first-time login needed
         'registrationToken': registrationToken,
         'rating': 0.0,
         'totalDeliveries': 0,
@@ -126,12 +129,29 @@ class DeliveryPartnerService {
         'updatedAt': Timestamp.now(),
         'createdBy': createdByUid ?? 'admin',
         'createdByRole': 'admin',
+        // Add metadata for tracking
+        'metadata': {
+          'createdByAdmin': true,
+          'needsPhoneVerification': true,
+          'loginAttempts': 0,
+          'lastLoginAttempt': null,
+        }
       };
 
-      // Save to Firestore
+      // Save to Firestore with the phone number as a searchable field
       await _firestore.collection('delivery').doc(deliveryPartnerId).set(deliveryPartnerData);
       
+      // Also create an index entry for quick phone lookup during login
+      await _firestore.collection('delivery_phone_index').doc(formattedPhone.replaceAll('+', '')).set({
+        'phoneNumber': formattedPhone,
+        'deliveryPartnerId': deliveryPartnerId,
+        'isActive': true,
+        'createdAt': Timestamp.now(),
+        'createdBy': createdByUid ?? 'admin',
+      });
+      
       print('✅ Delivery person created successfully with ID: $deliveryPartnerId');
+      print('📱 Phone indexed for login: $formattedPhone');
       
       // Return the created delivery person
       return DeliveryPartnerModel.fromMap(deliveryPartnerData);
@@ -147,7 +167,19 @@ class DeliveryPartnerService {
     try {
       String formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : '+91$phoneNumber';
       
-      // Check in delivery collection
+      // Check phone index first for faster lookup
+      String phoneKey = formattedPhone.replaceAll('+', '');
+      final indexDoc = await _firestore
+          .collection('delivery_phone_index')
+          .doc(phoneKey)
+          .get();
+      
+      if (indexDoc.exists && indexDoc.data()?['isActive'] == true) {
+        print('Phone number $formattedPhone already exists in index');
+        return false;
+      }
+      
+      // Check in delivery collection for backward compatibility
       final deliveryQuery = await _firestore
           .collection('delivery')
           .where('phoneNumber', isEqualTo: formattedPhone)
@@ -301,6 +333,69 @@ class DeliveryPartnerService {
     } catch (e) {
       print('Error updating delivery person: $e');
       return false;
+    }
+  }
+
+  // Migration function to create phone index for existing delivery partners
+  Future<void> migrateExistingDeliveryPartnersToPhoneIndex() async {
+    try {
+      print('🔄 Starting migration of existing delivery partners to phone index...');
+      
+      // Get all active delivery partners
+      final QuerySnapshot deliverySnapshot = await _firestore
+          .collection('delivery')
+          .where('isActive', isEqualTo: true)
+          .get();
+      
+      int migrated = 0;
+      int skipped = 0;
+      
+      for (var doc in deliverySnapshot.docs) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          final phoneNumber = data['phoneNumber'] as String?;
+          
+          if (phoneNumber != null && phoneNumber.isNotEmpty) {
+            String phoneKey = phoneNumber.replaceAll('+', '');
+            
+            // Check if phone index already exists
+            final indexDoc = await _firestore
+                .collection('delivery_phone_index')
+                .doc(phoneKey)
+                .get();
+            
+            if (!indexDoc.exists) {
+              // Create phone index entry
+              await _firestore.collection('delivery_phone_index').doc(phoneKey).set({
+                'phoneNumber': phoneNumber,
+                'deliveryPartnerId': doc.id,
+                'isActive': true,
+                'createdAt': Timestamp.now(),
+                'createdBy': 'migration',
+                'migratedAt': Timestamp.now(),
+              });
+              
+              print('✅ Migrated delivery partner ${doc.id} with phone $phoneNumber');
+              migrated++;
+            } else {
+              print('⏭️ Phone index already exists for ${doc.id}');
+              skipped++;
+            }
+          } else {
+            print('⚠️ Delivery partner ${doc.id} has no phone number');
+            skipped++;
+          }
+        } catch (e) {
+          print('❌ Error migrating delivery partner ${doc.id}: $e');
+          skipped++;
+        }
+      }
+      
+      print('🎉 Migration completed: $migrated migrated, $skipped skipped');
+      
+    } catch (e) {
+      print('❌ Error during migration: $e');
+      throw Exception('Migration failed: ${e.toString()}');
     }
   }
 }

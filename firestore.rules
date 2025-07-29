@@ -26,9 +26,26 @@ service cloud.firestore {
       return isAuthenticated() && exists(workshopPath) && get(workshopPath).data.isActive == true;
     }
     
-    // Helper function to validate notification data
+    // Enhanced validation function for notifications
     function isValidNotificationCreate() {
-      return request.resource.data.keys().hasAll(['title', 'body', 'type']) &&
+      let requiredFields = ['title', 'body', 'type'];
+      let validTypes = ['new_order', 'order_edit', 'order_cancellation', 'status_change', 
+                       'customer_registration', 'delivery_update', 'workshop_update'];
+      
+      return request.resource.data.keys().hasAll(requiredFields) &&
+             validTypes.hasAny([request.resource.data.type]) &&
+             request.resource.data.read == false &&
+             request.resource.data.createdAt == request.time;
+    }
+    
+    // Relaxed validation for admin-created notifications
+    function isValidAdminNotificationCreate() {
+      let requiredFields = ['title', 'body', 'type'];
+      let validTypes = ['new_order', 'order_edit', 'order_cancellation', 'status_change', 
+                       'customer_registration', 'delivery_update', 'workshop_update'];
+      
+      return request.resource.data.keys().hasAll(requiredFields) &&
+             validTypes.hasAny([request.resource.data.type]) &&
              request.resource.data.read == false;
     }
     
@@ -44,15 +61,9 @@ service cloud.firestore {
       
       // ADMIN NOTIFICATIONS SUBCOLLECTION
       match /notifications/{notificationId} {
-        // Admins can do everything with their own notifications
         allow read, write: if isAdmin() && isOwner(adminId);
-        // Any admin can read all admin notifications
         allow read, list: if isAdmin();
-        // Delivery partners can create notifications for admins (for status updates)
-        allow create: if isDeliveryPartner() && isValidNotificationCreate();
-        // Authenticated users (customers, delivery partners) can create notifications for admins
-        allow create: if isAuthenticated() && isValidNotificationCreate();
-        // Admins can update their own notifications (mark as read, etc.)
+        allow create: if isAuthenticated() && (isValidNotificationCreate() || (isAdmin() && isValidAdminNotificationCreate()));
         allow update: if isAdmin() && isOwner(adminId) && 
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
       }
@@ -60,22 +71,20 @@ service cloud.firestore {
 
     // DELIVERY PARTNERS: Admins create. Partners can link their profile once and then edit.
     match /delivery/{partnerId} {
+      // TEMPORARY DEBUG: Allow all operations for authenticated users
+      allow read, write: if isAuthenticated();
       allow read: if true;
       allow create, delete: if isAdmin();
-      // Allow updates by admin, document owner, or UID match
-      allow update: if isAdmin() || 
-                      isOwner(partnerId) ||
-                      (isAuthenticated() && resource.data.uid == request.auth.uid);
       allow list: if isAuthenticated();
       
-      // DELIVERY PARTNER NOTIFICATIONS SUBCOLLECTION
+      // Enhanced delivery partner notifications rules
       match /notifications/{notificationId} {
-        allow create, update, delete: if isAdmin();
-        allow create: if isAuthenticated() && isValidNotificationCreate();
-        allow read, list: if isOwner(partnerId);
+        allow create: if isAdmin() || 
+                     (isAuthenticated() && isValidNotificationCreate()) || 
+                     (isWorkshopWorker() && isValidNotificationCreate());
+        allow read, list: if isOwner(partnerId) || isAdmin();
         allow update: if isOwner(partnerId) && 
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
-        allow read, list: if isAdmin();
       }
     }
     
@@ -87,102 +96,148 @@ service cloud.firestore {
                       (isAuthenticated() && resource.data.uid == request.auth.uid);
       allow list: if isAuthenticated();
       
+      // Enhanced delivery personnel notifications rules
       match /notifications/{notificationId} {
-        allow create, update, delete: if isAdmin();
-        allow create: if isAuthenticated() && isValidNotificationCreate();
-        allow read, list: if isOwner(partnerId);
+        allow create: if isAdmin() || 
+                     (isAuthenticated() && isValidNotificationCreate()) || 
+                     (isWorkshopWorker() && isValidNotificationCreate());
+        allow read, list: if isOwner(partnerId) || isAdmin();
         allow update: if isOwner(partnerId) && 
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
-        allow read, list: if isAdmin();
       }
     }
     
-    // WORKSHOP WORKERS: Admins create. Workers can link their profile once and then edit.
+    // WORKSHOP WORKERS: Enhanced rules with notifications
     match /workshop_workers/{workerId} {
       allow read: if true;
       allow create, delete: if isAdmin();
-      // Allow updates by admin, document owner, or UID match
       allow update: if isAdmin() || 
                       isOwner(workerId) ||
                       (isAuthenticated() && resource.data.uid == request.auth.uid);
       allow list: if isAuthenticated();
       
-      // WORKSHOP WORKER NOTIFICATIONS SUBCOLLECTION
+      // Enhanced workshop worker notifications rules
       match /notifications/{notificationId} {
-        allow create, update, delete: if isAdmin();
-        allow create: if isAuthenticated() && isValidNotificationCreate();
-        allow read, list: if isOwner(workerId);
+        allow create: if isAdmin() || 
+                     (isAuthenticated() && isValidNotificationCreate()) || 
+                     (isDeliveryPartner() && isValidNotificationCreate());
+        allow read, list: if isOwner(workerId) || isAdmin();
         allow update: if isOwner(workerId) && 
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
-        allow read, list: if isAdmin();
       }
+    }
+    
+    // DELIVERY PHONE INDEX: For fast phone number lookup during login
+    match /delivery_phone_index/{phoneKey} {
+      // Allow admins to manage the phone index
+      allow read, write: if isAdmin();
+      
+      // Allow anyone to read for phone verification during login
+      // This is needed for delivery partners to login before they have a Firebase Auth UID
+      allow read: if true;
+      
+      // Allow authenticated users to update their own linked records
+      allow update: if isAuthenticated() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['linkedToUID', 'linkedAt']);
+      
+      // Allow listing for admin management
+      allow list: if isAdmin();
     }
     
     // CUSTOMERS: Can create their own account and update their own data
     match /customer/{customerId} { 
-      // Admins have full access to all customer data including queries and searches
-      allow read, write, list: if isAdmin();
-  
-      // Allow customer creation - customer can create their own document
+      allow read, write: if isAdmin();
       allow create: if isAuthenticated() && request.auth.uid == customerId;
-  
-      // Allow customer to read and update their own data
       allow read, update: if isOwner(customerId);
-  
-      // IMPORTANT: Additional explicit read permission for queries
       allow read: if isAuthenticated() && request.auth.uid == customerId;
-  
-      // Allow delivery partners to read customer info (for delivery purposes)
       allow read: if isDeliveryPartner();
-  
-      // Allow listing for admins and delivery partners
       allow list: if isAdmin() || isDeliveryPartner();
   
-      // Customer addresses subcollection
       match /addresses/{addressId} {
         allow read, write: if isAdmin();
         allow create, read, update, delete: if isOwner(customerId);
-        // Allow delivery partners to read customer addresses (for delivery)
         allow read: if isDeliveryPartner();
         allow list: if isOwner(customerId) || isDeliveryPartner();
       }
     }
     
-    // ORDERS: Customers can create and manage their orders
+    // LEGACY: Support for users collection
+    match /users/{userId} { 
+      allow read, write: if isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow read, update: if isOwner(userId);
+      allow read: if isDeliveryPartner();
+      allow list: if isAdmin() || isDeliveryPartner();
+      
+      match /addresses/{addressId} {
+        allow read, write: if isAdmin();
+        allow create, read, update, delete: if isOwner(userId);
+        allow read: if isDeliveryPartner();
+        allow list: if isOwner(userId) || isDeliveryPartner();
+      }
+    }
+    
+    // ORDERS: Enhanced rules with notifications subcollection
     match /orders/{orderId} { 
       allow read, write: if isAdmin();
       allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
       allow read: if isAuthenticated() && resource.data.customerId == request.auth.uid;
-      // Delivery partners and workshop workers can read all orders
       allow read, list: if isDeliveryPartner() || isWorkshopWorker();
       allow list: if isAuthenticated();
       
-      // Customer update permissions (multiple rules for different scenarios)
-      // 1. Customer can update order status, cancel reason, and notification flags
+      // Order notifications subcollection - Enhanced permissions
+      match /notifications/{notificationId} {
+        allow read: if isAdmin() || 
+                   (isAuthenticated() && resource.data.forAdmin == false && 
+                    get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid);
+        allow create: if isAdmin() || 
+                     (isAuthenticated() && isValidNotificationCreate()) ||
+                     (isAuthenticated() && 
+                      get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid &&
+                      isValidNotificationCreate());
+        allow update: if isAdmin() || 
+                     (isAuthenticated() && 
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']));
+      }
+      
+      // Customer update permissions
       allow update: if isAuthenticated() && 
         resource.data.customerId == request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'updatedAt', 'cancelReason', 'notificationSentToAdmin', 'notificationSentToDeliveryPerson']);
       
-      // 2. Allow system/automated updates for notification flags only
       allow update: if isAuthenticated() && 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notificationSentToAdmin', 'notificationSentToDeliveryPerson', 'updatedAt']);
       
-      // 3. Allow customers to cancel orders (specific case)
       allow update: if isAuthenticated() && 
         resource.data.customerId == request.auth.uid &&
         request.resource.data.status == 'cancelled' &&
         request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'cancelReason', 'updatedAt']);
       
-      // 4. Delivery partners can update delivery-related fields
       allow update: if isDeliveryPartner() && 
         request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'deliveryStatus', 'updatedAt', 'completedAt', 'deliveredAt', 'notificationSentToDeliveryPerson']);
       
-      // 5. Workshop workers can update order processing-related fields
       allow update: if isWorkshopWorker() && 
         request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'processingStatus', 'updatedAt', 'completedAt', 'processedAt', 'notificationSentToWorkshopWorker']);
     }
     
-    // Publicly readable collections for the customer app. Admins have write access.
+    // Customer Registration Notifications
+    match /customerRegistrationNotifications/{notificationId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && (isValidNotificationCreate() || (isAdmin() && isValidAdminNotificationCreate()));
+      allow update: if isAdmin();
+    }
+    
+    // Quick Order Notifications with enhanced rules
+    match /quickOrderNotifications/{notificationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isValidNotificationCreate() || (isAdmin() && isValidAdminNotificationCreate()));
+      allow update: if isAdmin() || 
+                   (isDeliveryPartner() && 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']));
+      allow delete: if isAdmin();
+    }
+    
+    // Publicly readable collections
     match /items/{doc=**} { 
       allow read: if true; 
       allow write: if isAdmin(); 
@@ -198,7 +253,6 @@ service cloud.firestore {
       allow write: if isAdmin(); 
     }
     
-    // FIXED: Corrected typo from 'notication' to 'notification'
     match /notification/{doc=**} { 
       allow read: if true; 
       allow write: if isAdmin(); 
@@ -214,14 +268,6 @@ service cloud.firestore {
       allow write: if isAdmin(); 
     }
     
-    // QUICK ORDER NOTIFICATIONS: Admins have full access, customers can create
-    match /quickOrderNotifications/{notificationId} {
-      allow read, list: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidNotificationCreate();
-      allow update: if isAdmin() || isDeliveryPartner();
-      allow delete: if isAdmin();
-    }
-    
     // FEEDBACK: Customers can create feedback, admins can manage all
     match /feedback/{feedbackId} {
       allow read: if true;
@@ -229,6 +275,43 @@ service cloud.firestore {
       allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow delete: if isAdmin();
       allow list: if isAdmin();
+    }
+    
+    // FCM NOTIFICATIONS: For sending push notifications
+    match /fcm_notifications/{notificationId} {
+      // Allow authenticated users to create FCM notifications
+      allow create: if isAuthenticated();
+      
+      // Allow admins to read and manage FCM notifications
+      allow read, update, delete: if isAdmin();
+      
+      // Allow users to read their own FCM notifications
+      allow read: if isAuthenticated() && 
+                 resource.data.userId == request.auth.uid;
+      
+      // Allow admins to list all FCM notifications
+      allow list: if isAdmin();
+    }
+    
+    // ========== COLLECTION GROUP RULES ==========
+    
+    // NOTIFICATIONS COLLECTION GROUP: For admin panel to query all notifications
+    match /{path=**}/notifications/{notificationId} {
+      // Allow admins to read all notifications across all collections
+      allow read, list: if isAdmin();
+      
+      // Allow customers to read their own notifications
+      allow read: if isAuthenticated() && 
+                 resource.data.forAdmin == false;
+      
+      // Allow admins to update read status of notifications
+      allow update: if isAdmin() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+      
+      // Allow customers to update read status of their own notifications
+      allow update: if isAuthenticated() && 
+        resource.data.forAdmin == false &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
     }
   }
 } 

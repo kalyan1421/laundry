@@ -1,6 +1,5 @@
 // lib/services/location_service.dart
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import '../core/errors/app_exceptions.dart';
 import '../data/models/address_model.dart';
 
@@ -57,46 +56,7 @@ class LocationService {
     }
   }
 
-  // Get address from coordinates
-  static Future<String> getAddressFromCoordinates(double latitude, double longitude) async {
-    try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(latitude, longitude);
-      
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks[0];
-        return '${place.street}, ${place.subLocality}, ${place.locality}, ${place.administrativeArea} ${place.postalCode}';
-      }
-      
-      return 'Address not found';
-    } catch (e) {
-      throw LocationException('Failed to get address: ${e.toString()}');
-    }
-  }
 
-  // Get coordinates from address
-  static Future<Position?> getCoordinatesFromAddress(String address) async {
-    try {
-      List<Location> locations = await locationFromAddress(address);
-      
-      if (locations.isNotEmpty) {
-        Location location = locations[0];
-        return Position(
-          latitude: location.latitude,
-          longitude: location.longitude,
-          timestamp: DateTime.now(),
-          accuracy: 0.0,
-          altitude: 0.0,
-          heading: 0.0,
-          speed: 0.0,
-          speedAccuracy: 0.0, altitudeAccuracy: 0.0, headingAccuracy: 0.0,
-        );
-      }
-      
-      return null;
-    } catch (e) {
-      throw LocationException('Failed to get coordinates: ${e.toString()}');
-    }
-  }
 
   // Calculate distance between two points
   static double calculateDistance(

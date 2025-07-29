@@ -253,27 +253,29 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   // Function to check if order can be edited
   bool _canEditOrder(OrderModel order) {
-    // Customer can edit order until delivery person starts processing
-    // Allow editing for pending, confirmed, and picked_up statuses
+    // Customer can edit order only until it's confirmed by admin
+    // Allow editing ONLY for pending status - once admin confirms, editing is disabled
     
     String orderStatus = order.status.toLowerCase().trim();
     
-    // Allow editing for these statuses (before processing starts)
+    // Allow editing ONLY for pending status (before admin confirmation)
     List<String> editableStatuses = [
       'pending',
-      'confirmed',
       'placed',
-      'accepted',
       'order_placed',
-      'order_confirmed',
-      'picked_up',  // Allow editing even after pickup
     ];
     
-    // Block editing for these statuses (after processing starts)
+    // Block editing for all other statuses (after admin confirmation)
     List<String> nonEditableStatuses = [
+      'confirmed',       // Admin has confirmed - no more editing
+      'accepted',
+      'order_confirmed',
+      'picked_up',
       'processing',
       'in_progress',
       'ready',
+      'ready_for_delivery',
+      'out_for_delivery',
       'delivered',
       'completed',
       'cancelled',
@@ -429,8 +431,48 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   }
 
   Widget _buildHorizontalProgressTimeline(OrderModel order) {
-    // Define the order status steps
+    // Check if order is cancelled - show special cancelled status
+    if (order.status.toLowerCase() == 'cancelled') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.red, width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.cancel,
+                    color: Colors.red,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Order Cancelled',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+            // Define the order status steps for normal orders (added pending at top)
     List<Map<String, String>> statusSteps = [
+          {'title': 'Pending', 'status': 'pending'},
       {'title': 'Confirmed', 'status': 'confirmed'},
       {'title': 'Picked Up', 'status': 'picked_up'},
       {'title': 'Processing', 'status': 'processing'},
@@ -445,29 +487,29 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       // Map common status variations
       switch (order.status.toLowerCase()) {
         case 'pending':
-          currentIndex = 0;
+          currentIndex = 0; // First step - Pending
           break;
         case 'confirmed':
-          currentIndex = 0;
+          currentIndex = 1; // Second step - Confirmed
           break;
         case 'picked_up':
         case 'pickup_completed':
-          currentIndex = 1;
+          currentIndex = 2; // Third step - Picked Up
           break;
         case 'processing':
         case 'in_progress':
-          currentIndex = 2;
+          currentIndex = 3; // Fourth step - Processing
           break;
         case 'ready_for_delivery':
         case 'ready':
-          currentIndex = 3;
+          currentIndex = 4; // Fifth step - Ready
           break;
         case 'completed':
         case 'delivered':
-          currentIndex = 4;
+          currentIndex = 5; // Sixth step - Delivered
           break;
         default:
-          currentIndex = 1; // Default to picked up since that's the current status
+          currentIndex = 0; // Default to pending
       }
     }
 
@@ -638,6 +680,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       case 'delivered':
       case 'completed':
         return 'Order Delivered';
+      case 'cancelled':
+        return 'Order Cancelled';
       default:
         return 'Status Updated';
     }

@@ -433,33 +433,40 @@ class FcmService {
     }
   }
 
-  // Add the missing _sendToMultipleTokens method
-  static Future<void> _sendToMultipleTokens({
+  // Static method to send notification to multiple tokens
+  static Future<void> sendToMultipleTokens({
     required List<String> tokens,
     required String title,
     required String body,
-    required Map<String, dynamic> data,
+    Map<String, dynamic>? data,
   }) async {
     try {
-      // For now, we'll log the notification that would be sent
-      // In a production app, this would send via your server's Admin SDK
-      print("FCM: Would send notification to ${tokens.length} tokens");
-      print("FCM: Title: $title");
-      print("FCM: Body: $body");
-      print("FCM: Data: $data");
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
       
-      // Individual token processing for logging
+      // Create notification documents for each token
+      // This will trigger the Cloud Function to send FCM notifications
       for (String token in tokens) {
         try {
-          print("FCM: Notification prepared for token: ${token.substring(0, 20)}...");
-          // In production, this would use your server's Admin SDK
-          // await yourServerSendNotification(token, title, body, data);
+          await firestore.collection('fcm_notifications').add({
+            'token': token,
+            'title': title,
+            'body': body,
+            'data': data ?? {},
+            'timestamp': FieldValue.serverTimestamp(),
+            'status': 'pending',
+            'type': 'direct_token',
+            'priority': 'high',
+          });
+          
+          print("FCM: Notification queued for token: ${token.substring(0, 20)}...");
         } catch (e) {
-          print("Error processing token $token: $e");
+          print("Error queuing notification for token $token: $e");
         }
       }
+      
+      print("FCM: ${tokens.length} notifications queued for sending");
     } catch (e) {
-      print("Error in _sendToMultipleTokens: $e");
+      print("Error in sendToMultipleTokens: $e");
     }
   }
 
@@ -508,12 +515,29 @@ class FcmService {
       Map<String, dynamic>? deliveryData = deliveryDoc.data() as Map<String, dynamic>?;
       String deliveryPersonName = deliveryData?['name'] ?? 'Delivery Person';
 
-      List<String> fcmTokens = List<String>.from(deliveryData?['fcmTokens'] ?? []);
+      // Check for both fcmToken (singular) and fcmTokens (plural) for compatibility
+      List<String> fcmTokens = [];
+      
+      // First check for multiple tokens (fcmTokens)
+      if (deliveryData?['fcmTokens'] != null) {
+        fcmTokens = List<String>.from(deliveryData?['fcmTokens'] ?? []);
+      }
+      
+      // If no multiple tokens, check for single token (fcmToken)
+      if (fcmTokens.isEmpty && deliveryData?['fcmToken'] != null) {
+        String singleToken = deliveryData?['fcmToken'] as String;
+        if (singleToken.isNotEmpty) {
+          fcmTokens = [singleToken];
+        }
+      }
       
       if (fcmTokens.isEmpty) {
-        print("No FCM token found for delivery person: $deliveryPersonId");
+        print("❌ No FCM token found for delivery person: $deliveryPersonId");
+        print("🔍 Delivery data keys: ${deliveryData?.keys.toList()}");
         return;
       }
+
+      print("🚚 📱 Found ${fcmTokens.length} FCM token(s) for delivery partner: $deliveryPersonName");
 
       // Enhanced notification data
       Map<String, dynamic> notificationData = {
@@ -526,12 +550,15 @@ class FcmService {
       };
 
       // Send to all tokens for this delivery person
-      await _sendToMultipleTokens(
+      await sendToMultipleTokens(
         tokens: fcmTokens,
         title: title,
         body: body,
         data: notificationData,
       );
+      
+      print("🚚 ✅ Push notification sent to delivery partner: $deliveryPersonName");
+      print("🚚 📱 Tokens used: ${fcmTokens.length}");
 
       // Save notification to delivery person's notifications collection
       await FirebaseFirestore.instance

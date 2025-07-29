@@ -128,57 +128,47 @@ class _AddDeliveryPartnerScreenState extends State<AddDeliveryPartnerScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Delivery person "${partner.name}" has been created successfully.',
+                'Delivery partner "${partner.name}" has been created successfully and is ready to login.',
                 style: TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 16),
-              if (partner.registrationToken != null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green[200]!),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'One-Time Registration Token',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green[800],
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SelectableText(
-                            partner.registrationToken!,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 4,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.copy, size: 20),
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: partner.registrationToken!));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Token copied to clipboard')),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+              Container(
+                padding: const EdgeInsets.all(12),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green[200]!),
                 ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.phone_android, color: Colors.green[700], size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Authentication Setup Complete',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green[800],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Phone number ${partner.phoneNumber} is now registered for delivery partner login.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.green[700],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 16),
               Container(
                 padding: EdgeInsets.all(12),
@@ -199,14 +189,9 @@ class _AddDeliveryPartnerScreenState extends State<AddDeliveryPartnerScreen> {
                     ),
                     SizedBox(height: 8),
                     _buildInstructionItem('1', 'Download the delivery partner app'),
-                    _buildInstructionItem('2', 'Select "Delivery" role during login'),
-                    _buildInstructionItem('3', 'Enter phone number: ${partner.formattedPhone}'),
-                    _buildInstructionItem('4', 'Verify with the OTP received on the phone'),
-                    _buildInstructionItem(
-                      '5',
-                      'Enter the one-time registration token shown above',
-                    ),
-                    _buildInstructionItem('6', 'Complete profile setup if required'),
+                    _buildInstructionItem('2', 'Enter phone number: ${partner.phoneNumber}'),
+                    _buildInstructionItem('3', 'Verify with the OTP received on the phone'),
+                    _buildInstructionItem('4', 'Start accepting delivery tasks immediately'),
                   ],
                 ),
               ),
@@ -224,7 +209,7 @@ class _AddDeliveryPartnerScreenState extends State<AddDeliveryPartnerScreen> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'The delivery partner must have access to the registered phone number to receive OTP for login.',
+                        'The delivery partner can now login directly using their phone number. No additional setup required.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.orange[700],

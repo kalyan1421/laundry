@@ -2,6 +2,7 @@
 import 'package:customer_app/data/models/user_model.dart';
 import 'package:customer_app/services/auth_service.dart';
 import 'package:customer_app/services/notification_service.dart';
+import 'package:customer_app/services/order_notification_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
@@ -173,6 +174,9 @@ class AuthProvider extends ChangeNotifier {
             _logger.w("Failed to save FCM token: $e");
           }
           
+          // Set up order status listener after successful authentication
+          OrderNotificationService.setupOrderStatusListener();
+          
           _safeNotifyListeners();
           return _userModel;
         } else {
@@ -198,6 +202,10 @@ class AuthProvider extends ChangeNotifier {
                   _userModel = finalUserModel;
                   _authStatus = AuthStatus.authenticated;
                   _logger.d("AuthProvider: User data loaded successfully after document creation.");
+                  
+                  // Set up order status listener after successful authentication
+                  OrderNotificationService.setupOrderStatusListener();
+                  
                   _safeNotifyListeners();
                   return _userModel;
                 }
@@ -294,6 +302,9 @@ class AuthProvider extends ChangeNotifier {
       _firebaseUser = _authService.currentUser;
       _authStatus = AuthStatus.authenticated;
       _setOTPStatus(OTPStatus.verified);
+      
+      // Set up order status listener after successful authentication
+      OrderNotificationService.setupOrderStatusListener();
       
       _isVerifying = false;
       _safeNotifyListeners();
@@ -651,6 +662,9 @@ class AuthProvider extends ChangeNotifier {
       _firebaseUser = _authService.currentUser;
       _authStatus = AuthStatus.authenticated;
       _setOTPStatus(OTPStatus.verified);
+
+      // Set up order status listener after successful authentication
+      OrderNotificationService.setupOrderStatusListener();
 
     } catch (e) {
       _logger.e("Error on verification completed: $e");
