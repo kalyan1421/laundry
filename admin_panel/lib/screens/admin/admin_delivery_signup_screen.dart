@@ -170,6 +170,62 @@ class _AddDeliveryPartnerScreenState extends State<AddDeliveryPartnerScreen> {
                   ),
                 ),
               const SizedBox(height: 16),
+              // Login Code Display
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.vpn_key, color: Colors.orange[700], size: 24),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Login Code',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange[800],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange[300]!),
+                      ),
+                      child: Text(
+                        partner.registrationToken ?? 'N/A',
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 4,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Share this code with ${partner.name} for login',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange[700],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -190,7 +246,7 @@ class _AddDeliveryPartnerScreenState extends State<AddDeliveryPartnerScreen> {
                     SizedBox(height: 8),
                     _buildInstructionItem('1', 'Download the delivery partner app'),
                     _buildInstructionItem('2', 'Enter phone number: ${partner.phoneNumber}'),
-                    _buildInstructionItem('3', 'Verify with the OTP received on the phone'),
+                    _buildInstructionItem('3', 'Enter login code: ${partner.registrationToken ?? 'N/A'}'),
                     _buildInstructionItem('4', 'Start accepting delivery tasks immediately'),
                   ],
                 ),

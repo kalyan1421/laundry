@@ -18,6 +18,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/delivery_partner_service.dart';
 import 'test_delivery_notification_screen.dart';
 import 'debug_delivery_assignment_screen.dart';
+import 'manage_admins_screen.dart';
+import 'manage_delivery_partners_screen.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
@@ -35,7 +37,7 @@ class _AdminHomeState extends State<AdminHome> {
     // const OrderNotificationsScreen(),
     const ManageClientsScreen(roleFilter: 'customer', pageTitle: 'Customers'),
     const ManageClientsScreen(roleFilter: 'delivery', pageTitle: 'Delivery Staff'),
-    const ManageClientsScreen(roleFilter: 'admin', pageTitle: 'Administrators'),
+    const ManageAdminsScreen(),
     const ManageClientsScreen(roleFilter: 'supervisor', pageTitle: 'Supervisors'),
     const ManageItems(),
     const ManageBanners(),
@@ -153,7 +155,23 @@ class _AdminHomeState extends State<AdminHome> {
             // _buildDrawerItemWithBadge(Icons.notifications_rounded, 'Order Notifications', 2),
             _buildDrawerItem(Icons.people_alt_rounded, 'Customers', 2),
             _buildDrawerItem(Icons.delivery_dining_rounded, 'Delivery Staff',  3),
+            ListTile(
+              leading: const Icon(Icons.add_road_rounded),
+              title: const Text('Manage Delivery Partners'),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pushNamed('/manage-delivery-partners');
+              },
+            ),
             _buildDrawerItem(Icons.admin_panel_settings_rounded, 'Administrators', 4),
+            ListTile(
+              leading: const Icon(Icons.person_add_rounded),
+              title: const Text('Add New Admin'),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pushNamed('/add-admin');
+              },
+            ),
             _buildDrawerItem(Icons.groups_rounded, 'Supervisors', 5),
               _buildDrawerItem(Icons.inventory_2_rounded, 'Manage Items', 6),
             _buildDrawerItem(Icons.photo_library_rounded, 'Manage Banners', 7),

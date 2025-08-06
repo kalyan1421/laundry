@@ -1,4 +1,4 @@
-// providers/order_provider.dart - Delivery Partner Order Management
+// Enhanced OrderProvider with better debugging
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/order_model.dart';
@@ -28,11 +28,7 @@ class OrderProvider extends ChangeNotifier {
     print('🚚 Order Number: ${notificationData['orderNumber']}');
     
     _lastNotificationTime = DateTime.now();
-    
-    // Clear any previous errors
     _error = null;
-    
-    // Trigger a refresh of the UI
     notifyListeners();
     
     print('🚚 ✅ OrderProvider: Notification handled, UI will refresh automatically via streams');
@@ -40,17 +36,14 @@ class OrderProvider extends ChangeNotifier {
   
   // Method to manually refresh order data
   Future<void> refreshOrderData(String deliveryPartnerId) async {
-    print('🚚 🔄 OrderProvider: Manually refreshing order data');
+    print('🚚 🔄 OrderProvider: Manually refreshing order data for: $deliveryPartnerId');
     
     _isLoading = true;
     _error = null;
     notifyListeners();
     
     try {
-      // The streams will automatically refresh the data
-      // This method just triggers loading state and clears errors
       await Future.delayed(Duration(milliseconds: 500)); // Small delay for UX
-      
       _isLoading = false;
       notifyListeners();
       
@@ -64,7 +57,7 @@ class OrderProvider extends ChangeNotifier {
     }
   }
   
-  // Get pickup tasks for delivery partner (including newly assigned orders)
+  // Enhanced pickup tasks with comprehensive debugging
   Stream<List<OrderModel>> getPickupTasksStream(String deliveryPartnerId) {
     print('🚚 📦 OrderProvider: Getting pickup tasks for delivery partner: $deliveryPartnerId');
     
@@ -76,18 +69,32 @@ class OrderProvider extends ChangeNotifier {
         .snapshots()
         .map((snapshot) {
       print('🚚 📦 OrderProvider: Pickup tasks query returned ${snapshot.docs.length} orders');
+      print('🚚 🔍 Debug Query Details:');
+      print('🚚    - Collection: orders');
+      print('🚚    - Status filter: [assigned, confirmed, ready_for_pickup]');
+      print('🚚    - assignedDeliveryPartner: $deliveryPartnerId');
+      print('🚚    - Order by: createdAt desc');
       
       if (snapshot.docs.isEmpty) {
         print('🚚 ⚠️ No pickup tasks found for delivery partner: $deliveryPartnerId');
-        print('🚚 ⚠️ Query used: status IN [assigned, confirmed, ready_for_pickup] AND assignedDeliveryPartner = $deliveryPartnerId');
+        print('🚚 ⚠️ Troubleshooting suggestions:');
+        print('🚚    1. Check if orders exist with assignedDeliveryPartner = $deliveryPartnerId');
+        print('🚚    2. Verify order status is one of: assigned, confirmed, ready_for_pickup');
+        print('🚚    3. Check Firestore security rules allow this query');
+        print('🚚    4. Verify delivery partner ID is correct');
+        
+        // Perform diagnostic query to check for any orders with this delivery partner
+        _performDiagnosticQuery(deliveryPartnerId);
       } else {
         print('🚚 ✅ Found ${snapshot.docs.length} pickup tasks:');
-        // Debug: Print details of each order
         for (var doc in snapshot.docs) {
           final data = doc.data() as Map<String, dynamic>;
-          print('🚚 📦 Order ${doc.id}: status=${data['status']}, assignedDeliveryPartner=${data['assignedDeliveryPartner']}');
-          print('🚚 📦   - OrderNumber: ${data['orderNumber']}');
-          print('🚚 📦   - Customer: ${data['customer']?['name']}');
+          print('🚚 📦 Order ${doc.id}:');
+          print('🚚      - status: ${data['status']}');
+          print('🚚      - assignedDeliveryPartner: ${data['assignedDeliveryPartner']}');
+          print('🚚      - orderNumber: ${data['orderNumber']}');
+          print('🚚      - customerName: ${data['customer']?['name'] ?? data['customerName']}');
+          print('🚚      - createdAt: ${data['createdAt']}');
         }
       }
       
@@ -95,13 +102,69 @@ class OrderProvider extends ChangeNotifier {
         return OrderModel.fromFirestore(doc);
       }).toList();
     }).handleError((error) {
-      print('🚚 Error in pickup tasks stream: $error');
+      print('🚚 ❌ Error in pickup tasks stream: $error');
+      print('🚚 💡 Possible causes:');
+      print('🚚    - Firestore security rules blocking query');
+      print('🚚    - Network connectivity issues');
+      print('🚚    - Invalid delivery partner ID');
+      print('🚚    - Missing composite index for this query');
+      
+      _error = 'Failed to load pickup tasks: $error';
+      notifyListeners();
       return <OrderModel>[];
     });
   }
   
+  // Diagnostic query to check for orders with this delivery partner
+  Future<void> _performDiagnosticQuery(String deliveryPartnerId) async {
+    try {
+      print('🚚 🔍 Running diagnostic query for delivery partner: $deliveryPartnerId');
+      
+      // Check for ANY orders with this delivery partner (regardless of status)
+      final allOrdersQuery = await _firestore
+          .collection('orders')
+          .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
+          .limit(10)
+          .get();
+      
+      print('🚚 🔍 Diagnostic: Found ${allOrdersQuery.docs.length} total orders for this delivery partner');
+      
+      if (allOrdersQuery.docs.isNotEmpty) {
+        print('🚚 🔍 Order statuses found:');
+        final statusCounts = <String, int>{};
+        for (var doc in allOrdersQuery.docs) {
+          final status = doc.data()['status'] as String? ?? 'unknown';
+          statusCounts[status] = (statusCounts[status] ?? 0) + 1;
+        }
+        statusCounts.forEach((status, count) {
+          print('🚚     - $status: $count orders');
+        });
+      } else {
+        print('🚚 ⚠️ No orders found with assignedDeliveryPartner = $deliveryPartnerId');
+        print('🚚 💡 Check if orders are being assigned with the correct field name');
+      }
+      
+      // Also check for orders with the old field name (assignedDeliveryPerson)
+      final oldFieldQuery = await _firestore
+          .collection('orders')
+          .where('assignedDeliveryPerson', isEqualTo: deliveryPartnerId)
+          .limit(5)
+          .get();
+      
+      if (oldFieldQuery.docs.isNotEmpty) {
+        print('🚚 ⚠️ Found ${oldFieldQuery.docs.length} orders using OLD field name "assignedDeliveryPerson"');
+        print('🚚 💡 Update admin code to use "assignedDeliveryPartner" instead');
+      }
+      
+    } catch (e) {
+      print('🚚 ❌ Diagnostic query failed: $e');
+    }
+  }
+  
   // Get delivery tasks for delivery partner
   Stream<List<OrderModel>> getDeliveryTasksStream(String deliveryPartnerId) {
+    print('🚚 🚛 OrderProvider: Getting delivery tasks for: $deliveryPartnerId');
+    
     return _firestore
         .collection('orders')
         .where('status', whereIn: ['picked_up', 'ready_for_delivery'])
@@ -109,17 +172,23 @@ class OrderProvider extends ChangeNotifier {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
+      print('🚚 🚛 Delivery tasks query returned ${snapshot.docs.length} orders');
+      
       return snapshot.docs.map((doc) {
         return OrderModel.fromFirestore(doc);
       }).toList();
     }).handleError((error) {
-      print('🚚 Error in delivery tasks stream: $error');
+      print('🚚 ❌ Error in delivery tasks stream: $error');
+      _error = 'Failed to load delivery tasks: $error';
+      notifyListeners();
       return <OrderModel>[];
     });
   }
   
-  // Get all assigned orders for delivery partner
+  // Get all assigned orders for delivery partner with debugging
   Stream<List<OrderModel>> getAllAssignedOrdersStream(String deliveryPartnerId) {
+    print('🚚 📋 OrderProvider: Getting ALL assigned orders for: $deliveryPartnerId');
+    
     return _firestore
         .collection('orders')
         .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
@@ -127,11 +196,25 @@ class OrderProvider extends ChangeNotifier {
         .limit(50)
         .snapshots()
         .map((snapshot) {
+      print('🚚 📋 All assigned orders query returned ${snapshot.docs.length} orders');
+      
+      if (snapshot.docs.isNotEmpty) {
+        print('🚚 📋 Order breakdown:');
+        final statusBreakdown = <String, int>{};
+        for (var doc in snapshot.docs) {
+          final status = doc.data()['status'] as String? ?? 'unknown';
+          statusBreakdown[status] = (statusBreakdown[status] ?? 0) + 1;
+        }
+        statusBreakdown.forEach((status, count) {
+          print('🚚     - $status: $count orders');
+        });
+      }
+      
       return snapshot.docs.map((doc) {
         return OrderModel.fromFirestore(doc);
       }).toList();
     }).handleError((error) {
-      print('🚚 Error in assigned orders stream: $error');
+      print('🚚 ❌ Error in assigned orders stream: $error');
       return <OrderModel>[];
     });
   }
@@ -142,6 +225,9 @@ class OrderProvider extends ChangeNotifier {
     final startOfDay = DateTime(today.year, today.month, today.day);
     final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
     
+    print('🚚 📅 Getting today\'s tasks for: $deliveryPartnerId');
+    print('🚚 📅 Date range: ${startOfDay} to ${endOfDay}');
+    
     return _firestore
         .collection('orders')
         .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
@@ -150,11 +236,13 @@ class OrderProvider extends ChangeNotifier {
         .orderBy('createdAt', descending: false)
         .snapshots()
         .map((snapshot) {
+      print('🚚 📅 Today\'s tasks query returned ${snapshot.docs.length} orders');
+      
       return snapshot.docs.map((doc) {
         return OrderModel.fromFirestore(doc);
       }).toList();
     }).handleError((error) {
-      print('🚚 Error in today tasks stream: $error');
+      print('🚚 ❌ Error in today tasks stream: $error');
       return <OrderModel>[];
     });
   }
@@ -165,6 +253,8 @@ class OrderProvider extends ChangeNotifier {
     Map<String, dynamic>? additionalData,
   }) async {
     try {
+      print('🚚 📝 Updating order $orderId status to: $newStatus');
+      
       _isLoading = true;
       _error = null;
       notifyListeners();
@@ -214,7 +304,7 @@ class OrderProvider extends ChangeNotifier {
       return true;
       
     } catch (e) {
-      print('🚚 Error updating order status: $e');
+      print('🚚 ❌ Error updating order status: $e');
       _error = 'Failed to update order status: $e';
       _isLoading = false;
       notifyListeners();
@@ -235,6 +325,8 @@ class OrderProvider extends ChangeNotifier {
   // Report issue with order
   Future<bool> reportOrderIssue(String orderId, String issue, {String? notes}) async {
     try {
+      print('🚚 ⚠️ Reporting issue for order $orderId: $issue');
+      
       _isLoading = true;
       _error = null;
       notifyListeners();
@@ -273,7 +365,7 @@ class OrderProvider extends ChangeNotifier {
       return true;
       
     } catch (e) {
-      print('🚚 Error reporting order issue: $e');
+      print('🚚 ❌ Error reporting order issue: $e');
       _error = 'Failed to report issue: $e';
       _isLoading = false;
       notifyListeners();
@@ -284,6 +376,8 @@ class OrderProvider extends ChangeNotifier {
   // Get delivery partner statistics
   Future<Map<String, dynamic>> getDeliveryPartnerStats(String deliveryPartnerId) async {
     try {
+      print('🚚 📊 Getting stats for delivery partner: $deliveryPartnerId');
+      
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
       final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
@@ -321,15 +415,18 @@ class OrderProvider extends ChangeNotifier {
           .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
           .get();
       
-      return {
+      final stats = {
         'todayCompleted': todayCompleted.docs.length,
         'weekCompleted': weekCompleted.docs.length,
         'monthCompleted': monthCompleted.docs.length,
         'todayPending': todayPending.docs.length,
       };
       
+      print('🚚 📊 Stats for $deliveryPartnerId: $stats');
+      return stats;
+      
     } catch (e) {
-      print('🚚 Error getting delivery partner stats: $e');
+      print('🚚 ❌ Error getting delivery partner stats: $e');
       return {
         'todayCompleted': 0,
         'weekCompleted': 0,
@@ -349,4 +446,4 @@ class OrderProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
-} 
+}

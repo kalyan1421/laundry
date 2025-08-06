@@ -68,6 +68,12 @@ dependencies:
   http: ^1.2.2
   shared_preferences: ^2.2.2 # For storing user preferences
   mockito: ^5.4.6
+  
+  # UPI Payment Integration
+  upi_pay: ^1.1.0 # For UPI payment functionality
+  sqflite: ^2.3.3 # For local database storage
+  crypto: ^3.0.3 # For generating transaction IDs
+  device_info_plus: ^10.1.2 # For device information
 
 dev_dependencies:
   flutter_test:

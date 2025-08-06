@@ -1,6 +1,6 @@
 import 'package:customer_app/data/models/item_model.dart';
 import 'package:customer_app/presentation/screens/profile/add_address_screen.dart';
-import 'package:customer_app/presentation/screens/orders/upi_payment_screen.dart';
+
 import 'package:customer_app/services/notification_service.dart';
 import 'package:customer_app/core/theme/app_colors.dart';
 import 'package:customer_app/core/theme/app_text_theme.dart';
@@ -16,6 +16,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart' as auth_provider;
 import 'package:customer_app/core/utils/address_utils.dart';
 import 'package:customer_app/services/order_notification_service.dart';
+import 'package:customer_app/presentation/screens/payment/upi_app_selection_screen.dart';
 
 // Define PaymentMethod enum
 enum PaymentMethod { cod, upi }
@@ -953,28 +954,24 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
       return;
     }
 
-    // Navigate to UPI payment screen
+    // Navigate to our new UPI app selection screen
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => UPIPaymentScreen(
-          amount: widget.totalAmount,
-          orderDetails: {
-            'itemCount': _totalItemCount,
-            'pickupDate': selectedPickupDate,
-            'deliveryDate': selectedDeliveryDate,
-            'pickupTimeSlot': selectedPickupTimeSlot?.displayName,
-            'deliveryTimeSlot': selectedDeliveryTimeSlot?.displayName,
-          },
+        builder: (context) => UpiAppSelectionScreen(
+          amount: widget.totalAmount >= 10 ? widget.totalAmount : 10.0, // Minimum ₹10 for testing
+          description: 'Laundry service payment - ${_totalItemCount} items',
+          orderId: 'ORDER_${DateTime.now().millisecondsSinceEpoch}',
         ),
       ),
     );
 
+    // Check if payment was completed successfully
     if (result != null && result['success'] == true) {
       // Payment successful, process the order
       await _processOrder(
         paymentStatus: 'completed',
-        transactionId: result['transactionId'],
+        transactionId: result['transactionId'] ?? 'UPI_${DateTime.now().millisecondsSinceEpoch}',
       );
     }
   }
@@ -2122,58 +2119,58 @@ Widget _buildDateSelector({
         ),
         
         // UPI Payment Option
-        // Container(
-        //   margin: const EdgeInsets.only(bottom: 12),
-        //   decoration: BoxDecoration(
-        //     color: Colors.white,
-        //     borderRadius: BorderRadius.circular(12),
-        //     border: Border.all(
-        //       color: _selectedPaymentMethod == PaymentMethod.upi 
-        //           ? Colors.blue 
-        //           : Colors.grey[300]!,
-        //       width: 2,
-        //     ),
-        //   ),
-        //   child: RadioListTile<PaymentMethod>(
-        //     title: Row(
-        //       children: [
-        //         Container(
-        //           padding: const EdgeInsets.all(8),
-        //           decoration: BoxDecoration(
-        //             color: Colors.blue.withOpacity(0.1),
-        //             shape: BoxShape.circle,
-        //           ),
-        //           child: const Icon(Icons.payment, color: Colors.blue, size: 20),
-        //         ),
-        //         const SizedBox(width: 12),
-        //         const Expanded(
-        //           child: Column(
-        //             crossAxisAlignment: CrossAxisAlignment.start,
-        //             children: [
-        //               Text(
-        //                 'UPI Payment',
-        //                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-        //               ),
-        //               Text(
-        //                 'Pay using Google Pay, PhonePe, Paytm, etc.',
-        //                 style: TextStyle(color: Colors.grey, fontSize: 14),
-        //               ),
-        //             ],
-        //           ),
-        //         ),
-        //       ],
-        //     ),
-        //     value: PaymentMethod.upi,
-        //     groupValue: _selectedPaymentMethod,
-        //     onChanged: (PaymentMethod? value) {
-        //       setState(() {
-        //         _selectedPaymentMethod = value!;
-        //       });
-        //     },
-        //     activeColor: Colors.blue,
-        //     contentPadding: const EdgeInsets.all(16),
-        //   ),
-        // ),
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _selectedPaymentMethod == PaymentMethod.upi 
+                  ? Colors.blue 
+                  : Colors.grey[300]!,
+              width: 2,
+            ),
+          ),
+          child: RadioListTile<PaymentMethod>(
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.payment, color: Colors.blue, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'UPI Payment',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                      ),
+                      Text(
+                        'Pay using Google Pay, PhonePe, Paytm, etc.',
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            value: PaymentMethod.upi,
+            groupValue: _selectedPaymentMethod,
+            onChanged: (PaymentMethod? value) {
+              setState(() {
+                _selectedPaymentMethod = value!;
+              });
+            },
+            activeColor: Colors.blue,
+            contentPadding: const EdgeInsets.all(16),
+          ),
+        ),
         
         const SizedBox(height: 16),
         
@@ -2184,14 +2181,16 @@ Widget _buildDateSelector({
             color: Colors.blue.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(Icons.info_outline, color: Colors.blue, size: 20),
-              SizedBox(width: 12),
+              const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Your order will be confirmed once you complete the payment process.',
-                  style: TextStyle(color: Colors.blue, fontSize: 14),
+                  _selectedPaymentMethod == PaymentMethod.upi
+                      ? 'Complete UPI payment to confirm your order. Your payment is secure and encrypted.'
+                      : 'Your order will be confirmed. Payment will be collected at delivery.',
+                  style: const TextStyle(color: Colors.blue, fontSize: 14),
                 ),
               ),
             ],
@@ -2259,10 +2258,10 @@ Widget _buildDateSelector({
     }
 
     // If UPI payment is selected, navigate to UPI payment screen
-    // if (_selectedPaymentMethod == PaymentMethod.upi) {
-    //   await _processUPIPayment();
-    //   return;
-    // }
+    if (_selectedPaymentMethod == PaymentMethod.upi) {
+      await _processUPIPayment();
+      return;
+    }
 
     // Process COD order directly
     await _processOrder(paymentStatus: 'pending', transactionId: null);

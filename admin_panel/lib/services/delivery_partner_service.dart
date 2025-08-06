@@ -1,7 +1,7 @@
 // services/delivery_partner_service.dart - No Firebase Auth operations
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math';
-import 'dart:convert';
+
 import '../models/delivery_partner_model.dart';
 
 class DeliveryPartnerService {
@@ -38,7 +38,7 @@ class DeliveryPartnerService {
   }
 
   // Get delivery person statistics
-  Future<Map<String, dynamic>> getDeliveryPartnerStats() async {
+  Future<Map<String, int>> getDeliveryPartnerStats() async {
     try {
       final snapshot = await _firestore
           .collection('delivery')
@@ -56,18 +56,16 @@ class DeliveryPartnerService {
       return {
         'total': total,
         'active': active,
-        'inactive': total - active,
+        'offline': active - online,
         'online': online,
-        'available': available,
       };
     } catch (e) {
       print('Error getting delivery person stats: $e');
       return {
         'total': 0,
         'active': 0,
-        'inactive': 0,
+        'offline': 0,
         'online': 0,
-        'available': 0,
       };
     }
   }
@@ -87,10 +85,9 @@ class DeliveryPartnerService {
       // Generate a unique ID for the delivery person
       String deliveryPartnerId = _firestore.collection('delivery').doc().id;
       
-      // Generate a secure registration token
+      // Generate a simple 4-digit login code
       final random = Random.secure();
-      var values = List<int>.generate(4, (i) => random.nextInt(255));
-      String registrationToken = base64UrlEncode(values).substring(0, 6).toUpperCase();
+      String loginCode = (1000 + random.nextInt(9000)).toString();
       
       // Create delivery person data with authentication setup
       final deliveryPartnerData = {
@@ -108,7 +105,8 @@ class DeliveryPartnerService {
         'authenticationStatus': 'pending_verification', // New field to track auth status
         'canLogin': true, // Allow login attempts
         'firstLoginRequired': true, // Indicates first-time login needed
-        'registrationToken': registrationToken,
+        'loginCode': loginCode,
+        'registrationToken': loginCode, // Keep for backward compatibility
         'rating': 0.0,
         'totalDeliveries': 0,
         'completedDeliveries': 0,
@@ -333,6 +331,80 @@ class DeliveryPartnerService {
     } catch (e) {
       print('Error updating delivery person: $e');
       return false;
+    }
+  }
+
+  // Update delivery partner online status
+  Future<void> updateOnlineStatus(String deliveryPartnerId, bool isOnline) async {
+    try {
+      await _firestore.collection('delivery').doc(deliveryPartnerId).update({
+        'isOnline': isOnline,
+        'lastStatusUpdate': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      });
+      print('✅ Updated online status for $deliveryPartnerId: $isOnline');
+    } catch (e) {
+      print('❌ Error updating online status: $e');
+      throw Exception('Failed to update online status');
+    }
+  }
+
+  // Get all delivery partners with real-time updates
+  Stream<List<DeliveryPartnerModel>> getAllDeliveryPartners() {
+    return _firestore
+        .collection('delivery')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => DeliveryPartnerModel.fromMap(doc.data() as Map<String, dynamic>))
+            .toList());
+  }
+
+  // Get only online delivery partners
+  Stream<List<DeliveryPartnerModel>> getOnlineDeliveryPartners() {
+    return _firestore
+        .collection('delivery')
+        .where('isOnline', isEqualTo: true)
+        .where('isActive', isEqualTo: true)
+        .orderBy('name')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => DeliveryPartnerModel.fromMap(doc.data() as Map<String, dynamic>))
+            .toList());
+  }
+
+  // Toggle delivery partner active status
+  Future<void> toggleActiveStatus(String deliveryPartnerId, bool isActive) async {
+    try {
+      await _firestore.collection('delivery').doc(deliveryPartnerId).update({
+        'isActive': isActive,
+        'updatedAt': Timestamp.now(),
+      });
+      print('✅ Updated active status for $deliveryPartnerId: $isActive');
+    } catch (e) {
+      print('❌ Error updating active status: $e');
+      throw Exception('Failed to update active status');
+    }
+  }
+
+
+
+  // Generate new login code for delivery partner
+  Future<void> generateNewLoginCode(String deliveryPartnerId) async {
+    try {
+      final random = Random.secure();
+      String newLoginCode = (1000 + random.nextInt(9000)).toString();
+      
+      await _firestore.collection('delivery').doc(deliveryPartnerId).update({
+        'loginCode': newLoginCode,
+        'registrationToken': newLoginCode, // Keep for backward compatibility
+        'updatedAt': Timestamp.now(),
+      });
+      
+      print('✅ Generated new login code for $deliveryPartnerId: $newLoginCode');
+    } catch (e) {
+      print('❌ Error generating new login code: $e');
+      throw Exception('Failed to generate new login code');
     }
   }
 

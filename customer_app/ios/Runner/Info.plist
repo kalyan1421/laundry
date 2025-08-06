@@ -2,14 +2,56 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>This app needs location access to provide delivery services and find nearby service areas.</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>This app needs location access to provide delivery services and find nearby service areas.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Cloud Ironing Factory needs access to your location to provide accurate pickup and delivery services, find the nearest service centers, and optimize delivery routes for your laundry orders.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Cloud Ironing Factory requires location access to track your delivery in real-time, send location-based notifications about pickup/delivery status, and provide seamless laundry service experience.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Cloud Ironing Factory needs continuous location access to provide real-time delivery tracking, send timely pickup/delivery notifications, and ensure efficient laundry service scheduling.</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>Cloud Ironing Factory needs permission to send you important notifications about your laundry orders, including pickup confirmations, washing status updates, delivery schedules, and promotional offers.</string>
+	<!-- Firebase URL Schemes for Authentication -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>REVERSED_CLIENT_ID</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<!-- EXACT URL scheme from Firebase error message -->
+				<string>app-1-491316420371-ios-9c3e6cfa74eede88bc84e6</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>BUNDLE_ID</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.cloudironingfactory.customer</string>
+			</array>
+		</dict>
+	</array>
+	
+	<!-- Firebase Auth Domain for reCAPTCHA -->
+	<key>FirebaseAuthDomain</key>
+	<string>laundry-management-57453.firebaseapp.com</string>
+	
+	<!-- reCAPTCHA Enterprise Configuration -->
+	<key>RECAPTCHA_ENTERPRISE_SITE_KEY</key>
+	<string>6LfByJ8qAAAAAJYwXwXwXwXwXwXwXwXwXwXwXwXwXw</string>
+	
+	<!-- Additional Firebase Configurations -->
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
+	
+	<!-- Temporarily disable reCAPTCHA for testing - change to true when you get real site key -->
+	<key>FirebasePhoneAuthReCaptchaEnabled</key>
+	<false/>
+	
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Customer App</string>
+	<string>Cloud Ironing Factory</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -49,5 +91,45 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>freecharge</string>
+		<string>gpay</string>
+		<string>in.fampay.app</string>
+		<string>lotza</string>
+		<string>mobikwik</string>
+		<string>paytm</string>
+		<string>phonepe</string>
+		<string>upi</string>
+		<string>upibillpay</string>
+		<string>whatsapp</string>
+		<string>tel</string>
+		<string>sms</string>
+		<string>maps</string>
+		<string>comgooglemaps</string>
+	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<false/>
+	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>background-fetch</string>
+		<string>background-processing</string>
+		<string>remote-notification</string>
+		<string>location</string>
+	</array>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+		<string>location-services</string>
+	</array>
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleDefault</string>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
 </dict>
 </plist>

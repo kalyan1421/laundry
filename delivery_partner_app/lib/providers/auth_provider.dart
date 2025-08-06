@@ -1,4 +1,4 @@
-// providers/auth_provider.dart - Delivery Partner Authentication
+// providers/auth_provider.dart - Fixed Delivery Partner Authentication
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -77,6 +77,9 @@ class AuthProvider extends ChangeNotifier {
           });
           _authStatus = AuthStatus.authenticated;
           print('🚚 ✅ Delivery partner authenticated with UID: $uid');
+          
+          // Now that we're authenticated, update login metadata
+          await _updateLoginMetadata(uid);
           return;
         }
       }
@@ -161,6 +164,9 @@ class AuthProvider extends ChangeNotifier {
               });
               _authStatus = AuthStatus.authenticated;
               print('🚚 ✅ Delivery partner linked and authenticated: $deliveryPartnerId');
+              
+              // Update login metadata after successful linking
+              await _updateLoginMetadata(deliveryPartnerId);
               return;
               
             } catch (updateError) {
@@ -192,6 +198,21 @@ class AuthProvider extends ChangeNotifier {
       print('🚚 Error loading delivery partner data: $e');
       _error = 'Failed to load delivery partner profile.';
       _authStatus = AuthStatus.unauthenticated;
+    }
+  }
+
+  // Update login metadata after authentication
+  Future<void> _updateLoginMetadata(String deliveryPartnerId) async {
+    try {
+      await _firestore.collection('delivery').doc(deliveryPartnerId).update({
+        'metadata.lastLoginAttempt': Timestamp.now(),
+        'metadata.loginAttempts': FieldValue.increment(1),
+        'metadata.lastSuccessfulLogin': Timestamp.now(),
+      });
+      print('🚚 ✅ Login metadata updated for: $deliveryPartnerId');
+    } catch (e) {
+      print('🚚 ⚠️ Failed to update login metadata: $e');
+      // Don't fail authentication if metadata update fails
     }
   }
 
@@ -241,11 +262,8 @@ class AuthProvider extends ChangeNotifier {
           final deliveryData = deliveryDoc.data()!;
           print('🚚 ✅ Valid delivery partner found: ${deliveryData['name']}');
           
-          // Update login attempt metadata
-          await _firestore.collection('delivery').doc(deliveryPartnerId).update({
-            'metadata.lastLoginAttempt': Timestamp.now(),
-            'metadata.loginAttempts': FieldValue.increment(1),
-          });
+          // DON'T update login attempt metadata here - wait until after Firebase Auth
+          // The update will happen in _updateLoginMetadata() after successful authentication
           
         } else {
           // Fallback: check all delivery documents (for backward compatibility)
@@ -388,4 +406,4 @@ class AuthProvider extends ChangeNotifier {
     _authSubscription?.cancel();
     super.dispose();
   }
-} 
+}
