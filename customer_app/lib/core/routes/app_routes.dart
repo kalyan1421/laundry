@@ -2,6 +2,7 @@ import 'package:customer_app/presentation/providers/auth_provider.dart';
 import 'package:customer_app/presentation/screens/auth/login_screen.dart';
 import 'package:customer_app/presentation/screens/auth/otp_verification_screen.dart';
 import 'package:customer_app/presentation/screens/auth/profile_setup_screen.dart';
+import 'package:customer_app/presentation/screens/auth/merged_registration_screen.dart';
 import 'package:customer_app/presentation/screens/auth/welcome_screen.dart';
 import 'package:customer_app/presentation/screens/main/main_wrapper.dart';
 import 'package:customer_app/presentation/screens/profile/edit_profile_screen.dart';
@@ -25,6 +26,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String otpVerification = '/otp-verification';
   static const String profileSetup = '/profile-setup';
+  static const String mergedRegistration = '/merged-registration';
   static const String addAddress = '/add-address';
   static const String welcome = '/welcome';
   static const String home = '/home';
@@ -47,6 +49,7 @@ class AppRoutes {
         login: (context) => const LoginScreen(),
         otpVerification: (context) => OTPVerificationScreen(phoneNumber: ModalRoute.of(context)?.settings.arguments as String? ?? ''),
         profileSetup: (context) => const ProfileSetupScreen(),
+        mergedRegistration: (context) => const MergedRegistrationScreen(),
         addAddress: (context) => const AddAddressScreen(),
         welcome: (context) => const WelcomeScreen(),
         home: (context) => const MainWrapper(),
@@ -147,7 +150,7 @@ class AppRoutes {
 
   // Helper method to navigate to profile setup
   static void navigateToProfileSetup(BuildContext context) {
-    Navigator.pushReplacementNamed(context, profileSetup);
+    Navigator.pushReplacementNamed(context, mergedRegistration);
   }
 
   static void navigateToAddAddress(BuildContext context) {

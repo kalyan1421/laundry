@@ -2,6 +2,7 @@
 import 'package:customer_app/presentation/providers/auth_provider.dart';
 import 'package:customer_app/presentation/screens/auth/login_screen.dart';
 import 'package:customer_app/presentation/screens/auth/profile_setup_screen.dart';
+import 'package:customer_app/presentation/screens/auth/merged_registration_screen.dart';
 import 'package:customer_app/presentation/screens/main/main_wrapper.dart';
 import 'package:customer_app/presentation/screens/splash/splash_screen.dart';
 import 'package:flutter/material.dart';
@@ -82,7 +83,7 @@ class AuthWrapper extends StatelessWidget {
             if (authProvider.isProfileComplete) {
               return const MainWrapper();
             } else {
-              return const ProfileSetupScreen();
+              return const MergedRegistrationScreen();
             }
         }
       },

@@ -8,6 +8,8 @@ import 'package:flutter/material.dart' hide TextButton;
 import 'package:flutter/material.dart' as material show TextButton;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:sms_autofill/sms_autofill.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common/custom_text_field.dart';
@@ -43,7 +45,33 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Reset OTP state when coming to login screen
       authProvider.resetOTPState();
+      
+      // Initialize phone number autofill
+      _initializePhoneAutofill();
     });
+  }
+  
+  Future<void> _initializePhoneAutofill() async {
+    try {
+      // Request phone permission
+      final status = await Permission.phone.request();
+      if (status.isGranted) {
+        // Get phone number hint
+        final phoneNumber = await SmsAutoFill().hint;
+        if (phoneNumber != null && phoneNumber.isNotEmpty) {
+          setState(() {
+            // Remove +91 if present and format the number
+            String formattedNumber = phoneNumber.replaceAll('+91', '').replaceAll(' ', '').replaceAll('-', '');
+            if (formattedNumber.length == 10) {
+              _phoneController.text = formattedNumber;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      // Handle any errors silently
+      print('Phone autofill error: $e');
+    }
   }
 
   @override

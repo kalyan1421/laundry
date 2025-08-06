@@ -57,7 +57,7 @@ class _MainWrapperState extends State<MainWrapper> {
     if (!authProvider.isProfileComplete) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _logger.i('User profile is not complete. Navigating to setup.');
-        Navigator.pushReplacementNamed(context, AppRoutes.profileSetup);
+        Navigator.pushReplacementNamed(context, AppRoutes.mergedRegistration);
       });
     } else {
       _logger.d('User profile is complete. No navigation needed.');

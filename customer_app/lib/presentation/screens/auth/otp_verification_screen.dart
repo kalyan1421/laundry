@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:sms_autofill/sms_autofill.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import '../../providers/auth_provider.dart';
 
@@ -28,6 +30,9 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   bool _isAutoVerifying = false;
   bool _hasNavigated = false;
   bool _isDisposed = false;
+  bool _showLoading = true;
+  bool _otpAutofillEnabled = false;
+  String _signature = '';
   
   final _formKey = GlobalKey<FormState>();
   final _otpController = TextEditingController();
@@ -36,6 +41,84 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   void initState() {
     super.initState();
     _startResendTimer();
+    _initializeOTPScreen();
+  }
+  
+  Future<void> _initializeOTPScreen() async {
+    // Show loading animation for 3 seconds
+    Timer(const Duration(seconds: 3), () {
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _showLoading = false;
+        });
+      }
+    });
+    
+    // Ask user for OTP autofill permission
+    _showOTPAutofillDialog();
+    
+    // Initialize SMS autofill
+    await _initializeSMSAutofill();
+  }
+  
+  Future<void> _showOTPAutofillDialog() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted || _isDisposed) return;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Enable OTP Auto-fill?'),
+          content: const Text(
+            'Would you like to enable automatic OTP detection from SMS? This will help fill the OTP automatically when received.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _otpAutofillEnabled = false;
+                });
+                Navigator.of(context).pop();
+              },
+              child: const Text('No, thanks'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final status = await Permission.sms.request();
+                setState(() {
+                  _otpAutofillEnabled = status.isGranted;
+                });
+                Navigator.of(context).pop();
+                if (_otpAutofillEnabled) {
+                  _startListeningForOTP();
+                }
+              },
+              child: const Text('Enable'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  Future<void> _initializeSMSAutofill() async {
+    try {
+      _signature = await SmsAutoFill().getAppSignature;
+    } catch (e) {
+      print('SMS signature error: $e');
+    }
+  }
+  
+  void _startListeningForOTP() async {
+    if (!_otpAutofillEnabled) return;
+    
+    try {
+      await SmsAutoFill().listenForCode();
+    } catch (e) {
+      print('SMS listening error: $e');
+    }
   }
 
   @override
@@ -45,6 +128,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     // Cancel timer first
     _timer?.cancel();
     _timer = null;
+    
+    // Stop SMS autofill listening
+    if (_otpAutofillEnabled) {
+      SmsAutoFill().unregisterListener();
+    }
     
     // Dispose controllers and focus nodes
     for (var controller in _otpControllers) {
@@ -264,6 +352,30 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
             }
           });
 
+          // Show loading animation for 3 seconds
+          if (_showLoading) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0066CC)),
+                    strokeWidth: 3,
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Setting up verification...',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
           return Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -352,9 +464,38 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   }
 
   Widget _buildOTPFields(AuthProvider authProvider) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: List.generate(6, (index) {
+    return Column(
+      children: [
+        // SMS autofill widget
+        if (_otpAutofillEnabled)
+          PinFieldAutoFill(
+            decoration: UnderlineDecoration(
+              textStyle: const TextStyle(fontSize: 20, color: Colors.black),
+              colorBuilder: FixedColorBuilder(Colors.black.withOpacity(0.3)),
+            ),
+            currentCode: _otpControllers.map((controller) => controller.text).join(),
+            onCodeSubmitted: (code) {
+              if (code.length == 6) {
+                for (int i = 0; i < 6; i++) {
+                  _otpControllers[i].text = code[i];
+                }
+                _verifyOTP();
+              }
+            },
+            onCodeChanged: (code) {
+              if (code?.length == 6) {
+                for (int i = 0; i < 6; i++) {
+                  if (i < code!.length) {
+                    _otpControllers[i].text = code[i];
+                  }
+                }
+              }
+            },
+          ),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(6, (index) {
         return SizedBox(
           width: 45,
           height: 55,
@@ -444,6 +585,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
           ),
         );
       }),
+        ),
+      ],
     );
   }
 
