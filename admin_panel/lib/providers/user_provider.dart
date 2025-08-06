@@ -209,4 +209,9 @@ class UserProvider extends ChangeNotifier {
 
   // If you add location to UserModel and want to fetch it specifically or format it:
   // String getUserDisplayLocation(UserModel user) { ... }
+  
+  // Refresh users by notifying listeners
+  void refreshUsers() {
+    notifyListeners();
+  }
 } 

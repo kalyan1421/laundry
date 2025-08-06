@@ -5,6 +5,9 @@ import 'package:admin_panel/screens/login/login_screen.dart';
 import 'package:admin_panel/screens/login/otp_verification_screen.dart';
 import 'package:admin_panel/screens/admin/admin_home.dart';
 import 'package:admin_panel/screens/admin/order_details_screen.dart';
+import 'package:admin_panel/screens/admin/add_admin_screen.dart';
+import 'package:admin_panel/screens/admin/manage_admins_screen.dart';
+import 'package:admin_panel/screens/admin/manage_delivery_partners_screen.dart';
 import 'package:admin_panel/screens/delivery/delivery_home.dart';
 import 'package:admin_panel/screens/delivery/task_detail_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -20,6 +23,8 @@ import 'providers/user_provider.dart';
 import 'services/fcm_service.dart';
 import 'services/database_service.dart';
 import 'models/order_model.dart';
+import 'services/order_notification_service.dart';
+import 'services/customer_registration_service.dart';
 
 // Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -31,6 +36,10 @@ void main() async {
   // Initialize FCM service
   final fcmService = FcmService();
   await fcmService.initialize(null);
+
+  // Initialize notification listeners
+  OrderNotificationService.setupOrderListener();
+  CustomerRegistrationService.setupCustomerRegistrationListener();
 
   runApp(const AdminPanelApp());
 }
@@ -79,6 +88,9 @@ class AdminPanelApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/admin-home': (context) => const AdminHome(),
           '/delivery-home': (context) => const DeliveryHome(),
+          '/add-admin': (context) => const AddAdminScreen(),
+          '/manage-admins': (context) => const ManageAdminsScreen(),
+          '/manage-delivery-partners': (context) => const ManageDeliveryPartnersScreen(),
         },
         onGenerateRoute: (settings) {
           if (settings.name == '/otp-verification') {

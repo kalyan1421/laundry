@@ -9,14 +9,14 @@ class MobileHeroSection extends StatelessWidget {
   // Book Pickup Functionality
   Future<void> _bookPickup() async {
     final Uri whatsappUri = Uri.parse(
-      'https://wa.me/919566654788?text=Hi! I would like to book a pickup for ironing services. Please let me know the available slots.',
+      'https://wa.me/919944797934?text=Hi! I would like to book a pickup for ironing services. Please let me know the available slots.',
     );
     try {
       if (await canLaunchUrl(whatsappUri)) {
         await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
       } else {
         // Fallback to phone call
-        final Uri phoneUri = Uri(scheme: 'tel', path: '9566654788');
+        final Uri phoneUri = Uri(scheme: 'tel', path: '9944797934');
         if (await canLaunchUrl(phoneUri)) {
           await launchUrl(phoneUri);
         }

@@ -6,6 +6,9 @@ import 'package:customer_app/data/models/item_model.dart';
 import 'package:customer_app/core/theme/app_colors.dart';
 import 'package:customer_app/core/theme/app_text_theme.dart';
 import 'package:customer_app/presentation/widgets/common/custom_button.dart';
+import 'package:customer_app/services/order_notification_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
 
 class EditOrderScreen extends StatefulWidget {
   final OrderModel order;
@@ -85,7 +88,9 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
           order: 0,
         ),
       );
-      total += item.pricePerPiece * quantity;
+      // Use offer price if available, otherwise use regular price
+      final effectivePrice = item.offerPrice ?? item.pricePerPiece;
+      total += effectivePrice * quantity;
     }
     setState(() {
       _totalAmount = total;
@@ -105,8 +110,6 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
 
   bool _canEditOrder() {
     // Customer can edit order until processing starts
-    // Allow editing for pending, confirmed, and picked_up statuses
-    
     String orderStatus = widget.order.status.toLowerCase().trim();
     
     // Allow editing for these statuses (before processing starts)
@@ -181,7 +184,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
         updatedItems.add({
           'name': item.name,
           'quantity': quantity,
-          'pricePerPiece': item.pricePerPiece,
+          'pricePerPiece': item.offerPrice ?? item.pricePerPiece,
           'category': item.category,
           'unit': item.unit,
         });
@@ -208,6 +211,22 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
           }
         ]),
       });
+
+      // Send notification to admin about order edit
+      try {
+        await OrderNotificationService.notifyOrderEdit(
+          orderId: widget.order.id,
+          orderNumber: widget.order.orderNumber ?? 'N/A',
+          changes: {
+            'itemCount': updatedItems.length,
+            'totalAmount': _totalAmount,
+            'items': updatedItems,
+          },
+        );
+        print('✅ Order edit notification sent to admin');
+      } catch (e) {
+        print('❌ Error sending order edit notification: $e');
+      }
 
       _showSuccessSnackBar('Order updated successfully!');
       Navigator.of(context).pop(true); // Return true to indicate success
@@ -239,14 +258,41 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     );
   }
 
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final selectedDate = DateTime(date.year, date.month, date.day);
+
+    if (selectedDate == today) {
+      return 'Today';
+    } else if (selectedDate == tomorrow) {
+      return 'Tomorrow';
+    } else {
+      return DateFormat('MMM d, yyyy').format(date);
+    }
+  }
+
+  IconData _getItemIcon(String itemName) {
+    final name = itemName.toLowerCase();
+    if (name.contains('shirt')) return Icons.checkroom;
+    if (name.contains('pant') || name.contains('trouser')) return Icons.checkroom;
+    if (name.contains('churidar')) return Icons.checkroom;
+    if (name.contains('saree') || name.contains('sare')) return Icons.checkroom;
+    if (name.contains('blouse') || name.contains('blows')) return Icons.checkroom;
+    if (name.contains('special')) return Icons.star;
+    return Icons.checkroom;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_canEditOrder()) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Edit Order'),
-          backgroundColor: AppColors.white,
+          backgroundColor: Colors.white,
           foregroundColor: AppColors.primary,
+          elevation: 0,
         ),
         body: Center(
           child: Padding(
@@ -291,62 +337,68 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Edit Order'),
-          backgroundColor: AppColors.white,
+          backgroundColor: Colors.white,
           foregroundColor: AppColors.primary,
+          elevation: 0,
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Edit Order'),
-          backgroundColor: AppColors.white,
+        backgroundColor: Colors.white,
         foregroundColor: AppColors.primary,
-        actions: [
-          if (_selectedItems.isNotEmpty)
-            TextButton(
-              onPressed: _isSaving ? null : _saveChanges,
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text(
-                      'Save',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-            ),
-        ],
+        elevation: 0,
       ),
       body: Column(
         children: [
-          // Order info header
+          // Order Information Header
           Container(
+            width: double.infinity,
+            color: Colors.white,
             padding: const EdgeInsets.all(16),
-            color: Colors.grey[50],
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Order Number
                 Text(
-                  'Order #${widget.order.orderNumber}',
-                  style: AppTextTheme.titleLarge.copyWith(
-                    color: AppColors.primary,
+                  'Order #${widget.order.orderNumber ?? widget.order.id}',
+                  style: const TextStyle(
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F3057),
                   ),
                 ),
                 const SizedBox(height: 8),
+                
+                // Pickup Information
                 Row(
                   children: [
-                    Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                    Icon(Icons.schedule, size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 4),
                     Text(
-                      'Pickup: ${widget.order.pickupTimeSlot}',
-                      style: AppTextTheme.bodyMedium.copyWith(
+                      'Pickup: ${_formatDate(widget.order.pickupDate.toDate())} • ${widget.order.pickupTimeSlot}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                
+                // Status
+                Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Status: ${widget.order.status.toUpperCase()}',
+                      style: TextStyle(
+                        fontSize: 14,
                         color: Colors.grey[600],
                       ),
                     ),
@@ -356,146 +408,236 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
             ),
           ),
           
-          // Items list
+          // Items Section Header
+          Container(
+            width: double.infinity,
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: const Text(
+              'Select Items for Ironing',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          
+          // Items List
           Expanded(
             child: _availableItems.isEmpty
                 ? const Center(child: Text('No items available'))
                 : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: _availableItems.length,
                     itemBuilder: (context, index) {
                       ItemModel item = _availableItems[index];
                       int currentQuantity = _selectedItems[item.name] ?? 0;
                       
-                      return Card(
+                      return Container(
                         margin: const EdgeInsets.only(bottom: 12),
-                        child: Padding(
                           padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
                           child: Row(
                             children: [
-                              // Item info
+                            // Item Image/Icon
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: item.imageUrl != null && item.imageUrl!.isNotEmpty
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: CachedNetworkImage(
+                                        imageUrl: item.imageUrl!,
+                                        fit: BoxFit.cover,
+                                        errorWidget: (context, url, error) {
+                                          return Icon(_getItemIcon(item.name), color: Colors.grey[400]);
+                                        },
+                                      ),
+                                    )
+                                  : Icon(_getItemIcon(item.name), color: Colors.grey[400]),
+                            ),
+                            const SizedBox(width: 16),
+                            
+                            // Item Details
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                  // Item Name
                                     Text(
                                       item.name,
-                                      style: AppTextTheme.titleMedium.copyWith(
+                                    style: const TextStyle(
                                         fontWeight: FontWeight.w600,
+                                      fontSize: 16,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                  
+                                  // Price Display with original and offer prices
+                                  Row(
+                                    children: [
+                                      // Original Price (strikethrough) - Show first if there's an offer
+                                      if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
                                     Text(
-                                      '₹${item.pricePerPiece.toStringAsFixed(0)} per ${item.unit}',
-                                      style: AppTextTheme.bodyMedium.copyWith(
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.w500,
+                                          '₹${item.originalPrice!.toInt()}',
+                                          style: const TextStyle(
+                                            decoration: TextDecoration.lineThrough,
+                                            color: Colors.grey,
+                                            fontSize: 12,
                                       ),
                                     ),
-                                    if (item.description != null) ...[
-                                      const SizedBox(height: 4),
+                                      // Add spacing between original and offer price
+                                      if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
+                                        const SizedBox(width: 8),
+                                      // Current/Offer Price
                                       Text(
-                                        item.description!,
-                                        style: AppTextTheme.bodySmall.copyWith(
-                                          color: Colors.grey[600],
+                                        '₹${(item.offerPrice ?? item.pricePerPiece).toInt()} per ${item.unit}',
+                                        style: TextStyle(
+                                          color: item.offerPrice != null ? Colors.green[700] : Colors.grey[600],
+                                          fontSize: 14,
+                                          fontWeight: item.offerPrice != null ? FontWeight.w600 : FontWeight.normal,
                                         ),
                                       ),
                                     ],
+                                  ),
                                   ],
                                 ),
                               ),
                               
-                              // Quantity controls
+                            // Quantity Controls
                               Row(
                                 children: [
                                   IconButton(
                                     onPressed: currentQuantity > 0
                                         ? () => _updateItemQuantity(item.name, currentQuantity - 1)
                                         : null,
-                                    icon: const Icon(Icons.remove_circle_outline),
-                                    color: AppColors.primary,
+                                  icon: Icon(
+                                    Icons.remove,
+                                    color: currentQuantity > 0 ? Colors.grey[600] : Colors.grey[300],
+                                  ),
                                   ),
                                   Container(
-                                    width: 40,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.grey[300]!),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Center(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                       child: Text(
-                                        currentQuantity.toString(),
-                                        style: AppTextTheme.titleMedium.copyWith(
+                                    '$currentQuantity',
+                                    style: const TextStyle(
                                           fontWeight: FontWeight.w600,
-                                        ),
+                                      fontSize: 16,
                                       ),
                                     ),
                                   ),
                                   IconButton(
                                     onPressed: () => _updateItemQuantity(item.name, currentQuantity + 1),
-                                    icon: const Icon(Icons.add_circle_outline),
-                                    color: AppColors.primary,
+                                  icon: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.blue,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.add,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
                                   ),
                                 ],
                               ),
                             ],
-                          ),
                         ),
                       );
                     },
                   ),
           ),
-          
-          Padding(padding: const EdgeInsets.only(bottom: 50),
-          child: 
-          // Total and save button
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
+        ],
+      ),
+      
+      // Bottom Sheet with Total and Update Button
+      bottomSheet: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+        decoration: const BoxDecoration(
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 1,
-                  blurRadius: 4,
-                  offset: const Offset(0, -2),
+              color: Colors.black12,
+              blurRadius: 8,
+              offset: Offset(0, -2),
                 ),
               ],
             ),
+        child: SafeArea(
             child: Column(
+            mainAxisSize: MainAxisSize.min,
               children: [
+              // Total Amount Display
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Total Amount:',
-                      style: AppTextTheme.titleLarge.copyWith(
+                        'Total Items: ${_selectedItems.values.fold(0, (sum, quantity) => sum + quantity)}',
+                        style: const TextStyle(
                         fontWeight: FontWeight.w600,
+                          fontSize: 16,
                       ),
                     ),
                     Text(
-                      '₹${_totalAmount.toStringAsFixed(0)}',
-                      style: AppTextTheme.titleLarge.copyWith(
-                        color: AppColors.primary,
+                        'Total Amount: ₹${_totalAmount.toInt()}',
+                        style: const TextStyle(
                         fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Colors.blue,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                  
+                  // Update Button
                 SizedBox(
-                  width: double.infinity,
-                  child: CustomButton(
-                    text: 'Update Order',
+                    width: 140,
+                    height: 48,
+                    child: ElevatedButton(
                     onPressed: _selectedItems.isEmpty || _isSaving ? null : _saveChanges,
-                    isLoading: _isSaving,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F3057),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text(
+                              'Update Order',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
                   ),
+                ],
                 ),
               ],
             ),
           ),
-          ),
-        ],
       ),
     );
   }

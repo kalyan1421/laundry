@@ -23,6 +23,82 @@ const {getMessaging} = require("firebase-admin/messaging");
 
 initializeApp();
 
+// Cloud Function to process FCM notifications
+exports.processFcmNotifications = onDocumentCreated(
+    "fcm_notifications/{notificationId}",
+    async (event) => {
+      const notificationData = event.data.data();
+      const notificationId = event.params.notificationId;
+
+      console.log(
+          `Processing FCM notification: ${notificationId}`,
+          notificationData,
+      );
+
+      try {
+        const {token, title, body, data, priority} = notificationData;
+
+        if (!token || !title || !body) {
+          console.error("Missing required fields for FCM notification");
+          await event.data.ref.update({
+            status: "failed",
+            error: "Missing required fields",
+          });
+          return;
+        }
+
+        // Prepare FCM message
+        const message = {
+          token: token,
+          notification: {
+            title: title,
+            body: body,
+          },
+          data: data || {},
+          android: {
+            priority: priority === "high" ? "high" : "normal",
+            notification: {
+              channelId: "laundry_channel",
+              priority: priority === "high" ? "high" : "default",
+              defaultSound: true,
+              defaultVibrateTimings: true,
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                alert: {
+                  title: title,
+                  body: body,
+                },
+                sound: "default",
+                badge: 1,
+              },
+            },
+          },
+        };
+
+        // Send the notification
+        const response = await getMessaging().send(message);
+        console.log("FCM notification sent successfully:", response);
+
+        // Update status to sent
+        await event.data.ref.update({
+          status: "sent",
+          sentAt: new Date(),
+          messageId: response,
+        });
+      } catch (error) {
+        console.error("Error sending FCM notification:", error);
+        await event.data.ref.update({
+          status: "failed",
+          error: error.message,
+          failedAt: new Date(),
+        });
+      }
+     },
+);
+
 // Cloud Function to send notification when a new order is created
 exports.sendOrderNotificationToAdmin = onDocumentCreated(
     "orders/{orderId}",

@@ -190,6 +190,15 @@ class DatabaseService {
     });
   }
 
+  Future<void> deleteOrder(String orderId) async {
+    try {
+      // Delete the order document
+      await _firestore.collection('orders').doc(orderId).delete();
+    } catch (e) {
+      throw Exception('Failed to delete order: $e');
+    }
+  }
+
   // Banners Management
   Stream<List<BannerModel>> getBanners() {
     return _firestore

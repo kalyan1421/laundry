@@ -1,6 +1,6 @@
 import 'package:customer_app/data/models/item_model.dart';
 import 'package:customer_app/presentation/screens/profile/add_address_screen.dart';
-import 'package:customer_app/presentation/screens/orders/upi_payment_screen.dart';
+
 import 'package:customer_app/services/notification_service.dart';
 import 'package:customer_app/core/theme/app_colors.dart';
 import 'package:customer_app/core/theme/app_text_theme.dart';
@@ -9,14 +9,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:logger/logger.dart';
 import 'package:customer_app/services/order_number_service.dart';
 import 'package:customer_app/core/utils/address_formatter.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart' as auth_provider;
 import 'package:customer_app/core/utils/address_utils.dart';
+import 'package:customer_app/services/order_notification_service.dart';
+import 'package:customer_app/presentation/screens/payment/upi_app_selection_screen.dart';
 
 // Define PaymentMethod enum
 enum PaymentMethod { cod, upi }
@@ -142,27 +142,32 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
   }
 
   void _initializeDateTimeSlots() {
-    final now = DateTime.now();
+  final now = DateTime.now();
+  
+    // Initialize pickup date
+  if (now.hour >= 20) {
+    selectedPickupDateOption = DateOption.tomorrow;
+      selectedPickupDate = _getDateFromOption(DateOption.tomorrow);
+  } else {
+    selectedPickupDateOption = DateOption.today;
+      selectedPickupDate = _getDateFromOption(DateOption.today);
+    }
+  
+    // Initialize delivery date to 2 days from pickup by default
+    selectedDeliveryDateOption = DateOption.custom;
+    selectedDeliveryDate = _getMinimumDeliveryDate().add(const Duration(days: 1));
     
-    // Set initial pickup date based on selected option
-    selectedPickupDate = _getDateFromOption(selectedPickupDateOption);
-    
-    // Set initial delivery date - try today first, fallback to tomorrow
-    selectedDeliveryDateOption = DateOption.today;
-    selectedDeliveryDate = _getDateFromDeliveryOption(selectedDeliveryDateOption);
-    
-    // If today doesn't work (no available slots), try tomorrow
-    if (selectedPickupTimeSlot != null) {
-      _updateAvailableDeliverySlots();
-      if (availableDeliverySlots.isEmpty) {
-        selectedDeliveryDateOption = DateOption.tomorrow;
-        selectedDeliveryDate = _getDateFromDeliveryOption(selectedDeliveryDateOption);
-      }
+    // Skip Sunday for both dates
+    while (selectedPickupDate!.weekday == DateTime.sunday) {
+      selectedPickupDate = selectedPickupDate!.add(const Duration(days: 1));
+    }
+    while (selectedDeliveryDate!.weekday == DateTime.sunday) {
+      selectedDeliveryDate = selectedDeliveryDate!.add(const Duration(days: 1));
     }
     
-    _updateAvailablePickupSlots();
-    _updateAvailableDeliverySlots();
-  }
+  _updateAvailablePickupSlots();
+  _updateAvailableDeliverySlots();
+}
 
 
 
@@ -943,28 +948,30 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
   }
 
   Future<void> _processUPIPayment() async {
-    // Navigate to UPI payment screen
+    // Prevent double submission
+    if (_isSavingOrder) {
+      print('🔥 ORDER PLACEMENT: ⚠️ Order already being processed, ignoring duplicate UPI payment request');
+      return;
+    }
+
+    // Navigate to our new UPI app selection screen
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => UPIPaymentScreen(
-          amount: widget.totalAmount,
-          orderDetails: {
-            'itemCount': _totalItemCount,
-            'pickupDate': selectedPickupDate,
-            'deliveryDate': selectedDeliveryDate,
-            'pickupTimeSlot': selectedPickupTimeSlot?.displayName,
-            'deliveryTimeSlot': selectedDeliveryTimeSlot?.displayName,
-          },
+        builder: (context) => UpiAppSelectionScreen(
+          amount: widget.totalAmount >= 10 ? widget.totalAmount : 10.0, // Minimum ₹10 for testing
+          description: 'Laundry service payment - ${_totalItemCount} items',
+          orderId: 'ORDER_${DateTime.now().millisecondsSinceEpoch}',
         ),
       ),
     );
 
+    // Check if payment was completed successfully
     if (result != null && result['success'] == true) {
       // Payment successful, process the order
       await _processOrder(
         paymentStatus: 'completed',
-        transactionId: result['transactionId'],
+        transactionId: result['transactionId'] ?? 'UPI_${DateTime.now().millisecondsSinceEpoch}',
       );
     }
   }
@@ -1034,10 +1041,14 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
       // Prepare order data
       List<Map<String, dynamic>> itemsForOrder = [];
       widget.selectedItems.forEach((itemModel, quantity) {
+        // Use effective price (considers offer price if available)
+        final effectivePrice = itemModel.offerPrice ?? itemModel.pricePerPiece;
         itemsForOrder.add({
           'itemId': itemModel.id,
           'name': itemModel.name,
-          'pricePerPiece': itemModel.pricePerPiece,
+          'pricePerPiece': effectivePrice,
+          'originalPrice': itemModel.originalPrice, // Store original price for reference
+          'offerPrice': itemModel.offerPrice, // Store offer price if exists
           'quantity': quantity,
           'category': itemModel.category,
           'unit': itemModel.unit,
@@ -1051,7 +1062,7 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
           : (_selectedDeliveryAddress!.data() as Map<String, dynamic>);
 
       Map<String, dynamic> orderData = {
-        'customerId': userId, // Use userModel.uid instead of currentUser.uid
+        'customerId': userId,
         'orderNumber': orderNumber,
         'orderTimestamp': Timestamp.now(),
         'items': itemsForOrder,
@@ -1099,13 +1110,23 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
       
       print('🔥 ORDER PLACEMENT: ✅ Order saved successfully: $orderId');
       
-      // Send notification to admin
+      // Send notification to admin using new OrderNotificationService
       try {
-        await NotificationService.sendNewOrderNotificationToAdmin(orderId);
+        await OrderNotificationService.notifyAdminOfNewOrder(
+          orderId: orderId,
+          orderNumber: orderNumber,
+          totalAmount: widget.totalAmount,
+          itemCount: _totalItemCount,
+          pickupAddress: _formatAddress(pickupAddressData),
+          specialInstructions: specialInstructionsController.text.trim(),
+        );
         print('🔥 ORDER PLACEMENT: ✅ Notification sent to admin');
       } catch (e) {
         print('🔥 ORDER PLACEMENT: ⚠️ Error sending notification to admin: $e');
       }
+
+      // Set up order status listener for this customer
+      OrderNotificationService.setupOrderStatusListener();
       
       setState(() {
         _isSavingOrder = false;
@@ -1121,32 +1142,10 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
         _isSavingOrder = false;
       });
       if (mounted) {
-        // Better error handling for authentication issues
-        String errorMessage = 'Failed to place order';
-        if (e.toString().contains('log in') || e.toString().contains('Authentication')) {
-          errorMessage = 'Please log in to place an order';
-        } else if (e.toString().contains('network') || e.toString().contains('connection')) {
-          errorMessage = 'Network error. Please check your connection and try again.';
-        } else {
-          errorMessage = 'Failed to place order: ${e.toString()}';
-        }
-        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
+            content: Text('Error placing order: $e'),
             backgroundColor: Colors.red,
-            action: e.toString().contains('log in') || e.toString().contains('Authentication') 
-                ? SnackBarAction(
-                    label: 'Login',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      Navigator.of(context).pushNamedAndRemoveUntil(
-                        '/login',
-                        (route) => false,
-                      );
-                    },
-                  )
-                : null,
           ),
         );
       }
@@ -1627,27 +1626,83 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Info message about minimum delivery time
-       
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Delivery must be at least 20 hours after pickup time',
+                  style: TextStyle(
+                    color: Colors.blue[700],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         
-        // Date selection options similar to pickup
-        _buildDateSelector(
-          selectedOption: selectedDeliveryDateOption,
-          onOptionSelected: (option) {
-            setState(() {
-              selectedDeliveryDateOption = option;
-              selectedDeliveryDate = _getDateFromDeliveryOption(option);
-              _updateAvailableDeliverySlots();
-            });
-          },
-          onCustomDateSelected: (date) {
+        // Custom date selector button
+        GestureDetector(
+          onTap: () async {
+            DateTime initialDate = _getMinimumDeliveryDate();
+            
+            final DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: initialDate,
+              firstDate: initialDate,
+              lastDate: DateTime.now().add(const Duration(days: 30)),
+              helpText: 'Select Delivery Date',
+              fieldLabelText: 'Must be at least 20 hours after pickup',
+              selectableDayPredicate: (DateTime date) {
+                // Disable Sundays
+                if (date.weekday == DateTime.sunday) return false;
+                // Ensure it meets minimum requirement
+                return !date.isBefore(_getMinimumDeliveryDate());
+              },
+            );
+            
+            if (picked != null) {
             setState(() {
               selectedDeliveryDateOption = DateOption.custom;
-              selectedDeliveryDate = date;
+                selectedDeliveryDate = picked;
               _updateAvailableDeliverySlots();
             });
+            }
           },
-          isDelivery: true,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  selectedDeliveryDate != null 
+                      ? DateFormat('EEEE, MMM d').format(selectedDeliveryDate!)
+                      : 'Select Delivery Date',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Icon(Icons.calendar_today, size: 20),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -1690,82 +1745,97 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
     return minDate;
   }
 
-  Widget _buildDateSelector({
-    required DateOption selectedOption,
-    required Function(DateOption) onOptionSelected,
-    required Function(DateTime) onCustomDateSelected,
-    bool isDelivery = false,
-  }) {
-    return Row(
-      children: DateOption.values.asMap().entries.map((entry) {
-        int index = entry.key;
-        DateOption option = entry.value;
-        bool isSelected = option == selectedOption;
-        
-        return Expanded(
-          child: GestureDetector(
-            onTap: () async {
-              if (option == DateOption.custom) {
-                DateTime initialDate = isDelivery ? _getMinimumDeliveryDate() : DateTime.now();
-                DateTime firstDate = isDelivery ? _getMinimumDeliveryDate() : DateTime.now();
-                
-                final DateTime? picked = await showDatePicker(
-                  context: context,
-                  initialDate: initialDate,
-                  firstDate: firstDate,
-                  lastDate: DateTime.now().add(const Duration(days: 30)),
-                  helpText: isDelivery ? 'Select Delivery Date' : 'Select Pickup Date',
-                  fieldLabelText: isDelivery ? 'Must be at least 20 hours after pickup' : 'Select date',
-                  selectableDayPredicate: (DateTime date) {
-                    // Disable Sundays
-                    if (date.weekday == DateTime.sunday) return false;
-                    
-                    // For delivery, ensure it meets minimum requirement
-                    if (isDelivery) {
-                      return !date.isBefore(_getMinimumDeliveryDate());
-                    }
-                    
-                    return true;
-                  },
-                );
-                if (picked != null) {
-                  onCustomDateSelected(picked);
-                }
-              } else {
-                onOptionSelected(option);
+// Replace the _buildDateSelector method with this updated version:
+
+Widget _buildDateSelector({
+  required DateOption selectedOption,
+  required Function(DateOption) onOptionSelected,
+  required Function(DateTime) onCustomDateSelected,
+  bool isDelivery = false,
+}) {
+  final now = DateTime.now();
+  List<DateOption> availableOptions = DateOption.values.toList();
+  
+  if (isDelivery) {
+    // For delivery, only show custom date option
+    availableOptions = [DateOption.custom];
+  } else {
+    // For pickup, remove "Today" option after 8 PM
+    if (now.hour >= 20) {
+      availableOptions.removeWhere((option) => option == DateOption.today);
+    }
+  }
+  
+  return Row(
+    children: availableOptions.asMap().entries.map((entry) {
+      int index = entry.key;
+      DateOption option = entry.value;
+      bool isSelected = option == selectedOption;
+      
+      return Expanded(
+        child: GestureDetector(
+          onTap: () async {
+            if (option == DateOption.custom) {
+              DateTime initialDate = isDelivery ? _getMinimumDeliveryDate() : DateTime.now();
+              DateTime firstDate = isDelivery ? _getMinimumDeliveryDate() : DateTime.now();
+              
+              final DateTime? picked = await showDatePicker(
+                context: context,
+                initialDate: initialDate,
+                firstDate: firstDate,
+                lastDate: DateTime.now().add(const Duration(days: 30)),
+                helpText: isDelivery ? 'Select Delivery Date' : 'Select Pickup Date',
+                fieldLabelText: isDelivery ? 'Must be at least 20 hours after pickup' : 'Select date',
+                selectableDayPredicate: (DateTime date) {
+                  // Disable Sundays
+                  if (date.weekday == DateTime.sunday) return false;
+                  
+                  // For delivery, ensure it meets minimum requirement
+                  if (isDelivery) {
+                    return !date.isBefore(_getMinimumDeliveryDate());
+                  }
+                  
+                  return true;
+                },
+              );
+              if (picked != null) {
+                onCustomDateSelected(picked);
+              }
+            } else {
+              onOptionSelected(option);
             }
           },
           child: Container(
-              margin: EdgeInsets.only(
-                right: index < DateOption.values.length - 1 ? 8 : 0,
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+            margin: EdgeInsets.only(
+              right: index < availableOptions.length - 1 ? 8 : 0,
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
             decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF1E3A8A) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isSelected ? const Color(0xFF1E3A8A) : Colors.grey[300]!,
-                ),
+              color: isSelected ? const Color(0xFF1E3A8A) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? const Color(0xFF1E3A8A) : Colors.grey[300]!,
               ),
-              child: Center(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    option.displayName,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
+            ),
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  option.displayName,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
                 ),
               ),
             ),
           ),
-        );
-      }).toList(),
-    );
-  }
+        ),
+      );
+    }).toList(),
+  );
+}
 
   Widget _buildTimeSlotSelector({
     required List<TimeSlot> availableSlots,
@@ -2049,58 +2119,58 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
         ),
         
         // UPI Payment Option
-        // Container(
-        //   margin: const EdgeInsets.only(bottom: 12),
-        //   decoration: BoxDecoration(
-        //     color: Colors.white,
-        //     borderRadius: BorderRadius.circular(12),
-        //     border: Border.all(
-        //       color: _selectedPaymentMethod == PaymentMethod.upi 
-        //           ? Colors.blue 
-        //           : Colors.grey[300]!,
-        //       width: 2,
-        //     ),
-        //   ),
-        //   child: RadioListTile<PaymentMethod>(
-        //     title: Row(
-        //       children: [
-        //         Container(
-        //           padding: const EdgeInsets.all(8),
-        //           decoration: BoxDecoration(
-        //             color: Colors.blue.withOpacity(0.1),
-        //             shape: BoxShape.circle,
-        //           ),
-        //           child: const Icon(Icons.payment, color: Colors.blue, size: 20),
-        //         ),
-        //         const SizedBox(width: 12),
-        //         const Expanded(
-        //           child: Column(
-        //             crossAxisAlignment: CrossAxisAlignment.start,
-        //             children: [
-        //               Text(
-        //                 'UPI Payment',
-        //                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-        //               ),
-        //               Text(
-        //                 'Pay using Google Pay, PhonePe, Paytm, etc.',
-        //                 style: TextStyle(color: Colors.grey, fontSize: 14),
-        //               ),
-        //             ],
-        //           ),
-        //         ),
-        //       ],
-        //     ),
-        //     value: PaymentMethod.upi,
-        //     groupValue: _selectedPaymentMethod,
-        //     onChanged: (PaymentMethod? value) {
-        //       setState(() {
-        //         _selectedPaymentMethod = value!;
-        //       });
-        //     },
-        //     activeColor: Colors.blue,
-        //     contentPadding: const EdgeInsets.all(16),
-        //   ),
-        // ),
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _selectedPaymentMethod == PaymentMethod.upi 
+                  ? Colors.blue 
+                  : Colors.grey[300]!,
+              width: 2,
+            ),
+          ),
+          child: RadioListTile<PaymentMethod>(
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.payment, color: Colors.blue, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'UPI Payment',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                      ),
+                      Text(
+                        'Pay using Google Pay, PhonePe, Paytm, etc.',
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            value: PaymentMethod.upi,
+            groupValue: _selectedPaymentMethod,
+            onChanged: (PaymentMethod? value) {
+              setState(() {
+                _selectedPaymentMethod = value!;
+              });
+            },
+            activeColor: Colors.blue,
+            contentPadding: const EdgeInsets.all(16),
+          ),
+        ),
         
         const SizedBox(height: 16),
         
@@ -2111,14 +2181,16 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
             color: Colors.blue.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(Icons.info_outline, color: Colors.blue, size: 20),
-              SizedBox(width: 12),
+              const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Your order will be confirmed once you complete the payment process.',
-                  style: TextStyle(color: Colors.blue, fontSize: 14),
+                  _selectedPaymentMethod == PaymentMethod.upi
+                      ? 'Complete UPI payment to confirm your order. Your payment is secure and encrypted.'
+                      : 'Your order will be confirmed. Payment will be collected at delivery.',
+                  style: const TextStyle(color: Colors.blue, fontSize: 14),
                 ),
               ),
             ],
@@ -2174,16 +2246,22 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
 
 
   Future<void> _saveOrder() async {
+    // Prevent double submission
+    if (_isSavingOrder) {
+      print('🔥 ORDER PLACEMENT: ⚠️ Order already being processed, ignoring duplicate request');
+      return;
+    }
+
     // Use the comprehensive validation method
     if (!_validateScheduleDetails()) {
       return; // Validation failed, error message already shown
     }
 
     // If UPI payment is selected, navigate to UPI payment screen
-    // if (_selectedPaymentMethod == PaymentMethod.upi) {
-    //   await _processUPIPayment();
-    //   return;
-    // }
+    if (_selectedPaymentMethod == PaymentMethod.upi) {
+      await _processUPIPayment();
+      return;
+    }
 
     // Process COD order directly
     await _processOrder(paymentStatus: 'pending', transactionId: null);

@@ -6,6 +6,7 @@ import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
 import '../../services/pdf_generation_service.dart';
 import '../../services/delivery_partner_service.dart';
+import '../../services/customer_deletion_service.dart';
 import '../../utils/phone_formatter.dart';
 import 'customer_detail_screen.dart';
 
@@ -140,7 +141,7 @@ class _ManageClientsScreenState extends State<ManageClientsScreen> {
         children: [
           // Search Bar
           Container(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(8.0),
             color: Colors.grey[100],
             child: TextField(
               controller: _searchController,
@@ -157,7 +158,18 @@ class _ManageClientsScreenState extends State<ManageClientsScreen> {
                           });
                         },
                       )
-                    : null,
+                    : IconButton(
+                        icon: Icon(Icons.refresh, color: Colors.blue[700]),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                          // Trigger refresh by notifying the provider
+                          Provider.of<UserProvider>(context, listen: false).refreshUsers();
+                        },
+                        tooltip: 'Refresh Customers',
+                      ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.0),
                   borderSide: BorderSide.none,
@@ -328,7 +340,7 @@ class _ManageClientsScreenState extends State<ManageClientsScreen> {
                   builder: (context, constraints) {
                     bool isWideScreen = constraints.maxWidth > 700;
                     return ListView.builder(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(8.0),
                       itemCount: filteredUsers.length,
                       itemBuilder: (context, index) {
                         final user = filteredUsers[index];
@@ -360,25 +372,46 @@ class SimplifiedUserCard extends StatelessWidget {
     );
   }
 
+  void _showDeleteCustomerDialog(BuildContext context, UserModel user) {
+    showDialog(
+      context: context,
+      builder: (context) => CustomerDeletionDialog(
+        user: user,
+        onDeleted: () {
+          // Refresh the user list after deletion
+          final userProvider = Provider.of<UserProvider>(context, listen: false);
+          userProvider.refreshUsers();
+        },
+      ),
+    );
+  }
+
+  void _navigateToEdit(BuildContext context, UserModel user) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditUserScreen(user: user),
+      ),
+    );
+    if (result == true) {
+      // Refresh the user list after editing
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      userProvider.refreshUsers();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Add debug output for user data
-    print('SimplifiedUserCard - User data:');
-    print('  Name: ${user.name}');
-    print('  Email: ${user.email}');
-    print('  Phone: ${user.phoneNumber}');
-    print('  UID: ${user.uid}');
-    print('  Client ID: ${user.clientId}');
-    print('  Role: ${user.role}');
+    
     
     return Card(
       elevation: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: InkWell(
         onTap: () => _showUserDetails(context),
         borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(6),
           child: Row(
             children: [
               CircleAvatar(
@@ -440,6 +473,91 @@ class SimplifiedUserCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
+              
+              // Action buttons for customers
+              if (user.role.toLowerCase() == 'customer') ...[
+                // Quick delete button
+                GestureDetector(
+                  onTap: () {
+                    // Prevent the card tap from being triggered
+                  },
+                  child: IconButton(
+                    onPressed: () => _showDeleteCustomerDialog(context, user),
+                    icon: Icon(
+                      Icons.delete_forever,
+                      size: 18,
+                      color: Colors.red[600],
+                    ),
+                    tooltip: 'Delete Customer Forever',
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                  ),
+                ),
+                
+                // More actions menu
+                PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert,
+                    size: 18,
+                    color: Colors.grey[600],
+                  ),
+                  tooltip: 'More Actions',
+                  padding: const EdgeInsets.all(4),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'edit':
+                        _navigateToEdit(context, user);
+                        break;
+                      case 'details':
+                        _showUserDetails(context);
+                        break;
+                      case 'delete':
+                        _showDeleteCustomerDialog(context, user);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 16, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text('Edit Customer'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'details',
+                      child: Row(
+                        children: [
+                          Icon(Icons.visibility, size: 16, color: Colors.green),
+                          SizedBox(width: 8),
+                          Text('View Details'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_forever, size: 16, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete Forever'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 4),
+              ] else ...[
+                // For non-customers, just show the arrow
+                const SizedBox(width: 8),
+              ],
+              
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
@@ -600,11 +718,16 @@ class UserDetailsDialog extends StatelessWidget {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () {
+                            onPressed: () async {
                               Navigator.of(context).pop();
-                              Navigator.of(context).push(MaterialPageRoute(
+                              final result = await Navigator.of(context).push(MaterialPageRoute(
                                 builder: (context) => EditUserScreen(user: user),
                               ));
+                              if (result == true) {
+                                // Refresh the user list
+                                final userProvider = Provider.of<UserProvider>(context, listen: false);
+                                userProvider.refreshUsers();
+                              }
                             },
                             icon: const Icon(Icons.edit),
                             label: const Text('Edit'),
@@ -650,6 +773,22 @@ class UserDetailsDialog extends StatelessWidget {
                         label: const Text('Download PDF'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _showDeleteCustomerDialog(context, user);
+                        },
+                        icon: const Icon(Icons.delete_forever),
+                        label: const Text('Delete Customer'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red[700],
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -815,6 +954,21 @@ class UserDetailsDialog extends StatelessWidget {
     }
   }
 
+  // Show comprehensive customer deletion dialog
+  void _showDeleteCustomerDialog(BuildContext context, UserModel user) {
+    showDialog(
+      context: context,
+      builder: (context) => CustomerDeletionDialog(
+        user: user,
+        onDeleted: () {
+          // Refresh the user list after deletion
+          final userProvider = Provider.of<UserProvider>(context, listen: false);
+          userProvider.refreshUsers();
+        },
+      ),
+    );
+  }
+
   Color _getRoleColor(String role) {
     switch (role.toLowerCase()) {
       case 'admin':
@@ -828,6 +982,374 @@ class UserDetailsDialog extends StatelessWidget {
       default:
         return Colors.grey;
     }
+  }
+}
+
+// Comprehensive Customer Deletion Dialog
+class CustomerDeletionDialog extends StatefulWidget {
+  final UserModel user;
+  final VoidCallback onDeleted;
+
+  const CustomerDeletionDialog({
+    super.key,
+    required this.user,
+    required this.onDeleted,
+  });
+
+  @override
+  State<CustomerDeletionDialog> createState() => _CustomerDeletionDialogState();
+}
+
+class _CustomerDeletionDialogState extends State<CustomerDeletionDialog> {
+  final CustomerDeletionService _deletionService = CustomerDeletionService();
+  CustomerDeletionPreview? _preview;
+  bool _isLoadingPreview = true;
+  bool _isDeleting = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadDeletionPreview();
+  }
+
+  Future<void> _loadDeletionPreview() async {
+    try {
+      final preview = await _deletionService.getCustomerDeletionPreview(widget.user.uid);
+      setState(() {
+        _preview = preview;
+        _isLoadingPreview = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingPreview = false;
+      });
+    }
+  }
+
+  void _showFinalConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red[700]),
+            const SizedBox(width: 8),
+            const Text('Confirm Deletion'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to delete this customer?',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Customer: ${widget.user.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text('Phone: ${widget.user.phoneNumber}'),
+                  Text('Email: ${widget.user.email}'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'This action cannot be undone.',
+              style: TextStyle(
+                color: Colors.red[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context); // Close confirmation dialog
+              _executeCustomerDeletion();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[700],
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Yes, Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _executeCustomerDeletion() async {
+    setState(() {
+      _isDeleting = true;
+    });
+
+    try {
+      final result = await _deletionService.deleteCustomerCompletely(
+        customerId: widget.user.uid,
+        customerName: widget.user.name,
+        customerPhone: widget.user.phoneNumber,
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        
+        if (result.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.message),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+          widget.onDeleted();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.message),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Deletion failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.delete_forever, color: Colors.red[700]),
+          const SizedBox(width: 8),
+          const Text('Delete Customer Forever'),
+        ],
+      ),
+      content: SizedBox(
+        width: 500,
+        child: _isLoadingPreview
+            ? const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Loading deletion preview...'),
+                ],
+              )
+            : _preview == null
+                ? const Text('Error loading customer data.')
+                : SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Customer Info
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red[200]!),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Customer: ${widget.user.name}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text('Phone: ${widget.user.phoneNumber}'),
+                              Text('Email: ${widget.user.email}'),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // What will be deleted
+                        const Text(
+                          'What will be deleted:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('✓ Customer account'),
+                              Text('✓ ${_preview!.addressCount} addresses'),
+                              if (_preview!.orderCount > 0)
+                                Text('⚠️ ${_preview!.orderCount} orders (marked as deleted, not removed)'),
+                            ],
+                          ),
+                        ),
+                        
+                        // Orders breakdown
+                        if (_preview!.ordersByStatus.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Orders by status:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue[200]!),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: _preview!.ordersByStatus.entries
+                                  .map((entry) => Text('• ${entry.key}: ${entry.value} orders'))
+                                  .toList(),
+                            ),
+                          ),
+                        ],
+                        
+                        // Warnings
+                        if (_preview!.warnings.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Warnings:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.orange,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange[200]!),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: _preview!.warnings
+                                  .map((warning) => Text('⚠️ $warning'))
+                                  .toList(),
+                            ),
+                          ),
+                        ],
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Final warning
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red[300]!, width: 2),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.warning, color: Colors.red[700], size: 24),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'This action cannot be undone!',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red[700],
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Customer account and all addresses will be permanently deleted.',
+                                      style: TextStyle(
+                                        color: Colors.red[600],
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isDeleting ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isDeleting ? null : _showFinalConfirmation,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red[700],
+            foregroundColor: Colors.white,
+          ),
+          child: _isDeleting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Text('DELETE CUSTOMER'),
+        ),
+      ],
+    );
   }
 }
 

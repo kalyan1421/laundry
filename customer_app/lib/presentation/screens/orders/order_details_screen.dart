@@ -1,108 +1,341 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:customer_app/data/models/order_model.dart';
+import 'package:customer_app/services/order_notification_service.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
-class OrderDetailsScreen extends StatelessWidget {
+class OrderDetailsScreen extends StatefulWidget {
   final OrderModel order;
 
-  const OrderDetailsScreen({Key? key, required this.order}) : super(key: key);
+  const OrderDetailsScreen({super.key, required this.order});
+
+  @override
+  State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
+}
+
+class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isCancelling = false;
+
+  Future<void> _cancelOrder() async {
+    final TextEditingController reasonController = TextEditingController();
+    bool? shouldCancel = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Order'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Please provide a reason for cancellation:'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                hintText: 'Enter cancellation reason',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Back'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cancel Order'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldCancel != true || !mounted) return;
+
+    String reason = reasonController.text.trim();
+    if (reason.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please provide a cancellation reason')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isCancelling = true);
+
+    try {
+      // Update order status
+      await _firestore.collection('orders').doc(widget.order.id).update({
+        'status': 'cancelled',
+        'cancelReason': reason,
+        'cancelledAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'statusHistory': FieldValue.arrayUnion([
+          {
+            'status': 'cancelled',
+            'timestamp': Timestamp.now(),
+            'reason': reason,
+            'updatedBy': 'customer',
+            'title': 'Order Cancelled',
+            'description': 'Order cancelled by customer: $reason',
+          }
+        ]),
+      });
+
+      // Send notification to admin
+      await OrderNotificationService.notifyAdminOfOrderCancellation(
+        orderId: widget.order.id,
+        orderNumber: widget.order.orderNumber ?? 'N/A',
+        reason: reason,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Order cancelled successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      print('Error cancelling order: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cancel order: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isCancelling = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Order #${order.orderNumber}'),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        iconTheme: const IconThemeData(color: Color(0xFF0F3057)),
-        titleTextStyle: const TextStyle(
-          color: Color(0xFF0F3057),
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-        ),
+        title: Text('Order #${widget.order.orderNumber ?? widget.order.id}'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            _buildSectionTitle('Order Summary'),
-            _buildDetailRow('Order ID:', '#${order.orderNumber}'),
-            _buildDetailRow('Status:', order.status),
-            _buildDetailRow('Order Date:', DateFormat('EEE, MMM d, yyyy - hh:mm a').format(order.orderTimestamp.toDate())),
-            _buildDetailRow('Service Type:', order.serviceType),
-            _buildDetailRow('Total Amount:', '₹${order.totalAmount.toStringAsFixed(2)}'),
-            _buildDetailRow('Payment Method:', order.paymentMethod),
-            const SizedBox(height: 20),
-
-            _buildSectionTitle('Pickup Details'),
-            _buildDetailRow('Address:', order.pickupAddress),
-            _buildDetailRow('Date:', DateFormat('EEE, MMM d, yyyy').format(order.pickupDate.toDate())),
-            _buildDetailRow('Time Slot:', order.pickupTimeSlot),
-            const SizedBox(height: 20),
-
-            if (order.deliveryDate != null && order.deliveryTimeSlot != null) ...[
-              _buildSectionTitle('Delivery Details'),
-              _buildDetailRow('Address:', order.deliveryAddress),
-              _buildDetailRow('Date:', DateFormat('EEE, MMM d, yyyy').format(order.deliveryDate!.toDate())),
-              _buildDetailRow('Time Slot:', order.deliveryTimeSlot!),
-              const SizedBox(height: 20),
-            ],
-            
-            if (order.specialInstructions != null && order.specialInstructions!.isNotEmpty)
-              Column(
+      body: _isCancelling
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildSectionTitle('Special Instructions'),
-                  Text(order.specialInstructions!, style: const TextStyle(fontSize: 15)),
-                  const SizedBox(height: 20),
+                  // Order status
+                  _buildStatusSection(),
+                  const Divider(),
+
+                  // Order details
+                  _buildOrderDetails(),
+                  const Divider(),
+
+                  // Items
+                  _buildItemsList(),
+                  const Divider(),
+
+                  // Addresses
+                  _buildAddressSection(),
+                  const Divider(),
+
+                  // Payment details
+                  _buildPaymentSection(),
+                  const SizedBox(height: 16),
+
+                  // Cancel button (only show if order is cancellable)
+                  if (_canCancelOrder())
+                    Center(
+                      child: ElevatedButton.icon(
+                        onPressed: _cancelOrder,
+                        icon: const Icon(Icons.cancel, color: Colors.white),
+                        label: const Text('Cancel Order'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
-
-            _buildSectionTitle('Items Ordered (${order.items.length})'),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: order.items.length,
-              itemBuilder: (context, index) {
-                final item = order.items[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: ListTile(
-                    title: Text(item['name'] ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.w500)),
-                    subtitle: Text('Category: ${item['category'] ?? 'N/A'}'),
-                    trailing: Text('Qty: ${item['quantity'] ?? 0} x ₹${(item['pricePerPiece'] ?? 0).toStringAsFixed(0)}'),
-                  ),
-                );
-              },
             ),
-            // TODO: Add more details as needed, e.g., tracking history, customer details (if admin view)
+    );
+  }
+
+  bool _canCancelOrder() {
+    // Define cancellable statuses
+    const cancellableStatuses = ['pending', 'confirmed'];
+    return cancellableStatuses.contains(widget.order.status.toLowerCase());
+  }
+
+  Widget _buildStatusSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Status: ${_formatStatus(widget.order.status)}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+            if (widget.order.status.toLowerCase() == 'cancelled')
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Reason: ${widget.order.statusHistory.lastWhere((h) => h['status'] == 'cancelled')['reason'] ?? 'No reason provided'}',
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Text(
-        title,
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F3057)),
+  String _formatStatus(String status) {
+    return status
+        .split('_')
+        .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
+        .join(' ');
+  }
+
+  Widget _buildOrderDetails() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Order #${widget.order.orderNumber ?? widget.order.id}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Placed on: ${_formatDate(widget.order.orderTimestamp)}',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('$label ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.grey[700])),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 15))),
-        ],
+  Widget _buildItemsList() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+            const Text(
+              'Items',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: widget.order.items.length,
+              itemBuilder: (context, index) {
+                final item = widget.order.items[index];
+                return ListTile(
+                  title: Text(item['name']),
+                  subtitle: Text('${item['quantity']} x ₹${item['pricePerPiece']}'),
+                  trailing: Text(
+                    '₹${(item['quantity'] * item['pricePerPiece']).toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'Total: ₹${widget.order.totalAmount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _buildAddressSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Addresses',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            _buildAddressCard('Pickup Address', widget.order.pickupAddress),
+            const SizedBox(height: 8),
+            _buildAddressCard('Delivery Address', widget.order.deliveryAddress),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddressCard(String title, String address) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        Text(address),
+      ],
+    );
+  }
+
+  Widget _buildPaymentSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+            const Text(
+              'Payment Details',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text('Method: ${widget.order.paymentMethod}'),
+            // Add more payment details as needed
+        ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(Timestamp timestamp) {
+    final date = timestamp.toDate();
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 }

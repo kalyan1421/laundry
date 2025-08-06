@@ -555,7 +555,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Icon(Icons.location_city_outlined, size: 14, color: Colors.grey[600]),
                         const SizedBox(width: 6),
                         Text(
-                          '${user.primaryAddress!.addressLine1}',
+                          '${user.primaryAddress!.addressLine1.length > 50 ? user.primaryAddress!.addressLine1.substring(0, 50) + '...' : user.primaryAddress!.addressLine1}',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,

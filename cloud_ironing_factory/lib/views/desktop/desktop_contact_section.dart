@@ -75,14 +75,14 @@ class _DesktopContactSectionState extends State<DesktopContactSection> {
   // Book Pickup Functionality
   Future<void> _bookPickup() async {
     final Uri whatsappUri = Uri.parse(
-      'https://wa.me/919566654788?text=Hi! I would like to book a pickup for ironing services. Please let me know the available slots.',
+      'https://wa.me/919944797934?text=Hi! I would like to book a pickup for ironing services. Please let me know the available slots.',
     );
     try {
       if (await canLaunchUrl(whatsappUri)) {
         await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
       } else {
         // Fallback to phone call
-        _makePhoneCall('9566654788');
+        _makePhoneCall('9944797934');
       }
     } catch (e) {
       _showErrorMessage('Error booking pickup: $e');
@@ -267,8 +267,8 @@ $name
             ),
             _buildClickableContactItem(
               Icons.phone,
-              '9566654788',
-              () => _makePhoneCall('9566654788'),
+              '9944797934',
+              () => _makePhoneCall('9944797934'),
             ),
             _buildClickableContactItem(
               Icons.phone,
@@ -725,7 +725,7 @@ $name
                   const SizedBox(height: 20),
 
                   // Contact Info
-                  _buildFooterContactItem(Icons.phone, '+91 9566654788'),
+                  _buildFooterContactItem(Icons.phone, '+91 9944797934'),
                   // _buildFooterContactItem(Icons.whatsapp, '+91 9566677166'),
                   _buildFooterContactItem(Icons.phone, '+91 6382654316'),
                   _buildFooterContactItem(

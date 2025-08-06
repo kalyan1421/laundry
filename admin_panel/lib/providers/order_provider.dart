@@ -20,7 +20,58 @@ class OrderProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   
-  // Optimized stream with pagination and filtering
+  // Fast loading stream without customer data for better performance
+  Stream<List<OrderModel>> getFastOrdersStream({String? statusFilter, int limit = 50}) {
+    Query query = _firestore.collection('orders');
+    
+    // Apply different query strategies based on filter
+    if (statusFilter != null && statusFilter != 'all') {
+      try {
+        query = query.where('status', isEqualTo: statusFilter);
+        try {
+          query = query.orderBy('orderTimestamp', descending: true).limit(limit);
+        } catch (e) {
+          query = query.limit(limit);
+        }
+      } catch (e) {
+        print('Status filter failed, using basic query: $e');
+        query = _firestore.collection('orders').limit(limit);
+      }
+    } else {
+      try {
+        query = query.orderBy('orderTimestamp', descending: true).limit(limit);
+      } catch (e) {
+        try {
+          query = query.orderBy('createdAt', descending: true).limit(limit);
+        } catch (e2) {
+          query = query.limit(limit);
+        }
+      }
+    }
+    
+    return query.snapshots().map((snapshot) {
+      List<OrderModel> orders = [];
+      
+      for (QueryDocumentSnapshot doc in snapshot.docs) {
+        try {
+          OrderModel order = OrderModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>);
+          
+          // Apply status filter in code if database query failed
+          if (statusFilter != null && statusFilter != 'all' && order.status != statusFilter) {
+            continue;
+          }
+          
+          orders.add(order);
+        } catch (e) {
+          print('Error parsing order ${doc.id}: $e');
+        }
+      }
+      
+      return orders;
+    });
+  }
+
+  // Original method with customer data (kept for compatibility)
   Stream<List<OrderModel>> getAllOrdersStream({String? statusFilter, int limit = 50}) {
     Query query = _firestore.collection('orders');
     
@@ -372,6 +423,11 @@ class OrderProvider extends ChangeNotifier {
   // Clear error
   void clearError() {
     _error = null;
+    notifyListeners();
+  }
+  
+  // Refresh orders by notifying listeners
+  void refreshOrders() {
     notifyListeners();
   }
 }

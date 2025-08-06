@@ -1081,18 +1081,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       );
       print('✅ Order status updated successfully');
       
-      // Step 2: Send notification to admin
-      print('📢 Sending notification to admins...');
-      await NotificationService.sendNotificationToAdmins(
-        title: isPickup ? 'Order Picked Up' : 'Order Delivered',
-        body: 'Order #${widget.order.orderNumber ?? widget.order.id.substring(0, 8)} has been ${isPickup ? 'picked up' : 'delivered'} by delivery partner',
-        data: {
-          'type': isPickup ? 'pickup_confirmed' : 'delivery_confirmed',
-          'orderId': widget.order.id,
-          'orderNumber': widget.order.orderNumber ?? '',
-        },
-      );
-      print('✅ Notification sent to admins');
+      // Note: Status change notifications to customers are handled automatically by the status listener
+      print('✅ Order status updated - customer will be notified automatically');
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

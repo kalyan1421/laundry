@@ -29,6 +29,7 @@ class DeliveryPartnerModel {
   final String? createdBy;
   final String? createdByRole;
   final String? registrationToken;
+  final String? loginCode;
 
   DeliveryPartnerModel({
     required this.id,
@@ -58,6 +59,7 @@ class DeliveryPartnerModel {
     this.createdBy,
     this.createdByRole,
     this.registrationToken,
+    this.loginCode,
   });
 
   factory DeliveryPartnerModel.fromMap(Map<String, dynamic> map) {
@@ -88,7 +90,8 @@ class DeliveryPartnerModel {
       updatedAt: map['updatedAt'] ?? Timestamp.now(),
       createdBy: map['createdBy'],
       createdByRole: map['createdByRole'],
-      registrationToken: map['registrationToken'],
+      registrationToken: map['registrationToken'] ?? map['loginCode'],
+      loginCode: map['loginCode'] ?? map['registrationToken'],
     );
   }
 
@@ -121,6 +124,7 @@ class DeliveryPartnerModel {
       'createdBy': createdBy,
       'createdByRole': createdByRole,
       'registrationToken': registrationToken,
+      'loginCode': loginCode ?? registrationToken,
     };
   }
 

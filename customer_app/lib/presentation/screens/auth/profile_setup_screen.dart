@@ -11,7 +11,6 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import '../../../presentation/providers/auth_provider.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
@@ -106,103 +105,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _logger.i('Longitude: ${position.longitude} (Type: ${position.longitude.runtimeType})');
       _logger.i('Accuracy: ${position.accuracy} meters');
       _logger.i('Timestamp: ${position.timestamp}');
-
-      // Get detailed address from coordinates
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks.first;
-        
-        // Extract maximum details from placemark
-        String street = place.street ?? '';
-        String subLocality = place.subLocality ?? '';
-        String locality = place.locality ?? '';
-        String subAdministrativeArea = place.subAdministrativeArea ?? '';
-        String administrativeArea = place.administrativeArea ?? '';
-        String postalCode = place.postalCode ?? '';
-        String country = place.country ?? '';
-        String name = place.name ?? '';
-        String thoroughfare = place.thoroughfare ?? '';
-        String subThoroughfare = place.subThoroughfare ?? '';
         
         setState(() {
           _currentPosition = position;
+        _isLoadingLocation = false;
           
           _logger.i('Position set in state:');
           _logger.i('_currentPosition.latitude: ${_currentPosition?.latitude}');
           _logger.i('_currentPosition.longitude: ${_currentPosition?.longitude}');
           
-          // Create a comprehensive address string for display
-          List<String> addressParts = [];
-          if (name.isNotEmpty && name != street) addressParts.add(name);
-          if (street.isNotEmpty) addressParts.add(street);
-          if (subLocality.isNotEmpty && subLocality != locality) addressParts.add(subLocality);
-          if (locality.isNotEmpty) addressParts.add(locality);
-          if (subAdministrativeArea.isNotEmpty && subAdministrativeArea != locality) addressParts.add(subAdministrativeArea);
-          if (administrativeArea.isNotEmpty) addressParts.add(administrativeArea);
-          if (postalCode.isNotEmpty) addressParts.add(postalCode);
-          
-          _currentAddress = addressParts.join(', ');
-          
-          // Pre-fill address fields with maximum available data
-          // Address Line 1: Use street, thoroughfare, or name (most specific)
-          if (street.isNotEmpty) {
-            _addressLine1Controller.text = street;
-          } else if (thoroughfare.isNotEmpty) {
-            _addressLine1Controller.text = thoroughfare;
-          } else if (name.isNotEmpty) {
-            _addressLine1Controller.text = name;
-          }
-          
-          // If we have subThoroughfare (house/building number), use it for door number
-          if (subThoroughfare.isNotEmpty) {
-            _doorNumberController.text = subThoroughfare;
-          }
-          
-          // Use subLocality for apartment/area name if available
-          if (subLocality.isNotEmpty && subLocality != locality) {
-            _apartmentNameController.text = subLocality;
-          }
-          
-          // City: Use locality or subAdministrativeArea
-          if (locality.isNotEmpty) {
-            _cityController.text = locality;
-          } else if (subAdministrativeArea.isNotEmpty) {
-            _cityController.text = subAdministrativeArea;
-          }
-          
-          // State
-          if (administrativeArea.isNotEmpty) {
-            _stateController.text = administrativeArea;
-          }
-          
-          // Pincode
-          if (postalCode.isNotEmpty) {
-            _pincodeController.text = postalCode;
-          }
-          
-          // Nearby landmark: Use name if it's different from street
-          if (name.isNotEmpty && name != street && name != thoroughfare) {
-            _nearbyLandmarkController.text = name;
-          }
-          
-          _isLoadingLocation = false;
-        });
-        
-        _logger.i('Location details extracted:');
-        _logger.i('Street: $street');
-        _logger.i('SubLocality: $subLocality');
-        _logger.i('Locality: $locality');
-        _logger.i('SubAdministrativeArea: $subAdministrativeArea');
-        _logger.i('AdministrativeArea: $administrativeArea');
-        _logger.i('PostalCode: $postalCode');
-        _logger.i('Name: $name');
-        _logger.i('Thoroughfare: $thoroughfare');
-        _logger.i('SubThoroughfare: $subThoroughfare');
-      }
+        _currentAddress = 'Location coordinates saved. Please manually fill your address details.';
+      });
     } catch (e) {
       setState(() {
         _locationError = e.toString();

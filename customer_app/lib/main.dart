@@ -11,12 +11,14 @@ import 'core/theme/app_theme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:customer_app/services/notification_service.dart';
+import 'package:customer_app/services/order_notification_service.dart';
 import 'package:customer_app/presentation/providers/address_provider.dart';
 import 'package:customer_app/presentation/providers/banner_provider.dart';
 import 'package:customer_app/presentation/providers/home_provider.dart';
 import 'package:customer_app/presentation/providers/item_provider.dart';
 import 'package:customer_app/presentation/providers/order_provider.dart';
 import 'package:customer_app/presentation/providers/special_offer_provider.dart';
+import 'package:customer_app/presentation/providers/payment_provider.dart';
 
 // Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -46,6 +48,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ItemProvider()),
         ChangeNotifierProvider(create: (_) => OrderProvider()),
         ChangeNotifierProvider(create: (_) => SpecialOfferProvider()),
+        ChangeNotifierProvider(create: (_) => PaymentProvider()),
       ],
       child: MaterialApp(
         title: 'Cloud Ironing Factory',
