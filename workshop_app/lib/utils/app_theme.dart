@@ -179,11 +179,10 @@ class AppTheme {
       appBarTheme: appBarTheme,
       
       // Card Theme
-      cardTheme: cardTheme,
+      cardTheme: cardTheme as CardThemeData?,
       
       // Elevated Button Theme
       elevatedButtonTheme: elevatedButtonTheme,
-      
       // Outlined Button Theme
       outlinedButtonTheme: outlinedButtonTheme,
       
@@ -282,7 +281,7 @@ class AppTheme {
       appBarTheme: appBarTheme,
       
       // Card Theme
-      cardTheme: cardTheme,
+      cardTheme: cardTheme as CardThemeData?  ,
       
       // Text Theme
       textTheme: textTheme,

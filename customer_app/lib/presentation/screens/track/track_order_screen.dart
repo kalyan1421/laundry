@@ -190,6 +190,42 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     }
   }
 
+  Future<void> _deleteOrder(OrderModel order) async {
+    // Check if order can be cancelled
+    if (!_canCancelOrder(order.status)) {
+      _showErrorSnackBar('This order cannot be deleted at this stage');
+      return;
+    }
+
+    bool shouldCancel = await _showConfirmationDialog(
+      'Delete Order',
+      'Are you sure you want to delete this order? This action cannot be undone.',
+    );
+
+    if (!shouldCancel) return;
+
+    try {
+      // Update order status to cancelled
+      await _firestore.collection('orders').doc(order.id).update({
+        'status': 'deleted',
+        'updatedAt': Timestamp.now(),
+        'statusHistory': FieldValue.arrayUnion([
+          {
+            'status': 'deleted',
+            'timestamp': Timestamp.now(),
+            'updatedBy': 'customer',
+            'title': 'Order Deleted',
+          }
+        ]),
+      });
+
+      _showSuccessSnackBar('Order deleted successfully');
+    } catch (e) {
+      print('Error deleting order: $e');
+      _showErrorSnackBar('Failed to delete order. Please try again.');
+    }
+  }
+
   // Function to check if order can be cancelled
   bool _canCancelOrder(String status) {
     // Customer can cancel order until processing starts
@@ -1003,37 +1039,74 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
           const SizedBox(height: 12),
           // Cancel Order Button (only show if order can be cancelled)
           if (_canCancelOrder(order.status))
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton(
-                onPressed: () => _cancelOrder(order),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.close,
-                      color: Colors.red,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Cancel Order',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+            Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton(
+                    onPressed: () => _deleteOrder(order),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.red),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                  ],
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Delete Order',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton(
+                    onPressed: () => _cancelOrder(order),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.red),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.close,
+                          color: Colors.red,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Cancel Order',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
         ],
       ),

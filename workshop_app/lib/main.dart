@@ -38,7 +38,7 @@ class WorkshopApp extends StatelessWidget {
           elevatedButtonTheme: AppTheme.elevatedButtonTheme,
           outlinedButtonTheme: AppTheme.outlinedButtonTheme,
           inputDecorationTheme: AppTheme.inputDecorationTheme,
-          cardTheme: AppTheme.cardTheme,
+          cardTheme: AppTheme.cardTheme as CardThemeData?,
         ),
         debugShowCheckedModeBanner: false,
         home: const AuthWrapper(),

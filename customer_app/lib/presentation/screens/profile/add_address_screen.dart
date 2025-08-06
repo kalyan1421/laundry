@@ -48,10 +48,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     super.initState();
     if (widget.address != null) {
       _populateFields();
-    } else {
-      // Automatically get current location for new addresses
-      _getCurrentLocation();
     }
+    // Removed automatic location fetch to disable auto-fill
   }
 
   void _populateFields() {
@@ -81,97 +79,97 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     }
   }
 
-  Future<void> _getCurrentLocation() async {
-    setState(() {
-      isLocationLoading = true;
-    });
+  // Future<void> _getCurrentLocation() async {
+  //   setState(() {
+  //     isLocationLoading = true;
+  //   });
 
-    try {
-      Position position = await LocationService.getCurrentLocation();
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
+  //   try {
+  //     Position position = await LocationService.getCurrentLocation();
+  //     List<Placemark> placemarks = await placemarkFromCoordinates(
+  //       position.latitude,
+  //       position.longitude,
+  //     );
 
-      setState(() {
-        currentLocation = position;
-        if (placemarks.isNotEmpty) {
-          _fillAddressFromPlacemark(placemarks.first);
-        }
-        isLocationLoading = false;
-      });
+  //     setState(() {
+  //       currentLocation = position;
+  //       if (placemarks.isNotEmpty) {
+  //         _fillAddressFromPlacemark(placemarks.first);
+  //       }
+  //       isLocationLoading = false;
+  //     });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Location fetched successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      setState(() {
-        isLocationLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error getting location: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(
+  //         content: Text('Location fetched successfully!'),
+  //         backgroundColor: Colors.green,
+  //       ),
+  //     );
+  //   } catch (e) {
+  //     setState(() {
+  //       isLocationLoading = false;
+  //     });
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: Text('Error getting location: $e'),
+  //         backgroundColor: Colors.red,
+  //       ),
+  //     );
+  //   }
+  // }
 
-  void _fillAddressFromPlacemark(Placemark place) {
-    String street = place.street ?? '';
-    String subLocality = place.subLocality ?? '';
-    String locality = place.locality ?? '';
-    String subAdministrativeArea = place.subAdministrativeArea ?? '';
-    String administrativeArea = place.administrativeArea ?? '';
-    String postalCode = place.postalCode ?? '';
-    String name = place.name ?? '';
-    String thoroughfare = place.thoroughfare ?? '';
-    String subThoroughfare = place.subThoroughfare ?? '';
+  // void _fillAddressFromPlacemark(Placemark place) {
+  //   String street = place.street ?? '';
+  //   String subLocality = place.subLocality ?? '';
+  //   String locality = place.locality ?? '';
+  //   String subAdministrativeArea = place.subAdministrativeArea ?? '';
+  //   String administrativeArea = place.administrativeArea ?? '';
+  //   String postalCode = place.postalCode ?? '';
+  //   String name = place.name ?? '';
+  //   String thoroughfare = place.thoroughfare ?? '';
+  //   String subThoroughfare = place.subThoroughfare ?? '';
 
-    // Address Line 1: Use street first, then thoroughfare, then name
-    if (street.isNotEmpty) {
-      _addressLine1Controller.text = street;
-    } else if (thoroughfare.isNotEmpty) {
-      _addressLine1Controller.text = thoroughfare;
-    } else if (name.isNotEmpty) {
-      _addressLine1Controller.text = name;
-    }
+  //   // Address Line 1: Use street first, then thoroughfare, then name
+  //   if (street.isNotEmpty) {
+  //     _addressLine1Controller.text = street;
+  //   } else if (thoroughfare.isNotEmpty) {
+  //     _addressLine1Controller.text = thoroughfare;
+  //   } else if (name.isNotEmpty) {
+  //     _addressLine1Controller.text = name;
+  //   }
 
-    // If we have subThoroughfare (house/building number), use it for door number
-    if (subThoroughfare.isNotEmpty) {
-      _doorNumberController.text = subThoroughfare;
-    }
+  //   // If we have subThoroughfare (house/building number), use it for door number
+  //   if (subThoroughfare.isNotEmpty) {
+  //     _doorNumberController.text = subThoroughfare;
+  //   }
 
-    // Use subLocality for address line 2 if available
-    if (subLocality.isNotEmpty && subLocality != locality) {
-      _addressLine2Controller.text = subLocality;
-    }
+  //   // Use subLocality for address line 2 if available
+  //   if (subLocality.isNotEmpty && subLocality != locality) {
+  //     _addressLine2Controller.text = subLocality;
+  //   }
 
-    // City: Use locality or subAdministrativeArea
-    if (locality.isNotEmpty) {
-      _cityController.text = locality;
-    } else if (subAdministrativeArea.isNotEmpty) {
-      _cityController.text = subAdministrativeArea;
-    }
+  //   // City: Use locality or subAdministrativeArea
+  //   if (locality.isNotEmpty) {
+  //     _cityController.text = locality;
+  //   } else if (subAdministrativeArea.isNotEmpty) {
+  //     _cityController.text = subAdministrativeArea;
+  //   }
 
-    // State
-    if (administrativeArea.isNotEmpty) {
-      _stateController.text = administrativeArea;
-    }
+  //   // State
+  //   if (administrativeArea.isNotEmpty) {
+  //     _stateController.text = administrativeArea;
+  //   }
 
-    // Pincode
-    if (postalCode.isNotEmpty) {
-      _pincodeController.text = postalCode;
-    }
+  //   // Pincode
+  //   if (postalCode.isNotEmpty) {
+  //     _pincodeController.text = postalCode;
+  //   }
 
-    // Nearby landmark: Use name if it's different from street
-    if (name.isNotEmpty && name != street && name != thoroughfare) {
-      _landmarkController.text = name;
-    }
-  }
+  //   // Nearby landmark: Use name if it's different from street
+  //   if (name.isNotEmpty && name != street && name != thoroughfare) {
+  //     _landmarkController.text = name;
+  //   }
+  // }
 
   Future<void> _saveAddress() async {
     if (!_formKey.currentState!.validate()) return;
@@ -367,7 +365,15 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                   )
                                 else
                                   TextButton(
-                                    onPressed: _getCurrentLocation,
+                                    onPressed: () {
+                                      // Location refresh disabled - auto-fill removed
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Location auto-fill has been disabled'),
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                      );
+                                    },
                                     child: const Text('Refresh'),
                                   ),
                               ],
