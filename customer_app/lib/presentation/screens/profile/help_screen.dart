@@ -53,7 +53,7 @@ class HelpScreen extends StatelessWidget {
                         context,
                         Icons.email,
                         'Email',
-                        'mailto:support@laundryapp.com',
+                        'mailto:cloudironingfactory@gmail.com',
                       ),
                       _buildQuickActionButton(
                         context,

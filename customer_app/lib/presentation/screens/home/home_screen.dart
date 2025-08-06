@@ -11,7 +11,8 @@ import 'package:customer_app/presentation/screens/home/allied_services_screen.da
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
-import 'package:customer_app/data/models/order_model.dart' as customer_order_model;
+import 'package:customer_app/data/models/order_model.dart'
+    as customer_order_model;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
@@ -44,7 +45,8 @@ class _HomeScreenState extends State<HomeScreen> {
           .fetchLastActiveOrder(authProvider.userModel!.uid);
     }
     Provider.of<BannerProvider>(context, listen: false).fetchBanners();
-    Provider.of<SpecialOfferProvider>(context, listen: false).fetchSpecialOffers();
+    Provider.of<SpecialOfferProvider>(context, listen: false)
+        .fetchSpecialOffers();
     Provider.of<ItemProvider>(context, listen: false).loadAllItemData();
   }
 
@@ -75,7 +77,8 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  int get totalItems => itemQuantities.values.fold(0, (sum, quantity) => sum + quantity);
+  int get totalItems =>
+      itemQuantities.values.fold(0, (sum, quantity) => sum + quantity);
 
   void _scrollToItemsSection() {
     // Scroll to items section (approximate position)
@@ -89,9 +92,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void _navigateToSchedulePickup() {
     final itemProvider = Provider.of<ItemProvider>(context, listen: false);
 
-    final selectedItems = Map.fromEntries(itemQuantities.entries
-        .where((entry) => entry.value > 0)
-        .map((entry) {
+    final selectedItems = Map.fromEntries(
+        itemQuantities.entries.where((entry) => entry.value > 0).map((entry) {
       final item = itemProvider.items.firstWhere((i) => i.id == entry.key);
       return MapEntry(item, entry.value);
     }));
@@ -124,18 +126,19 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-    //   appBar: _buildAppBar(),
+      appBar: _buildAppBar(),
       body: _buildBody(),
       bottomSheet: totalItems > 0 ? _buildBottomSheet() : null,
-    //   bottomNavigationBar: _buildBottomNavigationBar(),
+      //   bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
+      surfaceTintColor: Colors.white,
+      automaticallyImplyLeading: false,
       backgroundColor: Colors.white,
       elevation: 0,
-      
       title: const Text(
         'Cloud Ironing',
         style: TextStyle(
@@ -145,7 +148,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       centerTitle: true,
-     
     );
   }
 
@@ -228,7 +230,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             items: bannerProvider.banners.map((banner) {
               return Container(
-
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   image: DecorationImage(
@@ -317,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: GestureDetector(
                   onTap: () {
                     // Scroll to items section for placing order
-                    _scrollToItemsSection();
+                    // _scrollToItemsSection();
                   },
                   child: Container(
                     padding: const EdgeInsets.all(16),
@@ -349,7 +350,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: Colors.blue.withOpacity(0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.iron, color: Colors.blue[600], size: 28),
+                          child: Icon(Icons.iron,
+                              color: Colors.blue[600], size: 28),
                         ),
                         const SizedBox(height: 12),
                         const Text(
@@ -414,7 +416,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: Colors.green.withOpacity(0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.home_repair_service, color: Colors.green[600], size: 28),
+                          child: Icon(Icons.home_repair_service,
+                              color: Colors.green[600], size: 28),
                         ),
                         const SizedBox(height: 12),
                         const Text(
@@ -446,8 +449,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildRevenueTracking() {
-    final firebase_auth.User? currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
-    
+    final firebase_auth.User? currentUser =
+        firebase_auth.FirebaseAuth.instance.currentUser;
+
     if (currentUser == null) {
       return const SizedBox.shrink();
     }
@@ -457,13 +461,11 @@ class _HomeScreenState extends State<HomeScreen> {
         FirebaseFirestore.instance
             .collection('orders')
             .where('customerId', isEqualTo: currentUser.uid)
-            .where('status', whereIn: ['completed', 'delivered'])
-            .get(),
+            .where('status', whereIn: ['completed', 'delivered']).get(),
         FirebaseFirestore.instance
             .collection('orders')
             .where('userId', isEqualTo: currentUser.uid)
-            .where('status', whereIn: ['completed', 'delivered'])
-            .get(),
+            .where('status', whereIn: ['completed', 'delivered']).get(),
       ]),
       builder: (context, snapshot) {
         double totalRevenue = 0.0;
@@ -489,7 +491,8 @@ class _HomeScreenState extends State<HomeScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Card(
             elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -636,9 +639,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           Expanded(
                             child: Container(
                               decoration: BoxDecoration(
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                                borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(12)),
                                 image: DecorationImage(
-                                  image: CachedNetworkImageProvider(offer.imageUrl ?? ''),
+                                  image: CachedNetworkImageProvider(
+                                      offer.imageUrl ?? ''),
                                   fit: BoxFit.cover,
                                 ),
                               ),
@@ -649,7 +654,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                     top: 8,
                                     left: 8,
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
                                         color: Colors.green,
                                         borderRadius: BorderRadius.circular(12),
@@ -751,7 +757,7 @@ class _HomeScreenState extends State<HomeScreen> {
               itemBuilder: (context, index) {
                 final item = itemProvider.items[index];
                 final quantity = itemQuantities[item.id] ?? 0;
-                
+
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(16),
@@ -769,18 +775,21 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: Colors.grey[100],
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: item.imageUrl != null && item.imageUrl!.isNotEmpty
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: CachedNetworkImage(
-                                  imageUrl: item.imageUrl!,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) {
-                                    return Icon(_getItemIcon(item.name), color: Colors.grey[400]);
-                                  },
-                                ),
-                              )
-                            : Icon(_getItemIcon(item.name), color: Colors.grey[400]),
+                        child:
+                            item.imageUrl != null && item.imageUrl!.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: CachedNetworkImage(
+                                      imageUrl: item.imageUrl!,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (context, url, error) {
+                                        return Icon(_getItemIcon(item.name),
+                                            color: Colors.grey[400]);
+                                      },
+                                    ),
+                                  )
+                                : Icon(_getItemIcon(item.name),
+                                    color: Colors.grey[400]),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -798,7 +807,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             Row(
                               children: [
                                 // Original Price (strikethrough) - Show first if there's an offer
-                                if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
+                                if (item.originalPrice != null &&
+                                    item.originalPrice! >
+                                        (item.offerPrice ?? item.pricePerPiece))
                                   Text(
                                     '₹${item.originalPrice!.toInt()}',
                                     style: const TextStyle(
@@ -808,15 +819,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                 // Add spacing between original and offer price
-                                if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
+                                if (item.originalPrice != null &&
+                                    item.originalPrice! >
+                                        (item.offerPrice ?? item.pricePerPiece))
                                   const SizedBox(width: 8),
                                 // Current/Offer Price
                                 Text(
                                   '₹${(item.offerPrice ?? item.pricePerPiece).toInt()} per piece',
                                   style: TextStyle(
-                                    color: item.offerPrice != null ? Colors.green[700] : Colors.grey[600],
+                                    color: item.offerPrice != null
+                                        ? Colors.green[700]
+                                        : Colors.grey[600],
                                     fontSize: 14,
-                                    fontWeight: item.offerPrice != null ? FontWeight.w600 : FontWeight.normal,
+                                    fontWeight: item.offerPrice != null
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
                                   ),
                                 ),
                                 // Offer badge
@@ -854,14 +871,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       Row(
                         children: [
                           IconButton(
-                            onPressed: quantity > 0 ? () => _decrementQuantity(item.id) : null,
+                            onPressed: quantity > 0
+                                ? () => _decrementQuantity(item.id)
+                                : null,
                             icon: Icon(
                               Icons.remove,
-                              color: quantity > 0 ? Colors.grey[600] : Colors.grey[300],
+                              color: quantity > 0
+                                  ? Colors.grey[600]
+                                  : Colors.grey[300],
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
                             child: Text(
                               '$quantity',
                               style: const TextStyle(
@@ -981,11 +1003,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 4),
                       const Text(
                         '₹250',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.green[100],
                           borderRadius: BorderRadius.circular(12),
@@ -1030,7 +1054,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 4),
                       const Text(
                         '₹180',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                       const SizedBox(height: 32), // Space for delivered status
                       const SizedBox(height: 8),
@@ -1099,11 +1124,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: _navigateToSchedulePickup,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0F3057),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
                 child: const Text(
                   'Continue',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -1142,10 +1169,12 @@ class _HomeScreenState extends State<HomeScreen> {
   IconData _getItemIcon(String itemName) {
     final name = itemName.toLowerCase();
     if (name.contains('shirt')) return Icons.checkroom;
-    if (name.contains('pant') || name.contains('trouser')) return Icons.checkroom;
+    if (name.contains('pant') || name.contains('trouser'))
+      return Icons.checkroom;
     if (name.contains('churidar')) return Icons.checkroom;
     if (name.contains('saree') || name.contains('sare')) return Icons.checkroom;
-    if (name.contains('blouse') || name.contains('blows')) return Icons.checkroom;
+    if (name.contains('blouse') || name.contains('blows'))
+      return Icons.checkroom;
     if (name.contains('special')) return Icons.star;
     return Icons.checkroom;
   }

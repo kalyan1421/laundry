@@ -8,6 +8,7 @@ import 'package:flutter/material.dart' hide TextButton;
 import 'package:flutter/material.dart' as material show TextButton;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:sms_autofill/sms_autofill.dart';
 import 'dart:async';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common/custom_text_field.dart';
@@ -24,11 +25,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final FocusNode _phoneFocusNode = FocusNode();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  
+
   // Rate limiting countdown
   Timer? _countdownTimer;
   int _remainingSeconds = 0;
   bool _isRateLimited = false;
+  String? _phoneNumber;
 
   @override
   void initState() {
@@ -43,6 +45,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Reset OTP state when coming to login screen
       authProvider.resetOTPState();
+
+      // Get the phone number from SMS autofill
+      _getPhoneNumber();
     });
   }
 
@@ -51,7 +56,23 @@ class _LoginScreenState extends State<LoginScreen> {
     _phoneController.dispose();
     _phoneFocusNode.dispose();
     _countdownTimer?.cancel();
+
     super.dispose();
+  }
+
+  Future<void> _getPhoneNumber() async {
+    String? number = await SmsAutoFill().hint;
+    if (number != null && number.isNotEmpty) {
+      // Remove +91 if already included, to avoid double prefix
+      if (number.startsWith('+91')) {
+        number = number.replaceFirst('+91', '');
+      }
+
+      setState(() {
+        _phoneNumber = number;
+        _phoneController.text = number!;
+      });
+    }
   }
 
   void _startCountdown(int seconds) {
@@ -59,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _isRateLimited = true;
       _remainingSeconds = seconds;
     });
-    
+
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
@@ -71,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     });
   }
-  
+
   void _extractCountdownFromError(String errorMessage) {
     // Extract seconds from rate limit message
     final regex = RegExp(r'(\d+) seconds');
@@ -107,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       // Error handling is managed by the provider
       print('Error sending OTP: $e');
-      
+
       // Check if it's a rate limit error and start countdown
       final errorMessage = authProvider.errorMessage ?? '';
       if (errorMessage.contains('wait') && errorMessage.contains('seconds')) {
@@ -119,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (errorMessage.contains('blocked')) {
         _startCountdown(2 * 60 * 60); // 2 hours for account blocked
       }
-      
+
       // Show snackbar for additional feedback
       if (mounted) {
         // ScaffoldMessenger.of(context).showSnackBar(
@@ -186,14 +207,14 @@ class _LoginScreenState extends State<LoginScreen> {
           builder: (context, authProvider, child) {
             // Listen for OTP status changes for navigation
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (authProvider.otpStatus == OTPStatus.sent && 
+              if (authProvider.otpStatus == OTPStatus.sent &&
                   _phoneController.text.isNotEmpty) {
                 final fullPhoneNumber = '+91${_phoneController.text.trim()}';
                 AppRoutes.navigateToOTP(context, fullPhoneNumber);
               }
-              
+
               // Show error dialog if there's an error (but avoid during navigation)
-              if (authProvider.errorMessage != null && 
+              if (authProvider.errorMessage != null &&
                   authProvider.errorMessage!.isNotEmpty &&
                   authProvider.otpStatus != OTPStatus.sent) {
                 // _showErrorDialog(authProvider.errorMessage!);
@@ -201,12 +222,14 @@ class _LoginScreenState extends State<LoginScreen> {
               }
             });
 
-            return SingleChildScrollView( // Fixed: Added scroll view to prevent overflow
+            return SingleChildScrollView(
+              // Fixed: Added scroll view to prevent overflow
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: MediaQuery.of(context).size.height - 
-                           MediaQuery.of(context).padding.top - 48,
+                  minHeight: MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top -
+                      48,
                 ),
                 child: IntrinsicHeight(
                   child: Form(
@@ -237,7 +260,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         // Already have account
                         _buildFooter(),
-                        
+
                         const SizedBox(height: 16), // Add bottom spacing
                       ],
                     ),
@@ -281,10 +304,9 @@ class _LoginScreenState extends State<LoginScreen> {
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color:
-                  _phoneFocusNode.hasFocus
-                      ? const Color(0xFF4299E1)
-                      : Colors.grey[300]!,
+              color: _phoneFocusNode.hasFocus
+                  ? const Color(0xFF4299E1)
+                  : Colors.grey[300]!,
               width: _phoneFocusNode.hasFocus ? 2 : 1,
             ),
           ),
@@ -394,10 +416,9 @@ class _LoginScreenState extends State<LoginScreen> {
       child: ElevatedButton(
         onPressed: isValid && !isLoading && !_isRateLimited ? _sendOTP : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              isValid && !isLoading && !_isRateLimited
-                  ? const Color(0xFF0F3057)
-                  : const Color(0xFF0F3057).withOpacity(0.6),
+          backgroundColor: isValid && !isLoading && !_isRateLimited
+              ? const Color(0xFF0F3057)
+              : Colors.blueGrey,
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -456,13 +477,22 @@ class _LoginScreenState extends State<LoginScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
-              child: Text(
-                'G',
+              child: Text.rich(TextSpan(
+                children: [
+                  TextSpan(text: 'G   '),
+                  TextSpan(
+                    text: 'Sign in with google',
+                    style: AppTypography.bodyLarge.copyWith(
+                      fontWeight: FontConstants.bold,
+                      color: const Color(0xFF4285F4),
+                    ),
+                  ),
+                ],
                 style: AppTypography.headlineSmall.copyWith(
                   fontWeight: FontConstants.bold,
                   color: const Color(0xFF4285F4),
                 ),
-              ),
+              )),
             ),
           ),
         ),
@@ -471,37 +501,41 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildFooter() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'Already have account? ',
-          style: AppTypography.bodyMedium.copyWith(
-            color: const Color(0xFF718096),
-          ),
-        ),
-        GestureDetector(
-          onTap: () {
-            // Handle existing user login
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Just enter your phone number to login!',
-                  style: AppTypography.bodyMedium.copyWith(color: Colors.white),
-                ),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          },
-          child: Text(
-            'Login',
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Already have account? ',
             style: AppTypography.bodyMedium.copyWith(
-              color: const Color(0xFF4299E1),
-              fontWeight: FontConstants.medium,
+              color: const Color(0xFF718096),
             ),
           ),
-        ),
-      ],
+          GestureDetector(
+            onTap: () {
+              // Handle existing user login
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Just enter your phone number to login!',
+                    style:
+                        AppTypography.bodyMedium.copyWith(color: Colors.white),
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: Text(
+              'Login',
+              style: AppTypography.bodyMedium.copyWith(
+                color: const Color(0xFF4299E1),
+                fontWeight: FontConstants.medium,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
