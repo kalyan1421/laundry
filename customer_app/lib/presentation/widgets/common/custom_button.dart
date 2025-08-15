@@ -556,13 +556,16 @@ class AppIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double buttonSize = size ?? 48;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     
     return CustomButton(
       text: '',
       onPressed: onPressed,
       isLoading: isLoading,
       isDisabled: isDisabled,
-      backgroundColor: backgroundColor ?? AppColors.darkGray,
+      backgroundColor: backgroundColor ?? colors.surfaceVariant,
+      textColor: iconColor ?? colors.onSurface, // ensures spinner/text contrast if needed
       width: buttonSize,
       height: buttonSize,
       borderRadius: borderRadius ?? BorderRadius.circular(buttonSize / 2),
@@ -573,14 +576,14 @@ class AppIconButton extends StatelessWidget {
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  iconColor ?? Colors.white,
+                  iconColor ?? colors.onSurface,
                 ),
               ),
             )
           : Icon(
               icon,
               size: iconSize ?? 24,
-              color: iconColor ?? AppColors.white,
+              color: iconColor ?? colors.onSurface,
             ),
     );
   }

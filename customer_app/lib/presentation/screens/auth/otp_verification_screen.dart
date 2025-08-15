@@ -305,14 +305,14 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor ,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
+          icon:  Icon(
             Icons.arrow_back_ios,
-            color: Color(0xFF2D3748),
+            color: Theme.of(context).colorScheme.onSurface,
             size: 20,
           ),
           onPressed: () {
@@ -321,10 +321,10 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
             }
           },
         ),
-        title: const Text(
+        title:  Text(
           'Verify Your Number',
           style: TextStyle(
-            color: Color(0xFF2D3748),
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),

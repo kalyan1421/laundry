@@ -1,3 +1,4 @@
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -18,7 +19,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Support phone number
-  final String supportPhoneNumber = '+919566654788'; // Replace with actual support number
+  final String supportPhoneNumber =
+      '+919566654788'; // Replace with actual support number
 
   @override
   void initState() {
@@ -43,44 +45,46 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         .limit(1)
         .snapshots()
         .asyncMap((snapshot) async {
-          List<QueryDocumentSnapshot> docs = snapshot.docs;
-          
-          // If no results with customerId, try with userId
-          if (docs.isEmpty) {
-            print('TrackOrderScreen: No orders found with customerId, trying userId...');
-            QuerySnapshot userIdQuery = await _firestore
-                .collection('orders')
-                .where('userId', isEqualTo: currentUser.uid)
-                .orderBy('orderTimestamp', descending: true)
-                .limit(1)
-                .get();
-            docs = userIdQuery.docs;
-          }
+      List<QueryDocumentSnapshot> docs = snapshot.docs;
 
-          print('TrackOrderScreen: Found ${docs.length} orders in stream');
+      // If no results with customerId, try with userId
+      if (docs.isEmpty) {
+        print(
+            'TrackOrderScreen: No orders found with customerId, trying userId...');
+        QuerySnapshot userIdQuery = await _firestore
+            .collection('orders')
+            .where('userId', isEqualTo: currentUser.uid)
+            .orderBy('orderTimestamp', descending: true)
+            .limit(1)
+            .get();
+        docs = userIdQuery.docs;
+      }
 
-          if (docs.isEmpty) {
-            return null;
-          }
+      print('TrackOrderScreen: Found ${docs.length} orders in stream');
 
-          // Process orders and get the latest one
-          return _processOrderFromDoc(docs.first, currentUser.uid);
-        })
-        .handleError((error) {
-          print('TrackOrderScreen: Stream error: $error');
-          return null;
-        });
+      if (docs.isEmpty) {
+        return null;
+      }
+
+      // Process orders and get the latest one
+      return _processOrderFromDoc(docs.first, currentUser.uid);
+    }).handleError((error) {
+      print('TrackOrderScreen: Stream error: $error');
+      return null;
+    });
   }
-  
+
   OrderModel? _processOrderFromDoc(QueryDocumentSnapshot doc, String userId) {
     try {
       print('TrackOrderScreen: Processing order ${doc.id}');
       Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-      print('TrackOrderScreen: Order status: ${data['status']}, customerId: ${data['customerId']}, userId: ${data['userId']}');
-      
+      print(
+          'TrackOrderScreen: Order status: ${data['status']}, customerId: ${data['customerId']}, userId: ${data['userId']}');
+
       OrderModel order = OrderModel.fromFirestore(doc);
-      print('TrackOrderScreen: Processed order: ${order.id}, status: ${order.status}');
-      
+      print(
+          'TrackOrderScreen: Processed order: ${order.id}, status: ${order.status}');
+
       return order;
     } catch (e) {
       print('TrackOrderScreen: Error processing order document: $e');
@@ -133,24 +137,25 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   // Function to show confirmation dialog
   Future<bool> _showConfirmationDialog(String title, String message) async {
     return await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Confirm'),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text(title),
+              content: Text(message),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Confirm'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
   }
 
   // Function to cancel order
@@ -194,9 +199,9 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   bool _canCancelOrder(String status) {
     // Customer can cancel order until processing starts
     // Allow cancellation even after pickup
-    
+
     String orderStatus = status.toLowerCase().trim();
-    
+
     List<String> cancellableStatuses = [
       'pending',
       'confirmed',
@@ -204,9 +209,9 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       'accepted',
       'order_placed',
       'order_confirmed',
-      'picked_up',  // Allow cancellation even after pickup
+      'picked_up', // Allow cancellation even after pickup
     ];
-    
+
     // Block cancellation after processing starts
     List<String> nonCancellableStatuses = [
       'processing',
@@ -217,12 +222,12 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       'cancelled',
       'rejected',
     ];
-    
+
     // If already in non-cancellable state, block cancellation
     if (nonCancellableStatuses.contains(orderStatus)) {
       return false;
     }
-    
+
     return cancellableStatuses.contains(orderStatus);
   }
 
@@ -255,19 +260,19 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   bool _canEditOrder(OrderModel order) {
     // Customer can edit order only until it's confirmed by admin
     // Allow editing ONLY for pending status - once admin confirms, editing is disabled
-    
+
     String orderStatus = order.status.toLowerCase().trim();
-    
+
     // Allow editing ONLY for pending status (before admin confirmation)
     List<String> editableStatuses = [
       'pending',
       'placed',
       'order_placed',
     ];
-    
+
     // Block editing for all other statuses (after admin confirmation)
     List<String> nonEditableStatuses = [
-      'confirmed',       // Admin has confirmed - no more editing
+      'confirmed', // Admin has confirmed - no more editing
       'accepted',
       'order_confirmed',
       'picked_up',
@@ -281,17 +286,17 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       'cancelled',
       'rejected',
     ];
-    
+
     // If status is in non-editable list, block editing
     if (nonEditableStatuses.contains(orderStatus)) {
       return false;
     }
-    
+
     // If status is in editable list, allow editing
     if (editableStatuses.contains(orderStatus)) {
       return true;
     }
-    
+
     // For any unknown status, default to not allowing editing
     return false;
   }
@@ -357,9 +362,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     final Uri emailUri = Uri(
       scheme: 'mailto',
       path: 'support@cloudironing.com',
-      query: 'subject=Order Support Request&body=Hello, I need help with my order.',
+      query:
+          'subject=Order Support Request&body=Hello, I need help with my order.',
     );
-    
+
     try {
       if (await canLaunchUrl(emailUri)) {
         await launchUrl(emailUri);
@@ -403,7 +409,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.add_shopping_cart, color: Colors.blue),
+                leading:
+                    const Icon(Icons.add_shopping_cart, color: Colors.blue),
                 title: const Text('New Order'),
                 subtitle: const Text('Place a new order'),
                 onTap: () {
@@ -469,10 +476,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         ),
       );
     }
-    
-            // Define the order status steps for normal orders (added pending at top)
+
+    // Define the order status steps for normal orders (added pending at top)
     List<Map<String, String>> statusSteps = [
-          {'title': 'Pending', 'status': 'pending'},
+      {'title': 'Pending', 'status': 'pending'},
       {'title': 'Confirmed', 'status': 'confirmed'},
       {'title': 'Picked Up', 'status': 'picked_up'},
       {'title': 'Processing', 'status': 'processing'},
@@ -480,9 +487,9 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       {'title': 'Delivered', 'status': 'delivered'},
     ];
 
-    int currentIndex = statusSteps.indexWhere((step) => 
-        step['status']?.toLowerCase() == order.status.toLowerCase());
-    
+    int currentIndex = statusSteps.indexWhere(
+        (step) => step['status']?.toLowerCase() == order.status.toLowerCase());
+
     if (currentIndex == -1) {
       // Map common status variations
       switch (order.status.toLowerCase()) {
@@ -519,7 +526,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         children: List.generate(statusSteps.length, (index) {
           bool isCompleted = index <= currentIndex;
           bool isCurrent = index == currentIndex;
-          
+
           return Expanded(
             child: Column(
               children: [
@@ -530,23 +537,21 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                       height: 20,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isCompleted 
+                        color: isCompleted
                             ? (isCurrent ? Colors.blue : Colors.teal)
                             : Colors.grey[300],
                       ),
-                      child: isCompleted 
-                          ? Icon(
-                              Icons.check, 
-                              color: Colors.white, 
-                              size: 12
-                            )
+                      child: isCompleted
+                          ? Icon(Icons.check, color: Colors.white, size: 12)
                           : null,
                     ),
                     if (index < statusSteps.length - 1)
                       Expanded(
                         child: Container(
                           height: 2,
-                          color: index < currentIndex ? Colors.teal : Colors.grey[300],
+                          color: index < currentIndex
+                              ? Colors.teal
+                              : Colors.grey[300],
                         ),
                       ),
                   ],
@@ -557,7 +562,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
-                    color: isCompleted 
+                    color: isCompleted
                         ? (isCurrent ? Colors.blue : Colors.teal)
                         : Colors.grey[600],
                   ),
@@ -573,8 +578,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   Widget _buildStatusUpdates(OrderModel order) {
     // Create mock status history if not available
-    List<Map<String, dynamic>> statusHistory = order.statusHistory.isNotEmpty 
-        ? order.statusHistory 
+    List<Map<String, dynamic>> statusHistory = order.statusHistory.isNotEmpty
+        ? order.statusHistory
         : [
             {
               'status': order.status,
@@ -587,7 +592,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.backgroundColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -601,16 +606,19 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Status Updates',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF0F3057),
-            ),
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Color(0xFF0F3057)
+                    : context.onBackgroundColor),
           ),
           const SizedBox(height: 16),
-          ...statusHistory.reversed.map((status) => _buildStatusUpdateItem(status)).toList(),
+          ...statusHistory.reversed
+              .map((status) => _buildStatusUpdateItem(status))
+              .toList(),
         ],
       ),
     );
@@ -618,8 +626,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   Widget _buildStatusUpdateItem(Map<String, dynamic> status) {
     Timestamp timestamp = status['timestamp'] ?? Timestamp.now();
-    String statusText = status['title'] ?? _getStatusTitle(status['status'] ?? '');
-    String formattedDate = DateFormat('MMM d, yyyy h:mm a').format(timestamp.toDate());
+    String statusText =
+        status['title'] ?? _getStatusTitle(status['status'] ?? '');
+    String formattedDate =
+        DateFormat('MMM d, yyyy h:mm a').format(timestamp.toDate());
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -640,10 +650,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
               children: [
                 Text(
                   statusText,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: Colors.black87,
+                    color: context.onBackgroundColor,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -692,7 +702,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.backgroundColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -709,24 +719,27 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Order Details',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF0F3057),
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Color(0xFF0F3057)
+                      : context.onBackgroundColor,
                 ),
               ),
               // if (_canEditOrder(order))
-                TextButton.icon(
-                  onPressed: () => _editOrder(order),
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Edit'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.blue,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  ),
+              TextButton.icon(
+                onPressed: () => _editOrder(order),
+                icon: const Icon(Icons.edit, size: 16),
+                label: const Text('Edit'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.blue,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -752,10 +765,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   children: [
                     Text(
                       order.serviceType,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                        color: Colors.black87,
+                        color: context.onBackgroundColor,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -817,7 +830,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                     itemBuilder: (context, index) {
                       final item = order.items[index];
                       return ListTile(
-                        leading: const Icon(Icons.local_laundry_service_outlined),
+                        leading:
+                            const Icon(Icons.local_laundry_service_outlined),
                         title: Text(item['name'] ?? 'Item'),
                         subtitle: Text('Quantity: ${item['quantity'] ?? 1}'),
                         trailing: Text('₹${item['pricePerPiece'] ?? 0}'),
@@ -829,7 +843,9 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
+              child: const Text(
+                'Close',
+              ),
             ),
           ],
         );
@@ -842,7 +858,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.backgroundColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -856,17 +872,20 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Pickup & Delivery',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF0F3057),
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Color(0xFF0F3057)
+                  : context.onBackgroundColor,
             ),
           ),
           const SizedBox(height: 16),
           // Pickup Details
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Icon(
                 Icons.calendar_today_outlined,
@@ -880,14 +899,15 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   children: [
                     Text(
                       '${DateFormat('EEE, MMM d').format(order.pickupDate.toDate())} • ${order.pickupTimeSlot}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                        color: Colors.black87,
+                        color: context.onBackgroundColor,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Icon(
                           Icons.location_on_outlined,
@@ -915,6 +935,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
           // Delivery Details
           if (order.deliveryDate != null) ...[
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(
                   Icons.calendar_today_outlined,
@@ -928,14 +949,15 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                     children: [
                       Text(
                         '${DateFormat('EEE, MMM d').format(order.deliveryDate!.toDate())} • ${order.deliveryTimeSlot ?? 'TBD'}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: Colors.black87,
+                          color: context.onBackgroundColor,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Icon(
                             Icons.location_on_outlined,
@@ -967,7 +989,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   Widget _buildActionButtons(OrderModel order) {
     bool canEdit = _canEditOrder(order);
-    
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1007,10 +1029,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                 ),
               ),
             ),
-          
+
           // Add spacing if edit button is shown
           if (canEdit) const SizedBox(height: 12),
-          
+
           // Contact Support Button
           SizedBox(
             width: double.infinity,
@@ -1026,16 +1048,16 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.headset_mic_outlined,
-                    color: Colors.black87,
+                    color: context.onBackgroundColor,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'Contact Support',
                     style: TextStyle(
-                      color: Colors.black87,
+                      color: context.onBackgroundColor,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1087,7 +1109,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: context.backgroundColor,
       body: SafeArea(
         child: StreamBuilder<OrderModel?>(
           stream: _getLatestOrderStream(),
@@ -1129,7 +1151,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF0F3057),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 32, vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -1212,7 +1235,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1246,25 +1270,28 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                 children: [
                   // Header with order number and support button
                   Container(
-                    color: Colors.white,
+                    color: context.backgroundColor,
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
                         Expanded(
                           child: Text(
                             'Order #${snapshot.data!.orderNumber}',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF0F3057),
-                            ),
+                            style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).brightness ==
+                                        Brightness.light
+                                    ? Color(0xFF0F3057)
+                                    : context.onBackgroundColor),
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(
-                            Icons.headset_mic_outlined,
-                            color: Color(0xFF0F3057),
-                          ),
+                          icon: Icon(Icons.headset_mic_outlined,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.light
+                                  ? Color(0xFF0F3057)
+                                  : context.onBackgroundColor),
                           onPressed: _contactSupport,
                         ),
                       ],
@@ -1272,7 +1299,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   ),
                   // Horizontal Progress Timeline
                   Container(
-                    color: Colors.white,
+                    color: context.backgroundColor,
                     child: _buildHorizontalProgressTimeline(snapshot.data!),
                   ),
                   const SizedBox(height: 8),
@@ -1296,4 +1323,4 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       ),
     );
   }
-} 
+}

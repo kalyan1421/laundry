@@ -1,3 +1,4 @@
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
@@ -8,11 +9,11 @@ class HelpScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
         title: const Text('Help & Support'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: context.backgroundColor,
+        foregroundColor: context.onBackgroundColor,
         elevation: 0,
         centerTitle: true,
       ),
@@ -21,18 +22,19 @@ class HelpScreen extends StatelessWidget {
           children: [
             // Quick Actions Section
             Container(
-              color: Colors.white,
+              color: context.backgroundColor,
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Quick Actions',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F3057),
-                    ),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? context.primaryColor
+                            : context.onBackgroundColor),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -67,23 +69,25 @@ class HelpScreen extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             // FAQ Section
             Container(
-              color: Colors.white,
+              color: context.backgroundColor,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.all(16.0),
                     child: Text(
                       'Frequently Asked Questions',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F3057),
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? context.primaryColor
+                            : context.onBackgroundColor,
                       ),
                     ),
                   ),
@@ -114,63 +118,63 @@ class HelpScreen extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             // Contact Information
             Container(
-              color: Colors.white,
+              color: context.backgroundColor,
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Contact Information',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F3057),
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? context.primaryColor
+                          : context.onBackgroundColor,
                     ),
                   ),
                   const SizedBox(height: 16),
+                  _buildContactItem(Icons.phone, 'Customer Care',
+                      '+91 6382654316', 'Available 24/7', context),
                   _buildContactItem(
-                    Icons.phone,
-                    'Customer Care',
-                    '+91 6382654316',
-                    'Available 24/7',
-                  ),
+                      Icons.email,
+                      'Email Support',
+                      'cloudironingfactory@gmail.com',
+                      'Response within 24 hours',
+                      context),
                   _buildContactItem(
-                    Icons.email,
-                    'Email Support',
-                    'cloudironingfactory@gmail.com',
-                    'Response within 24 hours',
-                  ),
-                  _buildContactItem(
-                    Icons.location_on,
-                    'Head Office',
-                    'B10, 3rd street, Mogappair West, Chennai',
-                    'Mon-Sat: 9 AM - 6 PM',
-                  ),
+                      Icons.location_on,
+                      'Head Office',
+                      'B10, 3rd street, Mogappair West, Chennai',
+                      'Mon-Sat: 9 AM - 6 PM',
+                      context),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             // Other Options
             Container(
-              color: Colors.white,
+              color: context.backgroundColor,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.all(16.0),
                     child: Text(
                       'More Options',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F3057),
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? context.primaryColor
+                            : context.onBackgroundColor,
                       ),
                     ),
                   ),
@@ -212,7 +216,7 @@ class HelpScreen extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 20),
           ],
         ),
@@ -234,7 +238,9 @@ class HelpScreen extends StatelessWidget {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: const Color(0xFF0F3057).withOpacity(0.1),
+              color: Theme.of(context).brightness == Brightness.light
+                  ? context.primaryColor
+                  : context.onBackgroundColor,
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -290,6 +296,7 @@ class HelpScreen extends StatelessWidget {
     String title,
     String subtitle,
     String description,
+    BuildContext context,
   ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -322,9 +329,11 @@ class HelpScreen extends StatelessWidget {
                 ),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF0F3057),
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? context.primaryColor
+                        : context.onBackgroundColor,
                   ),
                 ),
                 Text(
@@ -350,7 +359,7 @@ class HelpScreen extends StatelessWidget {
     VoidCallback onTap,
   ) {
     return Material(
-      color: Colors.white,
+      color: context.backgroundColor,
       child: InkWell(
         onTap: onTap,
         child: Padding(
@@ -427,8 +436,9 @@ class HelpScreen extends StatelessWidget {
   }
 
   void _rateApp() async {
-    const String playStoreUrl = 'https://play.google.com/store/apps/details?id=com.cloudironingfactory.customer';
-    
+    const String playStoreUrl =
+        'https://play.google.com/store/apps/details?id=com.cloudironingfactory.customer';
+
     try {
       final Uri uri = Uri.parse(playStoreUrl);
       if (await canLaunchUrl(uri)) {
@@ -443,8 +453,10 @@ class HelpScreen extends StatelessWidget {
   }
 
   void _shareApp() {
-    const String playStoreUrl = 'https://play.google.com/store/apps/details?id=com.cloudironingfactory.customer';
-    const String shareMessage = '''🧺 Experience the convenience of cloud-based laundry service! 
+    const String playStoreUrl =
+        'https://play.google.com/store/apps/details?id=com.cloudironingfactory.customer';
+    const String shareMessage =
+        '''🧺 Experience the convenience of cloud-based laundry service! 
 
 📱 Download "Cloud Ironing" app and enjoy:
 ✨ Easy pickup & delivery scheduling

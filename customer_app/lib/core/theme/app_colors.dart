@@ -190,6 +190,24 @@ class AppColors {
   );
 
   // ===============================
+  // ANT DESIGN DARK THEME TOKENS (for dark mode)
+  // ===============================
+  
+  /// Ant Design dark background colors
+  static const Color adDarkBackground = Color(0xFF141414); // base background
+  static const Color adDarkSurface = Color(0xFF1F1F1F); // containers/cards
+  static const Color adDarkSurfaceSecondary = Color(0xFF262626);
+  
+  /// Ant Design dark text colors (using alpha on white)
+  static const Color adTextPrimary = Color(0xD9FFFFFF); // 85% white
+  static const Color adTextSecondary = Color(0xA6FFFFFF); // 65% white
+  static const Color adTextDisabled = Color(0x40FFFFFF); // 25% white
+  
+  /// Ant Design dark border/divider colors
+  static const Color adBorder = Color(0x26FFFFFF); // 15% white
+  static const Color adDivider = Color(0x1FFFFFFF); // 12% white
+  
+  // ===============================
   // UTILITY METHODS
   // ===============================
   

@@ -1,3 +1,4 @@
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:customer_app/data/models/item_model.dart';
 import 'package:customer_app/presentation/screens/profile/add_address_screen.dart';
 
@@ -24,7 +25,7 @@ enum PaymentMethod { cod, upi }
 // Updated TimeSlot enum with new timings
 enum TimeSlot {
   morning, // 7 AM - 11 AM
-  noon,    // 11 AM - 4 PM
+  noon, // 11 AM - 4 PM
   evening; // 4 PM - 8 PM
 
   String get displayName {
@@ -51,17 +52,23 @@ enum TimeSlot {
 
   int get startHour {
     switch (this) {
-      case TimeSlot.morning: return 7;
-      case TimeSlot.noon: return 11;
-      case TimeSlot.evening: return 16;
+      case TimeSlot.morning:
+        return 7;
+      case TimeSlot.noon:
+        return 11;
+      case TimeSlot.evening:
+        return 16;
     }
   }
 
   int get endHour {
     switch (this) {
-      case TimeSlot.morning: return 11;
-      case TimeSlot.noon: return 16;
-      case TimeSlot.evening: return 20;
+      case TimeSlot.morning:
+        return 11;
+      case TimeSlot.noon:
+        return 16;
+      case TimeSlot.evening:
+        return 20;
     }
   }
 }
@@ -97,17 +104,19 @@ class SchedulePickupDeliveryScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<SchedulePickupDeliveryScreen> createState() => _SchedulePickupDeliveryScreenState();
+  State<SchedulePickupDeliveryScreen> createState() =>
+      _SchedulePickupDeliveryScreenState();
 }
 
-class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScreen> {
+class _SchedulePickupDeliveryScreenState
+    extends State<SchedulePickupDeliveryScreen> {
   int selectedTabIndex = 1; // Schedule tab selected by default
 
   // Date and time state variables
   DateOption selectedPickupDateOption = DateOption.today;
   DateTime? selectedPickupDate;
   TimeSlot? selectedPickupTimeSlot;
-  
+
   DateOption selectedDeliveryDateOption = DateOption.tomorrow;
   DateTime? selectedDeliveryDate;
   TimeSlot? selectedDeliveryTimeSlot;
@@ -116,7 +125,8 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
   List<TimeSlot> availableDeliverySlots = TimeSlot.values;
 
   bool sameAddressForDelivery = true;
-  final TextEditingController specialInstructionsController = TextEditingController();
+  final TextEditingController specialInstructionsController =
+      TextEditingController();
   PaymentMethod _selectedPaymentMethod = PaymentMethod.cod;
 
   // Address and order saving state
@@ -127,11 +137,12 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
 
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
-  final _formKey = GlobalKey<FormState>(); // Form key for address form validation
+  final _formKey =
+      GlobalKey<FormState>(); // Form key for address form validation
   final Logger _logger = Logger();
 
   List<DocumentSnapshot> _fetchedUserAddresses = [];
-  
+
   // Removed unused inline address form variables - now using AddAddressScreen
 
   @override
@@ -142,21 +153,22 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
   }
 
   void _initializeDateTimeSlots() {
-  final now = DateTime.now();
-  
+    final now = DateTime.now();
+
     // Initialize pickup date
-  if (now.hour >= 20) {
-    selectedPickupDateOption = DateOption.tomorrow;
+    if (now.hour >= 20) {
+      selectedPickupDateOption = DateOption.tomorrow;
       selectedPickupDate = _getDateFromOption(DateOption.tomorrow);
-  } else {
-    selectedPickupDateOption = DateOption.today;
+    } else {
+      selectedPickupDateOption = DateOption.today;
       selectedPickupDate = _getDateFromOption(DateOption.today);
     }
-  
+
     // Initialize delivery date to 2 days from pickup by default
     selectedDeliveryDateOption = DateOption.custom;
-    selectedDeliveryDate = _getMinimumDeliveryDate().add(const Duration(days: 1));
-    
+    selectedDeliveryDate =
+        _getMinimumDeliveryDate().add(const Duration(days: 1));
+
     // Skip Sunday for both dates
     while (selectedPickupDate!.weekday == DateTime.sunday) {
       selectedPickupDate = selectedPickupDate!.add(const Duration(days: 1));
@@ -164,70 +176,70 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
     while (selectedDeliveryDate!.weekday == DateTime.sunday) {
       selectedDeliveryDate = selectedDeliveryDate!.add(const Duration(days: 1));
     }
-    
-  _updateAvailablePickupSlots();
-  _updateAvailableDeliverySlots();
-}
 
-
+    _updateAvailablePickupSlots();
+    _updateAvailableDeliverySlots();
+  }
 
   // Helper method to check if two dates are the same day
   bool _isSameDay(DateTime date1, DateTime date2) {
-    return date1.year == date2.year && 
-           date1.month == date2.month && 
-           date1.day == date2.day;
+    return date1.year == date2.year &&
+        date1.month == date2.month &&
+        date1.day == date2.day;
   }
 
   DateTime _getDateFromOption(DateOption option) {
     final now = DateTime.now();
     DateTime date;
-    
+
     switch (option) {
       case DateOption.today:
         date = DateTime(now.year, now.month, now.day);
         break;
       case DateOption.tomorrow:
-        date = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+        date =
+            DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
         break;
       case DateOption.custom:
         return DateTime(now.year, now.month, now.day);
     }
-    
+
     // Skip Sunday (weekday 7) for pickup and delivery
     while (date.weekday == DateTime.sunday) {
       date = date.add(const Duration(days: 1));
     }
-    
+
     return date;
   }
 
   DateTime _getDateFromDeliveryOption(DateOption option) {
     final now = DateTime.now();
     DateTime date;
-    
+
     switch (option) {
       case DateOption.today:
         date = DateTime(now.year, now.month, now.day);
         break;
       case DateOption.tomorrow:
-        date = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+        date =
+            DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
         break;
       case DateOption.custom:
         return _getMinimumDeliveryDate();
     }
-    
+
     // Ensure the date meets minimum delivery requirements
     final minDate = _getMinimumDeliveryDate();
     if (date.isBefore(minDate)) {
       // If the requested date is before minimum, use the minimum date
       date = minDate;
     }
-    
+
     // Skip Sunday (weekday 7) for delivery
     while (date.weekday == DateTime.sunday) {
       date = date.add(const Duration(days: 1));
     }
-    
+
     return date;
   }
 
@@ -250,7 +262,8 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
     }
 
     availablePickupSlots = slots;
-    if (!availablePickupSlots.contains(selectedPickupTimeSlot) && availablePickupSlots.isNotEmpty) {
+    if (!availablePickupSlots.contains(selectedPickupTimeSlot) &&
+        availablePickupSlots.isNotEmpty) {
       selectedPickupTimeSlot = availablePickupSlots.first;
     } else if (availablePickupSlots.isEmpty) {
       selectedPickupTimeSlot = null;
@@ -259,14 +272,16 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
   }
 
   void _updateAvailableDeliverySlots() {
-    if (selectedDeliveryDate == null || selectedPickupDate == null || selectedPickupTimeSlot == null) {
+    if (selectedDeliveryDate == null ||
+        selectedPickupDate == null ||
+        selectedPickupTimeSlot == null) {
       availableDeliverySlots = TimeSlot.values.toList();
       setState(() {});
       return;
     }
 
     List<TimeSlot> slots = TimeSlot.values.toList();
-    
+
     // Calculate pickup datetime
     final pickupDateTime = DateTime(
       selectedPickupDate!.year,
@@ -274,10 +289,10 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
       selectedPickupDate!.day,
       selectedPickupTimeSlot!.startHour,
     );
-    
+
     // Minimum delivery datetime (20 hours after pickup)
     final minDeliveryDateTime = pickupDateTime.add(const Duration(hours: 20));
-    
+
     // If delivery is on same day as pickup, filter slots based on 20-hour constraint
     if (_isSameDay(selectedDeliveryDate!, selectedPickupDate!)) {
       // Filter slots that start at or after the minimum delivery time
@@ -288,7 +303,8 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
           selectedDeliveryDate!.day,
           slot.startHour,
         );
-        return slotDateTime.isAfter(minDeliveryDateTime) || slotDateTime.isAtSameMomentAs(minDeliveryDateTime);
+        return slotDateTime.isAfter(minDeliveryDateTime) ||
+            slotDateTime.isAtSameMomentAs(minDeliveryDateTime);
       }).toList();
     }
     // If delivery is on a different day, check if it's at least 20 hours later
@@ -298,9 +314,10 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
         selectedDeliveryDate!.month,
         selectedDeliveryDate!.day,
       );
-      
+
       // If the delivery date is after the minimum delivery date, allow all slots
-      if (deliveryStartOfDay.isAfter(DateTime(minDeliveryDateTime.year, minDeliveryDateTime.month, minDeliveryDateTime.day))) {
+      if (deliveryStartOfDay.isAfter(DateTime(minDeliveryDateTime.year,
+          minDeliveryDateTime.month, minDeliveryDateTime.day))) {
         // All slots are available
       } else {
         // Filter based on minimum delivery time
@@ -311,19 +328,21 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
             selectedDeliveryDate!.day,
             slot.startHour,
           );
-          return slotDateTime.isAfter(minDeliveryDateTime) || slotDateTime.isAtSameMomentAs(minDeliveryDateTime);
+          return slotDateTime.isAfter(minDeliveryDateTime) ||
+              slotDateTime.isAtSameMomentAs(minDeliveryDateTime);
         }).toList();
       }
     }
-    
+
     availableDeliverySlots = slots;
-    
-    if (!availableDeliverySlots.contains(selectedDeliveryTimeSlot) && availableDeliverySlots.isNotEmpty) {
+
+    if (!availableDeliverySlots.contains(selectedDeliveryTimeSlot) &&
+        availableDeliverySlots.isNotEmpty) {
       selectedDeliveryTimeSlot = availableDeliverySlots.first;
     } else if (availableDeliverySlots.isEmpty) {
       selectedDeliveryTimeSlot = null;
     }
-    
+
     setState(() {});
   }
 
@@ -349,15 +368,14 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
         if (_fetchedUserAddresses.isNotEmpty) {
           DocumentSnapshot? primaryAddress;
           try {
-            primaryAddress = _fetchedUserAddresses.firstWhere(
-              (doc) => (doc.data() as Map<String, dynamic>)['isPrimary'] == true
-            );
+            primaryAddress = _fetchedUserAddresses.firstWhere((doc) =>
+                (doc.data() as Map<String, dynamic>)['isPrimary'] == true);
           } catch (e) {
             primaryAddress = _fetchedUserAddresses.first;
           }
 
           _selectedPickupAddress = primaryAddress;
-          
+
           if (sameAddressForDelivery) {
             _selectedDeliveryAddress = primaryAddress;
           }
@@ -366,7 +384,7 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
     } catch (e) {
       print('Error fetching addresses: $e');
     }
-    
+
     setState(() {
       _isLoadingAddress = false;
     });
@@ -418,7 +436,7 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                     },
                   );
                 }
-                
+
                 var addressDoc = _fetchedUserAddresses[index];
                 var addressData = addressDoc.data() as Map<String, dynamic>;
                 return ListTile(
@@ -486,18 +504,21 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.backgroundColor,
+        foregroundColor: context.onBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(
+            Icons.arrow_back,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
           'Schedule Pickup & Delivery',
           style: TextStyle(
-            color: Colors.black,
+            // color: Colors.black,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -521,7 +542,6 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                     const SizedBox(height: 24),
                     _buildItemsDetails(),
                     const SizedBox(height: 24),
-
                   ] else if (selectedTabIndex == 1) ...[
                     // Schedule Tab Content
                     _buildItemsSummary(),
@@ -544,7 +564,8 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                     _buildPaymentSection(),
                     const SizedBox(height: 24),
                   ],
-                  const SizedBox(height: 120), // Increased space for sticky cart
+                  const SizedBox(
+                      height: 120), // Increased space for sticky cart
                 ],
               ),
             ),
@@ -556,102 +577,106 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
   }
 
   Widget _buildStickyCartSummary() {
-    final totalItems = widget.selectedItems.values.fold(0, (sum, quantity) => sum + quantity);
-    
-    return Padding(padding: const EdgeInsets.only(bottom: 50),
-    child: 
-    Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            spreadRadius: 0,
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20), // 20px from bottom
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Cart Summary Row
-              Row(
-                children: [
-                  // Cart Icon with Badge
-                  Stack(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          widget.isAlliedServices ? Icons.home_repair_service : Icons.local_laundry_service,
-                          color: AppColors.primary,
-                          size: 24,
-                        ),
-                      ),
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '$totalItems',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 16),
-                  
-                  // Amount Details
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+    final totalItems =
+        widget.selectedItems.values.fold(0, (sum, quantity) => sum + quantity);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 50),
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.backgroundColor,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              spreadRadius: 0,
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Container(
+            padding:
+                const EdgeInsets.fromLTRB(16, 16, 16, 20), // 20px from bottom
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Cart Summary Row
+                Row(
+                  children: [
+                    // Cart Icon with Badge
+                    Stack(
                       children: [
-                        Text(
-                          '$totalItems item${totalItems > 1 ? 's' : ''} selected',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            widget.isAlliedServices
+                                ? Icons.home_repair_service
+                                : Icons.local_laundry_service,
+                            color: AppColors.primary,
+                            size: 24,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '₹${widget.totalAmount.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green,
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '$totalItems',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  
-                  // Action Button
-                  _buildStickyActionButton(),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 16),
+
+                    // Amount Details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$totalItems item${totalItems > 1 ? 's' : ''} selected',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '₹${widget.totalAmount.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Action Button
+                    _buildStickyActionButton(),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -659,13 +684,13 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
   Widget _buildTabBar() {
     final tabs = ['Items', 'Schedule', 'Payment'];
     return Container(
-      color: Colors.white,
+      color: context.backgroundColor,
       child: Row(
         children: tabs.asMap().entries.map((entry) {
           int index = entry.key;
           String tab = entry.value;
           bool isSelected = index == selectedTabIndex;
-          
+
           return Expanded(
             child: GestureDetector(
               onTap: () {
@@ -673,9 +698,9 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                 if (index > selectedTabIndex) {
                   if (index == 1 && selectedTabIndex == 0) {
                     // Moving from Items to Schedule - no validation needed
-                setState(() {
-                  selectedTabIndex = index;
-                });
+                    setState(() {
+                      selectedTabIndex = index;
+                    });
                   } else if (index == 2 && selectedTabIndex == 1) {
                     // Moving from Schedule to Payment - validate schedule details
                     if (_validateScheduleDetails()) {
@@ -707,7 +732,8 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: isSelected ? Colors.blue : Colors.grey[600],
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight:
+                        isSelected ? FontWeight.w600 : FontWeight.normal,
                     fontSize: 16,
                   ),
                 ),
@@ -720,45 +746,49 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
   }
 
   bool _validateScheduleDetails() {
-    if (_selectedPickupAddress == null || 
+    if (_selectedPickupAddress == null ||
         (!sameAddressForDelivery && _selectedDeliveryAddress == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select pickup and delivery addresses.')),
+        const SnackBar(
+            content: Text('Please select pickup and delivery addresses.')),
       );
       return false;
     }
-    
+
     if (selectedPickupDate == null || selectedPickupTimeSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select pickup date and time.')),
       );
       return false;
     }
-    
+
     if (selectedDeliveryDate == null || selectedDeliveryTimeSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select delivery date and time.')),
       );
       return false;
     }
-    
+
     // Validate 20-hour minimum constraint
     if (!_validateTwentyHourConstraint()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Delivery must be scheduled at least 20 hours after pickup.'),
+          content: Text(
+              'Delivery must be scheduled at least 20 hours after pickup.'),
           backgroundColor: Colors.orange,
         ),
       );
       return false;
     }
-    
+
     return true;
   }
 
   bool _validateTwentyHourConstraint() {
-    if (selectedPickupDate == null || selectedDeliveryDate == null ||
-        selectedPickupTimeSlot == null || selectedDeliveryTimeSlot == null) {
+    if (selectedPickupDate == null ||
+        selectedDeliveryDate == null ||
+        selectedPickupTimeSlot == null ||
+        selectedDeliveryTimeSlot == null) {
       return false;
     }
 
@@ -781,15 +811,16 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
     final minDeliveryDateTime = pickupDateTime.add(const Duration(hours: 20));
 
     // Check if delivery is at least 20 hours after pickup
-    return deliveryDateTime.isAfter(minDeliveryDateTime) || deliveryDateTime.isAtSameMomentAs(minDeliveryDateTime);
+    return deliveryDateTime.isAfter(minDeliveryDateTime) ||
+        deliveryDateTime.isAtSameMomentAs(minDeliveryDateTime);
   }
 
   Widget _buildItemsSummary() {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.backgroundColor,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
@@ -817,15 +848,15 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
             ),
           ),
         ],
-        ),
-      );
-    }
+      ),
+    );
+  }
 
   Widget _buildOrderSummary() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.backgroundColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -836,7 +867,7 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          
+
           // Pickup Details
           _buildSummaryRow(
             icon: Icons.location_on,
@@ -846,21 +877,22 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                 ? '${_formatDate(selectedPickupDate!)} at ${selectedPickupTimeSlot!.displayName}'
                 : 'Not selected',
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Delivery Details
           _buildSummaryRow(
             icon: Icons.location_on_outlined,
             iconColor: Colors.green,
             title: 'Delivery',
-            value: selectedDeliveryDate != null && selectedDeliveryTimeSlot != null
+            value: selectedDeliveryDate != null &&
+                    selectedDeliveryTimeSlot != null
                 ? '${_formatDate(selectedDeliveryDate!)} at ${selectedDeliveryTimeSlot!.displayName}'
                 : 'Not selected',
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Items Count
           _buildSummaryRow(
             icon: Icons.iron,
@@ -868,11 +900,11 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
             title: 'Items',
             value: '$_totalItemCount items',
           ),
-          
+
           const SizedBox(height: 16),
           const Divider(),
           const SizedBox(height: 16),
-          
+
           // Total Amount
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -903,30 +935,31 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
     required String value,
   }) {
     return Row(
-                children: [
-                  Container(
+      children: [
+        Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: iconColor.withOpacity(0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: iconColor, size: 16),
-                  ),
-                  const SizedBox(width: 12),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                  Text(
+              Text(
                 title,
                 style: const TextStyle(fontSize: 14, color: Colors.grey),
               ),
               Text(
                 value,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                  ),
-                ],
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
+            ],
+          ),
         ),
       ],
     );
@@ -950,7 +983,8 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
   Future<void> _processUPIPayment() async {
     // Prevent double submission
     if (_isSavingOrder) {
-      print('🔥 ORDER PLACEMENT: ⚠️ Order already being processed, ignoring duplicate UPI payment request');
+      print(
+          '🔥 ORDER PLACEMENT: ⚠️ Order already being processed, ignoring duplicate UPI payment request');
       return;
     }
 
@@ -959,7 +993,9 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
       context,
       MaterialPageRoute(
         builder: (context) => UpiAppSelectionScreen(
-          amount: widget.totalAmount >= 10 ? widget.totalAmount : 10.0, // Minimum ₹10 for testing
+          amount: widget.totalAmount >= 10
+              ? widget.totalAmount
+              : 10.0, // Minimum ₹10 for testing
           description: 'Laundry service payment - ${_totalItemCount} items',
           orderId: 'ORDER_${DateTime.now().millisecondsSinceEpoch}',
         ),
@@ -971,27 +1007,35 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
       // Payment successful, process the order
       await _processOrder(
         paymentStatus: 'completed',
-        transactionId: result['transactionId'] ?? 'UPI_${DateTime.now().millisecondsSinceEpoch}',
+        transactionId: result['transactionId'] ??
+            'UPI_${DateTime.now().millisecondsSinceEpoch}',
       );
     }
   }
 
-  Future<void> _processOrder({required String paymentStatus, String? transactionId}) async {
+  Future<void> _processOrder(
+      {required String paymentStatus, String? transactionId}) async {
     setState(() => _isSavingOrder = true);
 
     try {
       // Use AuthProvider instead of FirebaseAuth.instance.currentUser
-      final authProvider = Provider.of<auth_provider.AuthProvider>(context, listen: false);
-      
+      final authProvider =
+          Provider.of<auth_provider.AuthProvider>(context, listen: false);
+
       // Add debug logging
       print('🔥 ORDER PLACEMENT: Starting order process');
-      print('🔥 ORDER PLACEMENT: AuthProvider status: ${authProvider.authStatus}');
-      print('🔥 ORDER PLACEMENT: UserModel exists: ${authProvider.userModel != null}');
-      print('🔥 ORDER PLACEMENT: UserModel UID: ${authProvider.userModel?.uid}');
-      print('🔥 ORDER PLACEMENT: Firebase currentUser: ${_auth.currentUser?.uid}');
-      
+      print(
+          '🔥 ORDER PLACEMENT: AuthProvider status: ${authProvider.authStatus}');
+      print(
+          '🔥 ORDER PLACEMENT: UserModel exists: ${authProvider.userModel != null}');
+      print(
+          '🔥 ORDER PLACEMENT: UserModel UID: ${authProvider.userModel?.uid}');
+      print(
+          '🔥 ORDER PLACEMENT: Firebase currentUser: ${_auth.currentUser?.uid}');
+
       // Check if user is authenticated through AuthProvider
-      if (authProvider.authStatus != auth_provider.AuthStatus.authenticated || authProvider.userModel == null) {
+      if (authProvider.authStatus != auth_provider.AuthStatus.authenticated ||
+          authProvider.userModel == null) {
         print('🔥 ORDER PLACEMENT: ❌ User not authenticated via AuthProvider');
         throw Exception('Please log in to place an order');
       }
@@ -999,45 +1043,50 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
       // Get current user from AuthProvider (more reliable than FirebaseAuth.instance.currentUser)
       final currentUser = _auth.currentUser;
       final userModel = authProvider.userModel!;
-      
+
       print('🔥 ORDER PLACEMENT: ✅ User authenticated via AuthProvider');
       print('🔥 ORDER PLACEMENT: UserModel UID: ${userModel.uid}');
-      print('🔥 ORDER PLACEMENT: Firebase currentUser UID: ${currentUser?.uid}');
-      
+      print(
+          '🔥 ORDER PLACEMENT: Firebase currentUser UID: ${currentUser?.uid}');
+
       // Double-check Firebase auth state with retry mechanism
       if (currentUser == null) {
-        print('🔥 ORDER PLACEMENT: ⚠️ Firebase currentUser is null, retrying...');
+        print(
+            '🔥 ORDER PLACEMENT: ⚠️ Firebase currentUser is null, retrying...');
         // Wait a bit and try again (Firebase auth might be synchronizing)
         await Future.delayed(const Duration(milliseconds: 500));
         final retryCurrentUser = _auth.currentUser;
-        
-        print('🔥 ORDER PLACEMENT: Retry currentUser: ${retryCurrentUser?.uid}');
-        
+
+        print(
+            '🔥 ORDER PLACEMENT: Retry currentUser: ${retryCurrentUser?.uid}');
+
         if (retryCurrentUser == null) {
           print('🔥 ORDER PLACEMENT: ⚠️ Still null, refreshing auth state...');
           // If still null, refresh auth state
           await authProvider.refreshUserData();
           final finalCurrentUser = _auth.currentUser;
-          
-          print('🔥 ORDER PLACEMENT: Final currentUser: ${finalCurrentUser?.uid}');
-          
+
+          print(
+              '🔥 ORDER PLACEMENT: Final currentUser: ${finalCurrentUser?.uid}');
+
           if (finalCurrentUser == null) {
             print('🔥 ORDER PLACEMENT: ❌ Firebase auth completely lost');
-            throw Exception('Authentication session expired. Please log in again.');
+            throw Exception(
+                'Authentication session expired. Please log in again.');
           }
         }
       }
 
       // Use the userModel UID as primary source of truth
       final userId = userModel.uid;
-      
+
       print('🔥 ORDER PLACEMENT: ✅ Using userId: $userId');
-      
+
       // Generate unique 6-digit order number
       String orderNumber = await OrderNumberService.generateUniqueOrderNumber();
-      
+
       print('🔥 ORDER PLACEMENT: Generated order number: $orderNumber');
-      
+
       // Prepare order data
       List<Map<String, dynamic>> itemsForOrder = [];
       widget.selectedItems.forEach((itemModel, quantity) {
@@ -1047,7 +1096,8 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
           'itemId': itemModel.id,
           'name': itemModel.name,
           'pricePerPiece': effectivePrice,
-          'originalPrice': itemModel.originalPrice, // Store original price for reference
+          'originalPrice':
+              itemModel.originalPrice, // Store original price for reference
           'offerPrice': itemModel.offerPrice, // Store offer price if exists
           'quantity': quantity,
           'category': itemModel.category,
@@ -1056,9 +1106,10 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
       });
 
       // Prepare address data
-      final pickupAddressData = _selectedPickupAddress!.data() as Map<String, dynamic>;
-      final deliveryAddressData = sameAddressForDelivery 
-          ? pickupAddressData 
+      final pickupAddressData =
+          _selectedPickupAddress!.data() as Map<String, dynamic>;
+      final deliveryAddressData = sameAddressForDelivery
+          ? pickupAddressData
           : (_selectedDeliveryAddress!.data() as Map<String, dynamic>);
 
       Map<String, dynamic> orderData = {
@@ -1078,7 +1129,9 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
           'details': pickupAddressData,
         },
         'deliveryAddress': {
-          'addressId': sameAddressForDelivery ? _selectedPickupAddress!.id : _selectedDeliveryAddress!.id,
+          'addressId': sameAddressForDelivery
+              ? _selectedPickupAddress!.id
+              : _selectedDeliveryAddress!.id,
           'formatted': _formatAddress(deliveryAddressData),
           'details': deliveryAddressData,
         },
@@ -1104,14 +1157,16 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
         orderData['transactionId'] = transactionId;
       }
 
-      print('🔥 ORDER PLACEMENT: ✅ Saving order to Firestore with order number as document ID...');
+      print(
+          '🔥 ORDER PLACEMENT: ✅ Saving order to Firestore with order number as document ID...');
       // Use the 6-digit order number as the document ID
-      DocumentReference orderRef = _firestore.collection('orders').doc(orderNumber);
+      DocumentReference orderRef =
+          _firestore.collection('orders').doc(orderNumber);
       await orderRef.set(orderData);
       String orderId = orderRef.id; // This will be the 6-digit order number
-      
+
       print('🔥 ORDER PLACEMENT: ✅ Order saved successfully with ID: $orderId');
-      
+
       // Send notification to admin using new OrderNotificationService
       try {
         await OrderNotificationService.notifyAdminOfNewOrder(
@@ -1129,7 +1184,7 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
 
       // Set up order status listener for this customer
       OrderNotificationService.setupOrderStatusListener();
-      
+
       setState(() {
         _isSavingOrder = false;
       });
@@ -1154,7 +1209,7 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
     }
   }
 
-    void _showOrderSuccessDialog(bool isUPIPaid, String orderNumber) {
+  void _showOrderSuccessDialog(bool isUPIPaid, String orderNumber) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1168,7 +1223,8 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                 color: Colors.green.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_circle, color: Colors.green, size: 28),
+              child:
+                  const Icon(Icons.check_circle, color: Colors.green, size: 28),
             ),
             const SizedBox(width: 12),
             const Text('Order Placed!'),
@@ -1212,7 +1268,7 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: context.backgroundColor,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -1236,7 +1292,8 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Icons.local_shipping, size: 16, color: Colors.green),
+                      const Icon(Icons.local_shipping,
+                          size: 16, color: Colors.green),
                       const SizedBox(width: 8),
                       Text(
                         'Delivery: ${DateFormat('EEE, MMM d').format(selectedDeliveryDate!)}',
@@ -1252,11 +1309,13 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Icons.currency_rupee, size: 16, color: Colors.orange),
+                      const Icon(Icons.currency_rupee,
+                          size: 16, color: Colors.orange),
                       const SizedBox(width: 8),
                       Text(
                         'Total: ₹${widget.totalAmount.toStringAsFixed(0)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                     ],
                   ),
@@ -1264,11 +1323,13 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(Icons.payment, size: 16, color: Colors.green),
+                        const Icon(Icons.payment,
+                            size: 16, color: Colors.green),
                         const SizedBox(width: 8),
                         const Text(
                           'Payment: Completed',
-                          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.green),
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600, color: Colors.green),
                         ),
                       ],
                     ),
@@ -1290,7 +1351,8 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1E3A8A),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Done', style: TextStyle(color: Colors.white)),
             onPressed: () {
@@ -1312,12 +1374,12 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        
+
         // Pickup Address
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.backgroundColor,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -1331,7 +1393,8 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                       color: Colors.blue.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.location_on, color: Colors.blue, size: 20),
+                    child: const Icon(Icons.location_on,
+                        color: Colors.blue, size: 20),
                   ),
                   const SizedBox(width: 12),
                   const Text(
@@ -1340,20 +1403,26 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: () => _showAddressSelectionDialog(isPickup: true),
-                    child: const Text('Change', style: TextStyle(color: Colors.blue)),
+                    onPressed: () =>
+                        _showAddressSelectionDialog(isPickup: true),
+                    child: const Text('Change',
+                        style: TextStyle(color: Colors.blue)),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              _isLoadingAddress 
-                  ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(
-                    _selectedPickupAddress != null 
-                      ? _formatAddress(_selectedPickupAddress!.data() as Map<String, dynamic>)
+              _isLoadingAddress
+                  ? const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(
+                      _selectedPickupAddress != null
+                          ? _formatAddress(_selectedPickupAddress!.data()
+                              as Map<String, dynamic>)
                           : 'No address selected',
-                    style: TextStyle(
-                      color: _selectedPickupAddress != null ? Colors.grey[700] : Colors.orange, 
+                      style: TextStyle(
+                        color: _selectedPickupAddress != null
+                            ? Colors.grey[700]
+                            : Colors.orange,
                         fontSize: 14,
                         height: 1.4,
                       ),
@@ -1361,32 +1430,32 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
             ],
           ),
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Same address checkbox
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.backgroundColor,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
-                children: [
+            children: [
               Checkbox(
-                    value: sameAddressForDelivery,
-                    onChanged: (value) {
-                      setState(() {
+                value: sameAddressForDelivery,
+                onChanged: (value) {
+                  setState(() {
                     sameAddressForDelivery = value ?? true;
-                        if (sameAddressForDelivery) {
-                          _selectedDeliveryAddress = _selectedPickupAddress;
-                        } else {
-                          _selectedDeliveryAddress = null;
-                        }
-                      });
-                    },
-                    activeColor: Colors.blue,
-                  ),
+                    if (sameAddressForDelivery) {
+                      _selectedDeliveryAddress = _selectedPickupAddress;
+                    } else {
+                      _selectedDeliveryAddress = null;
+                    }
+                  });
+                },
+                activeColor: Colors.blue,
+              ),
               const Text(
                 'Same address for delivery',
                 style: TextStyle(fontSize: 16),
@@ -1394,55 +1463,62 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
             ],
           ),
         ),
-        
+
         // Delivery Address (if different)
         if (!sameAddressForDelivery) ...[
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.backgroundColor,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: Colors.green.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.location_on, color: Colors.green, size: 20),
+                      child: const Icon(Icons.location_on,
+                          color: Colors.green, size: 20),
                     ),
                     const SizedBox(width: 12),
                     const Text(
                       'Delivery',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () => _showAddressSelectionDialog(isPickup: false),
-                      child: const Text('Change', style: TextStyle(color: Colors.blue)),
-                        ),
-                      ],
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () =>
+                          _showAddressSelectionDialog(isPickup: false),
+                      child: const Text('Change',
+                          style: TextStyle(color: Colors.blue)),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _selectedDeliveryAddress != null
-                        ? _formatAddress(_selectedDeliveryAddress!.data() as Map<String, dynamic>)
-                      : 'No delivery address selected',
-                      style: TextStyle(
-                        color: _selectedDeliveryAddress != null ? Colors.grey[700] : Colors.orange, 
-                    fontSize: 14,
-                        height: 1.4,
-                    ),
+                  ],
                 ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  _selectedDeliveryAddress != null
+                      ? _formatAddress(_selectedDeliveryAddress!.data()
+                          as Map<String, dynamic>)
+                      : 'No delivery address selected',
+                  style: TextStyle(
+                    color: _selectedDeliveryAddress != null
+                        ? Colors.grey[700]
+                        : Colors.orange,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
         ],
       ],
     );
@@ -1459,34 +1535,36 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(width: 16),
-         if (selectedPickupDate != null)
+            if (selectedPickupDate != null)
               Text(
                 DateFormat('EEEE, MMM d').format(selectedPickupDate!),
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-              ],
-            ),
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+          ],
+        ),
         const SizedBox(height: 16),
         _buildDateSelector(
           selectedOption: selectedPickupDateOption,
-                    onOptionSelected: (option) {
+          onOptionSelected: (option) {
             setState(() {
               selectedPickupDateOption = option;
               selectedPickupDate = _getDateFromOption(option);
-              
+
               _updateAvailablePickupSlots();
-              
+
               // Recalculate best delivery options based on new pickup date
               selectedDeliveryDateOption = DateOption.today;
-              selectedDeliveryDate = _getDateFromDeliveryOption(selectedDeliveryDateOption);
+              selectedDeliveryDate =
+                  _getDateFromDeliveryOption(selectedDeliveryDateOption);
               _updateAvailableDeliverySlots();
-              
+
               if (availableDeliverySlots.isEmpty) {
                 selectedDeliveryDateOption = DateOption.tomorrow;
-                selectedDeliveryDate = _getDateFromDeliveryOption(selectedDeliveryDateOption);
+                selectedDeliveryDate =
+                    _getDateFromDeliveryOption(selectedDeliveryDateOption);
                 _updateAvailableDeliverySlots();
               }
-              
+
               if (availableDeliverySlots.isNotEmpty) {
                 selectedDeliveryTimeSlot = availableDeliverySlots.first;
               }
@@ -1496,20 +1574,22 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
             setState(() {
               selectedPickupDateOption = DateOption.custom;
               selectedPickupDate = date;
-              
+
               _updateAvailablePickupSlots();
-              
+
               // Recalculate best delivery options based on new pickup date
               selectedDeliveryDateOption = DateOption.today;
-              selectedDeliveryDate = _getDateFromDeliveryOption(selectedDeliveryDateOption);
+              selectedDeliveryDate =
+                  _getDateFromDeliveryOption(selectedDeliveryDateOption);
               _updateAvailableDeliverySlots();
-              
+
               if (availableDeliverySlots.isEmpty) {
                 selectedDeliveryDateOption = DateOption.tomorrow;
-                selectedDeliveryDate = _getDateFromDeliveryOption(selectedDeliveryDateOption);
+                selectedDeliveryDate =
+                    _getDateFromDeliveryOption(selectedDeliveryDateOption);
                 _updateAvailableDeliverySlots();
               }
-              
+
               if (availableDeliverySlots.isNotEmpty) {
                 selectedDeliveryTimeSlot = availableDeliverySlots.first;
               }
@@ -1526,33 +1606,35 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
           availableSlots: availablePickupSlots,
           selectedSlot: selectedPickupTimeSlot,
           onSlotSelected: (slot) {
-                  setState(() {
-                    selectedPickupTimeSlot = slot;
-                    // Update delivery slots based on new pickup time
-                    _updateAvailableDeliverySlots();
-                    
-                    // If current delivery date/time is no longer valid, reset to best option
-                    if (availableDeliverySlots.isEmpty || !availableDeliverySlots.contains(selectedDeliveryTimeSlot)) {
-                      // Try to find a better delivery date
-                      selectedDeliveryDateOption = DateOption.today;
-                      selectedDeliveryDate = _getDateFromDeliveryOption(selectedDeliveryDateOption);
-                      _updateAvailableDeliverySlots();
-                      
-                      if (availableDeliverySlots.isEmpty) {
-                        selectedDeliveryDateOption = DateOption.tomorrow;
-                        selectedDeliveryDate = _getDateFromDeliveryOption(selectedDeliveryDateOption);
-                        _updateAvailableDeliverySlots();
-                      }
-                      
-                      if (availableDeliverySlots.isNotEmpty) {
-                        selectedDeliveryTimeSlot = availableDeliverySlots.first;
-                      }
-                    }
-                  });
-                },
-          ),
+            setState(() {
+              selectedPickupTimeSlot = slot;
+              // Update delivery slots based on new pickup time
+              _updateAvailableDeliverySlots();
+
+              // If current delivery date/time is no longer valid, reset to best option
+              if (availableDeliverySlots.isEmpty ||
+                  !availableDeliverySlots.contains(selectedDeliveryTimeSlot)) {
+                // Try to find a better delivery date
+                selectedDeliveryDateOption = DateOption.today;
+                selectedDeliveryDate =
+                    _getDateFromDeliveryOption(selectedDeliveryDateOption);
+                _updateAvailableDeliverySlots();
+
+                if (availableDeliverySlots.isEmpty) {
+                  selectedDeliveryDateOption = DateOption.tomorrow;
+                  selectedDeliveryDate =
+                      _getDateFromDeliveryOption(selectedDeliveryDateOption);
+                  _updateAvailableDeliverySlots();
+                }
+
+                if (availableDeliverySlots.isNotEmpty) {
+                  selectedDeliveryTimeSlot = availableDeliverySlots.first;
+                }
+              }
+            });
+          },
+        ),
         const SizedBox(height: 16),
-       
       ],
     );
   }
@@ -1628,14 +1710,13 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-       
         const SizedBox(height: 16),
-        
+
         // Custom date selector button
         GestureDetector(
           onTap: () async {
             DateTime initialDate = _getMinimumDeliveryDate();
-            
+
             final DateTime? picked = await showDatePicker(
               context: context,
               initialDate: initialDate,
@@ -1650,19 +1731,19 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
                 return !date.isBefore(_getMinimumDeliveryDate());
               },
             );
-            
+
             if (picked != null) {
-            setState(() {
-              selectedDeliveryDateOption = DateOption.custom;
+              setState(() {
+                selectedDeliveryDateOption = DateOption.custom;
                 selectedDeliveryDate = picked;
-              _updateAvailableDeliverySlots();
-            });
+                _updateAvailableDeliverySlots();
+              });
             }
           },
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.backgroundColor,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey[300]!),
             ),
@@ -1670,7 +1751,7 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  selectedDeliveryDate != null 
+                  selectedDeliveryDate != null
                       ? DateFormat('EEEE, MMM d').format(selectedDeliveryDate!)
                       : 'Select Delivery Date',
                   style: const TextStyle(
@@ -1689,7 +1770,7 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
 
   DateTime _getMinimumDeliveryDate() {
     DateTime minDateTime;
-    
+
     if (selectedPickupDate != null && selectedPickupTimeSlot != null) {
       // Calculate exact 20 hours from pickup time
       final pickupDateTime = DateTime(
@@ -1712,109 +1793,117 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
       // If no pickup selected, use current time + 20 hours as minimum
       minDateTime = DateTime.now().add(const Duration(hours: 20));
     }
-    
+
     // Return the date part of the minimum datetime (same day if possible)
-    DateTime minDate = DateTime(minDateTime.year, minDateTime.month, minDateTime.day);
-    
+    DateTime minDate =
+        DateTime(minDateTime.year, minDateTime.month, minDateTime.day);
+
     // Skip Sunday for minimum delivery date
     while (minDate.weekday == DateTime.sunday) {
       minDate = minDate.add(const Duration(days: 1));
     }
-    
+
     return minDate;
   }
 
 // Replace the _buildDateSelector method with this updated version:
 
-Widget _buildDateSelector({
-  required DateOption selectedOption,
-  required Function(DateOption) onOptionSelected,
-  required Function(DateTime) onCustomDateSelected,
-  bool isDelivery = false,
-}) {
-  final now = DateTime.now();
-  List<DateOption> availableOptions = DateOption.values.toList();
-  
-  if (isDelivery) {
-    // For delivery, only show custom date option
-    availableOptions = [DateOption.custom];
-  } else {
-    // For pickup, remove "Today" option after 8 PM
-    if (now.hour >= 20) {
-      availableOptions.removeWhere((option) => option == DateOption.today);
+  Widget _buildDateSelector({
+    required DateOption selectedOption,
+    required Function(DateOption) onOptionSelected,
+    required Function(DateTime) onCustomDateSelected,
+    bool isDelivery = false,
+  }) {
+    final now = DateTime.now();
+    List<DateOption> availableOptions = DateOption.values.toList();
+
+    if (isDelivery) {
+      // For delivery, only show custom date option
+      availableOptions = [DateOption.custom];
+    } else {
+      // For pickup, remove "Today" option after 8 PM
+      if (now.hour >= 20) {
+        availableOptions.removeWhere((option) => option == DateOption.today);
+      }
     }
-  }
-  
-  return Row(
-    children: availableOptions.asMap().entries.map((entry) {
-      int index = entry.key;
-      DateOption option = entry.value;
-      bool isSelected = option == selectedOption;
-      
-      return Expanded(
-        child: GestureDetector(
-          onTap: () async {
-            if (option == DateOption.custom) {
-              DateTime initialDate = isDelivery ? _getMinimumDeliveryDate() : DateTime.now();
-              DateTime firstDate = isDelivery ? _getMinimumDeliveryDate() : DateTime.now();
-              
-              final DateTime? picked = await showDatePicker(
-                context: context,
-                initialDate: initialDate,
-                firstDate: firstDate,
-                lastDate: DateTime.now().add(const Duration(days: 30)),
-                helpText: isDelivery ? 'Select Delivery Date' : 'Select Pickup Date',
-                fieldLabelText: isDelivery ? 'Must be at least 20 hours after pickup' : 'Select date',
-                selectableDayPredicate: (DateTime date) {
-                  // Disable Sundays
-                  if (date.weekday == DateTime.sunday) return false;
-                  
-                  // For delivery, ensure it meets minimum requirement
-                  if (isDelivery) {
-                    return !date.isBefore(_getMinimumDeliveryDate());
-                  }
-                  
-                  return true;
-                },
-              );
-              if (picked != null) {
-                onCustomDateSelected(picked);
+
+    return Row(
+      children: availableOptions.asMap().entries.map((entry) {
+        int index = entry.key;
+        DateOption option = entry.value;
+        bool isSelected = option == selectedOption;
+
+        return Expanded(
+          child: GestureDetector(
+            onTap: () async {
+              if (option == DateOption.custom) {
+                DateTime initialDate =
+                    isDelivery ? _getMinimumDeliveryDate() : DateTime.now();
+                DateTime firstDate =
+                    isDelivery ? _getMinimumDeliveryDate() : DateTime.now();
+
+                final DateTime? picked = await showDatePicker(
+                  context: context,
+                  initialDate: initialDate,
+                  firstDate: firstDate,
+                  lastDate: DateTime.now().add(const Duration(days: 30)),
+                  helpText: isDelivery
+                      ? 'Select Delivery Date'
+                      : 'Select Pickup Date',
+                  fieldLabelText: isDelivery
+                      ? 'Must be at least 20 hours after pickup'
+                      : 'Select date',
+                  selectableDayPredicate: (DateTime date) {
+                    // Disable Sundays
+                    if (date.weekday == DateTime.sunday) return false;
+
+                    // For delivery, ensure it meets minimum requirement
+                    if (isDelivery) {
+                      return !date.isBefore(_getMinimumDeliveryDate());
+                    }
+
+                    return true;
+                  },
+                );
+                if (picked != null) {
+                  onCustomDateSelected(picked);
+                }
+              } else {
+                onOptionSelected(option);
               }
-            } else {
-              onOptionSelected(option);
-            }
-          },
-          child: Container(
-            margin: EdgeInsets.only(
-              right: index < availableOptions.length - 1 ? 8 : 0,
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-            decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFF1E3A8A) : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isSelected ? const Color(0xFF1E3A8A) : Colors.grey[300]!,
+            },
+            child: Container(
+              margin: EdgeInsets.only(
+                right: index < availableOptions.length - 1 ? 8 : 0,
               ),
-            ),
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  option.displayName,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF1E3A8A) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color:
+                      isSelected ? const Color(0xFF1E3A8A) : Colors.grey[300]!,
+                ),
+              ),
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    option.displayName,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      );
-    }).toList(),
-  );
-}
+        );
+      }).toList(),
+    );
+  }
 
   Widget _buildTimeSlotSelector({
     required List<TimeSlot> availableSlots,
@@ -1829,7 +1918,7 @@ Widget _buildDateSelector({
         itemBuilder: (context, index) {
           final slot = availableSlots[index];
           bool isSelected = slot == selectedSlot;
-          
+
           return GestureDetector(
             onTap: () => onSlotSelected(slot),
             child: AnimatedContainer(
@@ -1844,51 +1933,53 @@ Widget _buildDateSelector({
                 color: isSelected ? const Color(0xFF1E3A8A) : Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isSelected ? const Color(0xFF1E3A8A) : Colors.grey[300]!,
+                  color:
+                      isSelected ? const Color(0xFF1E3A8A) : Colors.grey[300]!,
                 ),
               ),
-              child: isSelected 
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Main category
-                      Flexible(
-                     child: Text(
+              child: isSelected
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Main category
+                        Flexible(
+                          child: Text(
+                            slot.displayName,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Time range
+                        Flexible(
+                          child: Text(
+                            slot.timeRange,
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Center(
+                      child: Text(
                         slot.displayName,
                         style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,  
+                          color: Colors.black,
+                          fontWeight: FontWeight.w600,
                           fontSize: 16,
-                          overflow: TextOverflow.ellipsis,
-                          ),textAlign: TextAlign.center,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(width: 8),
-                      // Time range
-                      Flexible(
-                        child: Text(
-                          slot.timeRange,
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  )
-                : Center(
-                    child: Text(
-                      slot.displayName,
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                      textAlign: TextAlign.center,
                     ),
-                  ),
             ),
           );
         },
@@ -1907,7 +1998,7 @@ Widget _buildDateSelector({
         const SizedBox(height: 16),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.backgroundColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey[300]!),
           ),
@@ -1915,13 +2006,14 @@ Widget _buildDateSelector({
             controller: specialInstructionsController,
             maxLines: 4,
             decoration: const InputDecoration(
-              hintText: 'Any specific requirements for ironing? (e.g., starch, delicate handling)',
+              hintText:
+                  'Any specific requirements for ironing? (e.g., starch, delicate handling)',
               border: InputBorder.none,
               contentPadding: EdgeInsets.all(16),
               hintStyle: TextStyle(color: Colors.grey),
             ),
           ),
-          ),
+        ),
       ],
     );
   }
@@ -1930,16 +2022,16 @@ Widget _buildDateSelector({
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.backgroundColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
             'Order Details',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 16),
           ListView.separated(
             shrinkWrap: true,
@@ -1951,7 +2043,7 @@ Widget _buildDateSelector({
               final quantity = widget.selectedItems[item]!;
               final effectivePrice = item.offerPrice ?? item.pricePerPiece;
               final itemTotal = effectivePrice * quantity;
-              
+
               return Row(
                 children: [
                   Container(
@@ -1978,7 +2070,9 @@ Widget _buildDateSelector({
                         Row(
                           children: [
                             // Original Price (strikethrough) - Show first if there's an offer
-                            if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
+                            if (item.originalPrice != null &&
+                                item.originalPrice! >
+                                    (item.offerPrice ?? item.pricePerPiece))
                               Text(
                                 '₹${item.originalPrice!.toInt()}',
                                 style: const TextStyle(
@@ -1988,15 +2082,21 @@ Widget _buildDateSelector({
                                 ),
                               ),
                             // Add spacing between original and offer price
-                            if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
+                            if (item.originalPrice != null &&
+                                item.originalPrice! >
+                                    (item.offerPrice ?? item.pricePerPiece))
                               const SizedBox(width: 8),
                             // Current/Offer Price
                             Text(
                               '₹${(item.offerPrice ?? item.pricePerPiece).toInt()} per piece',
                               style: TextStyle(
-                                color: item.offerPrice != null ? Colors.green[700] : Colors.grey[600],
+                                color: item.offerPrice != null
+                                    ? Colors.green[700]
+                                    : Colors.grey[600],
                                 fontSize: 14,
-                                fontWeight: item.offerPrice != null ? FontWeight.w600 : FontWeight.normal,
+                                fontWeight: item.offerPrice != null
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                               ),
                             ),
                           ],
@@ -2042,16 +2142,16 @@ Widget _buildDateSelector({
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        
+
         // Cash on Delivery Option
         Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.backgroundColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _selectedPaymentMethod == PaymentMethod.cod 
-                  ? Colors.blue 
+              color: _selectedPaymentMethod == PaymentMethod.cod
+                  ? Colors.blue
                   : Colors.grey[300]!,
               width: 2,
             ),
@@ -2069,12 +2169,13 @@ Widget _buildDateSelector({
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
-          child: Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Cash on Delivery',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 16),
                       ),
                       Text(
                         'Pay when your order is delivered',
@@ -2085,18 +2186,18 @@ Widget _buildDateSelector({
                 ),
               ],
             ),
-                value: PaymentMethod.cod,
-                groupValue: _selectedPaymentMethod,
-                onChanged: (PaymentMethod? value) {
-                  setState(() {
-                    _selectedPaymentMethod = value!;
-                  });
-                },
-                activeColor: Colors.blue,
+            value: PaymentMethod.cod,
+            groupValue: _selectedPaymentMethod,
+            onChanged: (PaymentMethod? value) {
+              setState(() {
+                _selectedPaymentMethod = value!;
+              });
+            },
+            activeColor: Colors.blue,
             contentPadding: const EdgeInsets.all(16),
           ),
         ),
-        
+
         // UPI Payment Option
         // Container(
         //   margin: const EdgeInsets.only(bottom: 12),
@@ -2104,8 +2205,8 @@ Widget _buildDateSelector({
         //     color: Colors.white,
         //     borderRadius: BorderRadius.circular(12),
         //     border: Border.all(
-        //       color: _selectedPaymentMethod == PaymentMethod.upi 
-        //           ? Colors.blue 
+        //       color: _selectedPaymentMethod == PaymentMethod.upi
+        //           ? Colors.blue
         //           : Colors.grey[300]!,
         //       width: 2,
         //     ),
@@ -2150,9 +2251,9 @@ Widget _buildDateSelector({
         //     contentPadding: const EdgeInsets.all(16),
         //   ),
         // ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Payment Info
         Container(
           padding: const EdgeInsets.all(12),
@@ -2180,7 +2281,8 @@ Widget _buildDateSelector({
   }
 
   // New method to build inline action buttons
-  Widget _buildInlineActionButton(String text, VoidCallback? onPressed, {bool isLoading = false}) {
+  Widget _buildInlineActionButton(String text, VoidCallback? onPressed,
+      {bool isLoading = false}) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -2222,12 +2324,11 @@ Widget _buildDateSelector({
     );
   }
 
-
-
   Future<void> _saveOrder() async {
     // Prevent double submission
     if (_isSavingOrder) {
-      print('🔥 ORDER PLACEMENT: ⚠️ Order already being processed, ignoring duplicate request');
+      print(
+          '🔥 ORDER PLACEMENT: ⚠️ Order already being processed, ignoring duplicate request');
       return;
     }
 

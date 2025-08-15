@@ -1,3 +1,4 @@
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -16,12 +17,12 @@ class OrderHistoryScreen extends StatefulWidget {
 class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final User? currentUser = FirebaseAuth.instance.currentUser;
-  
+
   List<OrderModel> allOrders = [];
   List<OrderModel> filteredOrders = [];
   bool isLoading = true;
   String selectedStatus = 'All';
-  
+
   final List<String> statusFilters = [
     'All',
     'pending',
@@ -100,7 +101,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       filteredOrders = List.from(allOrders);
     } else {
       filteredOrders = allOrders
-          .where((order) => order.status.toLowerCase() == selectedStatus.toLowerCase())
+          .where((order) =>
+              order.status.toLowerCase() == selectedStatus.toLowerCase())
           .toList();
     }
   }
@@ -108,10 +110,11 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
         title: const Text('Order History'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
+        backgroundColor: context.backgroundColor,
+        foregroundColor: context.onBackgroundColor,
         elevation: 0,
       ),
       body: Column(
@@ -119,7 +122,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           // Status Filter Bar
           Container(
             height: 50,
-            color: Colors.blue[50],
+            color: context.backgroundColor,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -127,7 +130,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
               itemBuilder: (context, index) {
                 String status = statusFilters[index];
                 bool isSelected = selectedStatus == status;
-                
+
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: FilterChip(
@@ -155,7 +158,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
               },
             ),
           ),
-          
+
           // Orders List
           Expanded(
             child: isLoading
@@ -190,7 +193,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            selectedStatus == 'All' ? 'No orders yet' : 'No ${selectedStatus.toLowerCase()} orders',
+            selectedStatus == 'All'
+                ? 'No orders yet'
+                : 'No ${selectedStatus.toLowerCase()} orders',
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -199,7 +204,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            selectedStatus == 'All' 
+            selectedStatus == 'All'
                 ? 'Your order history will appear here'
                 : 'No orders found with ${selectedStatus.toLowerCase()} status',
             style: TextStyle(
@@ -225,9 +230,11 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   }
 
   Widget _buildOrderCard(OrderModel order) {
-    String formattedDate = DateFormat('EEE, MMM d, yyyy').format(order.orderTimestamp.toDate());
-    String formattedTime = DateFormat('hh:mm a').format(order.orderTimestamp.toDate());
-    
+    String formattedDate =
+        DateFormat('EEE, MMM d, yyyy').format(order.orderTimestamp.toDate());
+    String formattedTime =
+        DateFormat('hh:mm a').format(order.orderTimestamp.toDate());
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
@@ -273,7 +280,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: _getStatusColor(order.status).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -289,9 +297,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Order Items Preview
               if (order.items.isNotEmpty) ...[
                 Text(
@@ -305,17 +313,21 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 Wrap(
                   spacing: 6,
                   runSpacing: 4,
-                  children: order.items.take(3).map((item) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${item['name']} (${item['quantity']})',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  )).toList(),
+                  children: order.items
+                      .take(3)
+                      .map((item) => Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: context.backgroundColor,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${item['name']} (${item['quantity']})',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ))
+                      .toList(),
                 ),
                 if (order.items.length > 3)
                   Padding(
@@ -330,13 +342,14 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     ),
                   ),
               ],
-              
+
               const SizedBox(height: 12),
-              
+
               // Order Footer
               Row(
                 children: [
-                  Icon(Icons.currency_rupee, size: 16, color: Colors.green[600]),
+                  Icon(Icons.currency_rupee,
+                      size: 16, color: Colors.green[600]),
                   Text(
                     '${order.totalAmount.toStringAsFixed(0)}',
                     style: TextStyle(
@@ -351,7 +364,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => OrderDetailsScreen(order: order),
+                          builder: (context) =>
+                              OrderDetailsScreen(order: order),
                         ),
                       );
                     },
@@ -386,4 +400,4 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         return Colors.grey;
     }
   }
-} 
+}
