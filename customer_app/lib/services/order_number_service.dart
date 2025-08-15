@@ -5,49 +5,44 @@ class OrderNumberService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final Random _random = Random();
 
-  /// Generates a unique 6-digit order number
+  /// Generates a unique sequential order number starting from 100000
   /// Format: XXXXXX (where X is a digit from 0-9)
-  /// Range: 100000 to 999999
+  /// Range: 100000 and increments by 1 for each order
   static Future<String> generateUniqueOrderNumber() async {
-    const int maxRetries = 50;
-    int retryCount = 0;
-
-    while (retryCount < maxRetries) {
-      // Generate 6-digit number between 100000 and 999999
-      int orderNumber = 100000 + _random.nextInt(900000);
-      String orderNumberStr = orderNumber.toString();
-
-      // Check if this order number already exists
-      bool exists = await _orderNumberExists(orderNumberStr);
-      
-      if (!exists) {
-        return orderNumberStr;
-      }
-
-      retryCount++;
-    }
-
-    // If we couldn't generate a unique number after max retries,
-    // use timestamp-based approach as fallback
-    return _generateTimestampBasedOrderNumber();
-  }
-
-  /// Check if an order number already exists in Firestore
-  static Future<bool> _orderNumberExists(String orderNumber) async {
     try {
-      final QuerySnapshot snapshot = await _firestore
-          .collection('orders')
-          .where('orderNumber', isEqualTo: orderNumber)
-          .limit(1)
-          .get();
-
-      return snapshot.docs.isNotEmpty;
+      // Use Firestore transaction to get and increment the counter atomically
+      final DocumentReference counterRef = _firestore.collection('counters').doc('order_counter');
+      
+      return await _firestore.runTransaction<String>((transaction) async {
+        final DocumentSnapshot counterSnapshot = await transaction.get(counterRef);
+        
+        int nextOrderNumber;
+        if (counterSnapshot.exists) {
+          // Get current counter value and increment
+          final data = counterSnapshot.data() as Map<String, dynamic>?;
+          final currentValue = data?['value'] as int? ?? 99999;
+          nextOrderNumber = currentValue + 1;
+        } else {
+          // First time - start from 100000
+          nextOrderNumber = 100000;
+        }
+        
+        // Update the counter
+        transaction.set(counterRef, {
+          'value': nextOrderNumber,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+        
+        return nextOrderNumber.toString();
+      });
     } catch (e) {
-      print('Error checking order number existence: $e');
-      // In case of error, assume it exists to be safe
-      return true;
+      print('Error generating sequential order number: $e');
+      // Fallback to timestamp-based approach
+      return _generateTimestampBasedOrderNumber();
     }
   }
+
+
 
   /// Generate a timestamp-based 6-digit order number as fallback
   static String _generateTimestampBasedOrderNumber() {

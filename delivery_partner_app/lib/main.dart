@@ -113,7 +113,7 @@ class AuthWrapper extends StatelessWidget {
           print('🚚 AuthWrapper: Authenticated delivery partner: ${authProvider.deliveryPartner!.name}');
           
           // Ensure FCM token is saved for delivery partner
-          _ensureDeliveryFCMToken(authProvider);
+          _ensureDeliveryFCMToken(authProvider, context);
           
           return DashboardScreen(deliveryPartner: authProvider.deliveryPartner!);
         }
@@ -125,12 +125,12 @@ class AuthWrapper extends StatelessWidget {
     );
   }
 
-  void _ensureDeliveryFCMToken(AuthProvider authProvider) {
+  void _ensureDeliveryFCMToken(AuthProvider authProvider, BuildContext context) {
     // Run FCM token check after the widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         final fcmService = FcmService();
-        await fcmService.ensureDeliveryPartnerTokenSaved();
+        await fcmService.ensureDeliveryPartnerTokenSaved(context);
         print('🚚 Delivery FCM token check completed');
       } catch (e) {
         print('🚚 Error ensuring delivery FCM token: $e');

@@ -8,13 +8,13 @@ import 'package:admin_panel/screens/admin/order_details_screen.dart';
 import 'package:admin_panel/screens/admin/add_admin_screen.dart';
 import 'package:admin_panel/screens/admin/manage_admins_screen.dart';
 import 'package:admin_panel/screens/admin/manage_delivery_partners_screen.dart';
-import 'package:admin_panel/screens/delivery/delivery_home.dart';
-import 'package:admin_panel/screens/delivery/task_detail_screen.dart';
+// Removed delivery screens - using phone+code auth now
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// Removed unused import
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/item_provider.dart';
+import 'providers/allied_service_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/banner_provider.dart';
 import 'providers/offer_provider.dart';
@@ -22,7 +22,7 @@ import 'providers/dashboard_provider.dart';
 import 'providers/user_provider.dart';
 import 'services/fcm_service.dart';
 import 'services/database_service.dart';
-import 'models/order_model.dart';
+// Removed unused import
 import 'services/order_notification_service.dart';
 import 'services/customer_registration_service.dart';
 
@@ -53,6 +53,7 @@ class AdminPanelApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ItemProvider()),
+        ChangeNotifierProvider(create: (_) => AlliedServiceProvider()),
         ChangeNotifierProvider(create: (_) => OrderProvider()),
         ChangeNotifierProvider(create: (_) => BannerProvider()),
         ChangeNotifierProvider(create: (_) => OfferProvider()),
@@ -87,7 +88,6 @@ class AdminPanelApp extends StatelessWidget {
         routes: {
           '/login': (context) => const LoginScreen(),
           '/admin-home': (context) => const AdminHome(),
-          '/delivery-home': (context) => const DeliveryHome(),
           '/add-admin': (context) => const AddAdminScreen(),
           '/manage-admins': (context) => const ManageAdminsScreen(),
           '/manage-delivery-partners': (context) => const ManageDeliveryPartnersScreen(),
@@ -111,14 +111,8 @@ class AdminPanelApp extends StatelessWidget {
                 builder: (context) => OrderDetailsScreen(orderId: orderId),
               );
             }
-          } else if (settings.name == '/task_details') {
-            final orderId = settings.arguments as String?;
-            if (orderId != null) {
-              return MaterialPageRoute(
-                builder: (context) => TaskDetailWrapper(orderId: orderId),
-              );
-            }
           }
+          // Removed task details route - delivery partners use separate app
           return null;
         },
       ),
@@ -145,9 +139,25 @@ class AuthWrapper extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(),
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                  ),
                   SizedBox(height: 16),
-                  Text('Loading...'),
+                  Text(
+                    'Loading Admin Panel...',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Please wait while we initialize your session',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -169,7 +179,8 @@ class AuthWrapper extends StatelessWidget {
             case UserRole.supervisor:
               return const AdminHome();
             case UserRole.delivery:
-              return const DeliveryHome();
+              // Delivery partners now use separate app with phone+code auth
+              return const AdminHome(); // Fallback to admin home
           }
         }
 
@@ -194,40 +205,4 @@ class AuthWrapper extends StatelessWidget {
   }
 }
 
-// Wrapper widget to fetch order by ID and pass to TaskDetailScreen
-class TaskDetailWrapper extends StatelessWidget {
-  final String orderId;
-
-  const TaskDetailWrapper({super.key, required this.orderId});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('orders')
-              .doc(orderId)
-              .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Error')),
-            body: const Center(child: Text('Order not found')),
-          );
-        }
-
-        final order = OrderModel.fromFirestore(
-          snapshot.data! as DocumentSnapshot<Map<String, dynamic>>,
-        );
-
-        return TaskDetailScreen(order: order);
-      },
-    );
-  }
-}
+// Removed TaskDetailWrapper - delivery partners use separate app

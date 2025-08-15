@@ -1,16 +1,36 @@
-# cloud_ironing_factory
+# Company Website - Cloud Ironing Factory
 
-A new Flutter project.
+## 📋 Complete Documentation
 
-## Getting Started
+**For comprehensive documentation, please refer to:**
+👉 **[../COMPLETE_PROJECT_DOCUMENTATION.md](../COMPLETE_PROJECT_DOCUMENTATION.md)**
 
-This project is a starting point for a Flutter application.
+## 🚀 Quick Start
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+# Install dependencies
+flutter pub get
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+# Run web version
+flutter run -d chrome
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+# Build for web
+flutter build web
+```
+
+## 📱 App Status
+
+- ✅ **Ready for Production**
+- ✅ **Web Support**
+- ✅ **Responsive Design**
+- ✅ **Company Portfolio**
+
+## 🔥 Key Features
+
+- ✅ Service information
+- ✅ Contact details
+- ✅ Company portfolio
+- ✅ Customer testimonials
+- ✅ Responsive design
+
+For detailed setup and configuration, see the main documentation.

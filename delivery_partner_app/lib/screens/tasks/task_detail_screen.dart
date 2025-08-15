@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/order_model.dart';
 import '../../providers/order_provider.dart';
+import '../../services/item_service.dart';
+import 'edit_order_screen.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final OrderModel order;
@@ -20,9 +22,47 @@ class TaskDetailScreen extends StatefulWidget {
 
 class _TaskDetailScreenState extends State<TaskDetailScreen> {
   bool _isLoading = false;
+  final ItemService _itemService = ItemService();
+  Map<String, Map<String, dynamic>> _itemDetails = {};
 
   bool get _isPickupTask {
-    return widget.order.status == 'confirmed' || widget.order.status == 'ready_for_pickup';
+    // Match the same statuses used in OrderProvider.getPickupTasksStream
+    final pickupStatuses = ['assigned', 'confirmed', 'ready_for_pickup'];
+    return pickupStatuses.contains(widget.order.status);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadItemDetails();
+  }
+
+  Future<void> _loadItemDetails() async {
+    // Extract item IDs from order
+    final itemIds = widget.order.items
+        .map((item) => item['itemId']?.toString())
+        .where((id) => id != null && id.isNotEmpty)
+        .cast<String>()
+        .toList();
+
+    if (itemIds.isNotEmpty) {
+      print('📋 TaskDetail: Loading details for ${itemIds.length} items');
+      final itemDetails = await _itemService.getItemsByIds(itemIds);
+      
+      if (mounted) {
+        setState(() {
+          _itemDetails = itemDetails;
+        });
+        print('📋 TaskDetail: Loaded ${itemDetails.length} item details');
+      }
+    }
+  }
+
+  bool _hasCoordinatesForAddress(dynamic address) {
+    if (address is DeliveryAddress && address.latitude != null && address.longitude != null) {
+      return true;
+    }
+    return widget.order.hasCoordinates;
   }
 
   @override
@@ -165,9 +205,29 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          
+          // Customer Name
           _buildInfoRow('Name', widget.order.customerName),
+          
+          // Customer Phone
           _buildInfoRow('Phone', widget.order.customerPhone),
+          
+          // Customer Email (if available)
+          if (widget.order.customer?.email?.isNotEmpty == true)
+            _buildInfoRow('Email', widget.order.customer!.email!),
+          
+          // Customer ID for reference
+          if (widget.order.customerId?.isNotEmpty == true)
+            _buildInfoRow('Customer ID', widget.order.customerId!),
+          
+          // Profile completion status
+          if (widget.order.customer?.isProfileComplete != null)
+            _buildInfoRow('Profile Status', 
+                widget.order.customer!.isProfileComplete! ? 'Complete' : 'Incomplete'),
+          
           const SizedBox(height: 16),
+          
+          // Action buttons
           Row(
             children: [
               Expanded(
@@ -254,10 +314,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () => _openMaps(address),
-                  icon: const Icon(Icons.map, size: 16),
-                  label: const Text('Open in Maps'),
+                  icon: Icon(
+                    _hasCoordinatesForAddress(address) ? Icons.navigation : Icons.map,
+                    size: 16,
+                  ),
+                  label: Text(
+                    _hasCoordinatesForAddress(address) 
+                        ? 'Navigate (GPS)' 
+                        : 'Open in Maps',
+                  ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: _hasCoordinatesForAddress(address) 
+                        ? Colors.green 
+                        : Colors.blue,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
@@ -265,6 +334,28 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
             ],
           ),
+          // Show coordinates info if available
+          if (_hasCoordinatesForAddress(address)) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.gps_fixed,
+                  size: 14,
+                  color: Colors.green[600],
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'GPS coordinates available for precise navigation',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.green[600],
+                    fontFamily: 'SFProDisplay',
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -297,6 +388,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           ),
           const SizedBox(height: 16),
           ...widget.order.items.map((item) {
+            // Get item details from ItemService if available
+            final itemId = item['itemId']?.toString();
+            final itemDetails = itemId != null ? _itemDetails[itemId] : null;
+            
+            // Use resolved name from ItemService or fallback to stored name
+            final itemName = itemDetails?['name'] ?? 
+                           item['itemName'] ?? 
+                           item['name'] ?? 
+                           'Unknown Item';
+            
+            final category = itemDetails?['category'] ?? item['category'];
+            final unit = itemDetails?['unit'] ?? item['unit'] ?? 'piece';
+            final originalPrice = itemDetails?['price'];
+            
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
@@ -307,29 +412,67 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          item['itemName'] ?? 'Unknown Item',
+                          itemName,
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontFamily: 'SFProDisplay',
                           ),
                         ),
-                        Text(
-                          'Qty: ${item['quantity'] ?? 0}',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                            fontFamily: 'SFProDisplay',
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'Qty: ${item['quantity'] ?? 0} $unit',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                                fontFamily: 'SFProDisplay',
+                              ),
+                            ),
+                            if (category != null) ...[
+                              Text(
+                                ' • $category',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                  fontFamily: 'SFProDisplay',
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
+                        if (originalPrice != null && originalPrice != (item['price'] ?? 0)) ...[
+                          Text(
+                            'Original: ₹${originalPrice.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 10,
+                              decoration: TextDecoration.lineThrough,
+                              fontFamily: 'SFProDisplay',
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                  Text(
-                    '₹${(item['price'] ?? 0).toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'SFProDisplay',
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '₹${(item['price'] ?? 0).toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'SFProDisplay',
+                        ),
+                      ),
+                      Text(
+                        'per $unit',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 10,
+                          fontFamily: 'SFProDisplay',
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -411,6 +554,26 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return Column(
       children: [
         if (_isPickupTask) ...[
+          // Edit order button (for pickup tasks only)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _isLoading ? null : _editOrder,
+              icon: const Icon(Icons.edit),
+              label: const Text('Edit Order'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.blue,
+                side: const BorderSide(color: Colors.blue),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
           // Pickup completion button
           SizedBox(
             width: double.infinity,
@@ -554,27 +717,82 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _openMaps(dynamic address) async {
-    String addressString = '';
-    if (address is DeliveryAddress) {
-      addressString = '${address.addressLine1}, ${address.addressLine2}, ${address.city}, ${address.state} ${address.pincode}';
+    Uri uri;
+    
+    // Check if we have coordinates available
+    if (address is DeliveryAddress && address.latitude != null && address.longitude != null) {
+      // Use coordinates for precise navigation
+      print('🗺️ Opening Google Maps with coordinates: ${address.latitude}, ${address.longitude}');
+      uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${address.latitude},${address.longitude}');
+    } else if (widget.order.hasCoordinates) {
+      // Use order-level coordinates if available
+      print('🗺️ Opening Google Maps with order coordinates: ${widget.order.latitude}, ${widget.order.longitude}');
+      uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${widget.order.latitude},${widget.order.longitude}');
     } else {
-      addressString = address.toString();
+      // Fall back to address search
+      String addressString = '';
+      if (address is DeliveryAddress) {
+        addressString = '${address.addressLine1}, ${address.addressLine2}, ${address.city}, ${address.state} ${address.pincode}';
+      } else {
+        addressString = address.toString();
+      }
+      
+      print('🗺️ Opening Google Maps with address search: $addressString');
+      final encodedAddress = Uri.encodeComponent(addressString);
+      uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encodedAddress');
     }
     
-    final encodedAddress = Uri.encodeComponent(addressString);
-    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encodedAddress');
-    
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        print('🗺️ ✅ Successfully opened Google Maps');
+      } else {
+        throw Exception('Cannot launch URL: $uri');
+      }
+    } catch (e) {
+      print('🗺️ ❌ Error opening Google Maps: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not open maps'),
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('Could not open Google Maps: ${e.toString()}'),
+                ),
+              ],
+            ),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         );
       }
+    }
+  }
+
+  Future<void> _editOrder() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditOrderScreen(order: widget.order),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // Order was modified, show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Refresh the current screen by popping and letting the parent refresh
+      Navigator.pop(context);
     }
   }
 

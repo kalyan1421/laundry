@@ -72,3 +72,9 @@ node_modules/
 *.apk
 *.aab
 admin-panel-v*.*
+
+# IDE settings (personal configurations)
+.vscode/
+.idea/
+*.swp
+*.swo

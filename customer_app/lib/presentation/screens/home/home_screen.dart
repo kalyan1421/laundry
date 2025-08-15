@@ -15,6 +15,9 @@ import 'package:customer_app/data/models/order_model.dart' as customer_order_mod
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:url_launcher/url_launcher.dart';
+import 'package:customer_app/core/utils/auth_validator.dart';
+import 'package:customer_app/core/theme/theme_extensions.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,10 +26,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
   final Logger _logger = Logger();
   Map<String, int> itemQuantities = {};
   final ScrollController _scrollController = ScrollController();
+  
+  // Contact numbers for place order
+  static const String phoneNumber = '+916382654316'; // Replace with actual phone number
+  static const String whatsappNumber = '+916382654316'; // Replace with actual WhatsApp number
 
   @override
   void initState() {
@@ -36,16 +43,35 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _fetchInitialData() {
+  void _fetchInitialData() async {
     _logger.d('Fetching initial data for HomeScreen');
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.userModel != null) {
-      Provider.of<HomeProvider>(context, listen: false)
-          .fetchLastActiveOrder(authProvider.userModel!.uid);
+    
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Validate authentication state before fetching data
+      if (authProvider.userModel == null && authProvider.authStatus == AuthStatus.authenticated) {
+        _logger.w('UserModel is null but auth status is authenticated - validating auth state');
+        await handleAuthError();
+        return;
+      }
+      
+      if (authProvider.userModel != null) {
+        Provider.of<HomeProvider>(context, listen: false)
+            .fetchLastActiveOrder(authProvider.userModel!.uid);
+      }
+      
+      Provider.of<BannerProvider>(context, listen: false).fetchBanners();
+      Provider.of<SpecialOfferProvider>(context, listen: false).fetchSpecialOffers();
+      Provider.of<ItemProvider>(context, listen: false).loadAllItemData();
+      
+    } catch (e) {
+      _logger.e('Error fetching initial data: $e');
+      // Handle auth-related errors
+      if (e.toString().contains('permission') || e.toString().contains('unauthenticated')) {
+        await handleAuthError();
+      }
     }
-    Provider.of<BannerProvider>(context, listen: false).fetchBanners();
-    Provider.of<SpecialOfferProvider>(context, listen: false).fetchSpecialOffers();
-    Provider.of<ItemProvider>(context, listen: false).loadAllItemData();
   }
 
   void _incrementQuantity(String itemId) {
@@ -86,6 +112,237 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Show place order options bottom sheet
+  void _showPlaceOrderOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                height: 4,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: context.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              
+              // Title
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Text(
+                  'Place Your Order',
+                  style: context.heading2,
+                ),
+              ),
+              
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'Choose your preferred way to place an order',
+                  style: context.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              
+              const SizedBox(height: 20),
+              
+              // Phone Call Option
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _makePhoneCall();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.blue.shade200),
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.blue.shade50,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.phone,
+                            color: Colors.blue.shade700,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Call Us',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Speak directly with our team',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.blue.shade400,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              
+              // WhatsApp Option
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openWhatsApp();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.green.shade200),
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.green.shade50,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade100,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.chat,
+                            color: Colors.green.shade700,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'WhatsApp',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Chat with us on WhatsApp',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.green.shade400,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 30),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Make phone call
+  Future<void> _makePhoneCall() async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        _showErrorSnackBar('Could not launch phone dialer');
+      }
+    } catch (e) {
+      _logger.e('Error making phone call: $e');
+      _showErrorSnackBar('Error opening phone dialer');
+    }
+  }
+
+  // Open WhatsApp
+  Future<void> _openWhatsApp() async {
+    final String message = Uri.encodeComponent('Hello! I would like to place an order for laundry service.');
+    final Uri whatsappUri = Uri.parse('https://wa.me/$whatsappNumber?text=$message');
+    
+    try {
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+      } else {
+        _showErrorSnackBar('WhatsApp is not installed');
+      }
+    } catch (e) {
+      _logger.e('Error opening WhatsApp: $e');
+      _showErrorSnackBar('Error opening WhatsApp');
+    }
+  }
+
+  // Show error snackbar
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   void _navigateToSchedulePickup() {
     final itemProvider = Provider.of<ItemProvider>(context, listen: false);
 
@@ -123,7 +380,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: context.backgroundColor,
     //   appBar: _buildAppBar(),
       body: _buildBody(),
       bottomSheet: totalItems > 0 ? _buildBottomSheet() : null,
@@ -160,6 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // _buildSearchBar(),
             _buildBanners(),
             _buildQuickActions(),
+            _buildCallChatToPlaceOrder(),
             // _buildRevenueTracking(),
             // _buildSpecialOffers(),
             _buildItemsSection(),
@@ -373,6 +631,75 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
+              // Expanded(
+              //   child: GestureDetector(
+              //     onTap: _showPlaceOrderOptions,
+              //     child: Container(
+              //       padding: const EdgeInsets.all(18),
+              //       decoration: BoxDecoration(
+              //         gradient: LinearGradient(
+              //           begin: Alignment.topLeft,
+              //           end: Alignment.bottomRight,
+              //           colors: [
+              //             Colors.orange.shade50,
+              //             Colors.white,
+              //           ],
+              //         ),
+              //         borderRadius: BorderRadius.circular(15),
+              //         border: Border.all(color: Colors.orange.shade200, width: 1),
+              //         boxShadow: [
+              //           BoxShadow(
+              //             color: Colors.orange.withOpacity(0.1),
+              //             spreadRadius: 1,
+              //             blurRadius: 3,
+              //             offset: const Offset(0, 2),
+              //           ),
+              //         ],
+              //       ),
+              //       child: Column(
+              //         children: [
+                        
+              //           const SizedBox(height: 5),
+              //           const Text(
+              //             'Place Order',
+              //             style: TextStyle(
+              //               letterSpacing: 0.5,
+              //               fontWeight: FontWeight.bold,
+              //               fontSize: 20,
+              //               color: Colors.black87,
+              //             ),
+              //           ),
+              //           const SizedBox(height: 6),
+              //           Text(
+              //             'Call or WhatsApp us',
+              //             style: TextStyle(
+              //               color: Colors.grey[700],
+              //               fontSize: 15,
+              //               fontWeight: FontWeight.w500,
+              //             ),
+              //             textAlign: TextAlign.center,
+              //           ),
+              //           const SizedBox(height: 4),
+              //           Container(
+              //             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              //             decoration: BoxDecoration(
+              //               color: Colors.orange.shade100,
+              //               borderRadius: BorderRadius.circular(12),
+              //             ),
+              //             child: Text(
+              //               'Tap to contact',
+              //               style: TextStyle(
+              //                 color: Colors.orange[600],
+              //                 fontSize: 14,
+              //                 fontWeight: FontWeight.w600,
+              //               ),
+              //             ),
+              //           ),
+              //         ],
+              //       ),
+              //     ),
+              //   ),
+              // ),
               const SizedBox(width: 12),
               Expanded(
                 child: GestureDetector(
@@ -441,6 +768,97 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCallChatToPlaceOrder() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: GestureDetector(
+        onTap: _showPlaceOrderOptions,
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.orange.shade50,
+                Colors.white,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.orange.shade200, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.orange.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 3,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.phone,
+                  color: Colors.orange.shade700,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Call / Chat To Place Order',
+                      style: TextStyle(
+                        letterSpacing: 0.5,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    
+                    // Text(
+                    //   'Call or WhatsApp us to place your order',
+                    //   style: TextStyle(
+                    //     color: Colors.grey,
+                    //     fontSize: 14,
+                    //     fontWeight: FontWeight.w500,
+                    //   ),
+                    // ),
+                  ],
+                ),
+              ),
+              // Container(
+              //   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              //   decoration: BoxDecoration(
+              //     color: Colors.orange.shade100,
+              //     borderRadius: BorderRadius.circular(12),
+              //   ),
+              //   child: Text(
+              //     'Tap to contact',
+              //     style: TextStyle(
+              //       color: Colors.orange[700],
+              //       fontSize: 12,
+              //       fontWeight: FontWeight.w600,
+              //     ),
+              //   ),
+              // ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -161,7 +161,8 @@ class OrderModel {
       
       // Safe conversion for all fields
       String userId = data['customerId']?.toString() ?? data['userId']?.toString() ?? '';
-      String orderNumber = data['orderNumber']?.toString() ?? doc.id;
+      // Since we're using order number as document ID, use doc.id as order number
+      String orderNumber = doc.id;
       double totalAmount = 0.0;
       
       // Handle totalAmount conversion safely

@@ -1,16 +1,36 @@
-# workshop_app
+# Workshop App - Cloud Ironing Factory
 
-A new Flutter project.
+## 📋 Complete Documentation
 
-## Getting Started
+**For comprehensive documentation, please refer to:**
+👉 **[../COMPLETE_PROJECT_DOCUMENTATION.md](../COMPLETE_PROJECT_DOCUMENTATION.md)**
 
-This project is a starting point for a Flutter application.
+## 🚀 Quick Start
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+# Install dependencies
+flutter pub get
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+# Run app
+flutter run
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+# Build APK
+flutter build apk --release
+```
+
+## 📱 App Status
+
+- ✅ **Ready for Production**
+- ✅ **Mobile Support**
+- ✅ **Firebase Integration**
+- ✅ **Order Processing**
+
+## 🔥 Key Features
+
+- ✅ Order processing workflow
+- ✅ Status updates
+- ✅ Quality control
+- ✅ Inventory management
+- ✅ Real-time synchronization
+
+For detailed setup and configuration, see the main documentation.

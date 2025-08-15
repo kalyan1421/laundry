@@ -8,6 +8,8 @@ class DeliveryPartnerModel {
   final String email;
   final String phoneNumber;
   final String licenseNumber;
+  final String? aadharNumber;
+  final String? loginCode;
   final String role;
   final bool isActive;
   final bool isAvailable;
@@ -37,6 +39,8 @@ class DeliveryPartnerModel {
     required this.email,
     required this.phoneNumber,
     required this.licenseNumber,
+    this.aadharNumber,
+    this.loginCode,
     this.role = 'delivery',
     this.isActive = true,
     this.isAvailable = true,
@@ -68,6 +72,8 @@ class DeliveryPartnerModel {
       email: map['email'] ?? '',
       phoneNumber: map['phoneNumber'] ?? '',
       licenseNumber: map['licenseNumber'] ?? '',
+      aadharNumber: map['aadharNumber'],
+      loginCode: map['loginCode'],
       role: map['role'] ?? 'delivery',
       isActive: map['isActive'] ?? true,
       isAvailable: map['isAvailable'] ?? true,
@@ -100,6 +106,8 @@ class DeliveryPartnerModel {
       'email': email,
       'phoneNumber': phoneNumber,
       'licenseNumber': licenseNumber,
+      'aadharNumber': aadharNumber,
+      'loginCode': loginCode,
       'role': role,
       'isActive': isActive,
       'isAvailable': isAvailable,

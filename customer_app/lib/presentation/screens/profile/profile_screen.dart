@@ -3,7 +3,9 @@ import 'package:customer_app/core/routes/app_routes.dart';
 import 'package:customer_app/core/utils/address_formatter.dart';
 import 'package:customer_app/data/models/user_model.dart';
 import 'package:customer_app/presentation/providers/auth_provider.dart';
+import 'package:customer_app/presentation/widgets/theme_selector_widget.dart';
 import 'package:customer_app/services/qr_code_service.dart';
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -217,7 +219,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[100], // Light background color from design
+      backgroundColor: context.backgroundColor, // Theme-aware background
       // AppBar is handled by MainWrapper, but we might want to add an edit action.
       // For demonstration, let's imagine adding it here if it were a standalone screen.
       // In MainWrapper, the AppBar actions are global. If a specific edit icon is needed
@@ -232,6 +234,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SizedBox(height: 10),
             _buildStatsBar(context, user),
             _buildQRCodeSection(context, user),
+            // Theme Selector Section
+            const ThemeSelectorWidget(),
             // _buildDefaultAddressSection(context, user.primaryAddress),
             _buildMenuSection(
               context,
@@ -306,12 +310,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Privacy & Terms: TBD')));
                   },
                 ),
-                _buildMenuItem(
-                  context,
-                  Icons.settings_outlined,
-                  'App Settings',
-                  () => Navigator.pushNamed(context, AppRoutes.appSettings),
-                ),
+                // _buildMenuItem(
+                //   context,
+                //   Icons.settings_outlined,
+                //   'App Settings',
+                //   () => Navigator.pushNamed(context, AppRoutes.appSettings),
+                // ),
               ],
             ),
             _buildSignOutButton(context, authProvider),

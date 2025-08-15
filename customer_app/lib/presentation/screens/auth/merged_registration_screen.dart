@@ -1,12 +1,8 @@
 import 'dart:io';
 
 import 'package:customer_app/core/routes/app_routes.dart';
-import 'package:customer_app/core/theme/app_colors.dart';
-import 'package:customer_app/core/theme/app_text_theme.dart';
 import 'package:customer_app/core/utils/validators.dart';
-import 'package:customer_app/presentation/widgets/common/custom_button.dart';
 import 'package:customer_app/presentation/widgets/common/custom_text_field.dart';
-import 'package:customer_app/presentation/widgets/common/loading_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
@@ -53,6 +49,10 @@ class _MergedRegistrationScreenState extends State<MergedRegistrationScreen> {
   void initState() {
     super.initState();
     _pincodeController.addListener(_onPincodeChanged);
+    // Automatically get location when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _getCurrentLocationAndFillAddress();
+    });
   }
   
   @override
@@ -100,7 +100,8 @@ class _MergedRegistrationScreenState extends State<MergedRegistrationScreen> {
     }
   }
   
-  Future<void> _getCurrentLocation() async {
+  // Automatically get location and fill address details
+  Future<void> _getCurrentLocationAndFillAddress() async {
     setState(() {
       _isLoadingLocation = true;
       _locationError = null;
@@ -132,22 +133,84 @@ class _MergedRegistrationScreenState extends State<MergedRegistrationScreen> {
       _logger.i('GPS Position obtained:');
       _logger.i('Latitude: ${position.latitude}');
       _logger.i('Longitude: ${position.longitude}');
+      
+      // Perform reverse geocoding to get address details
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude, 
+        position.longitude
+      );
+      
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        _logger.i('Address details obtained:');
+        _logger.i('Locality: ${place.locality}');
+        _logger.i('SubLocality: ${place.subLocality}');
+        _logger.i('AdministrativeArea: ${place.administrativeArea}');
+        _logger.i('PostalCode: ${place.postalCode}');
+        _logger.i('Country: ${place.country}');
         
-      setState(() {
-        _currentPosition = position;
-        _isLoadingLocation = false;
-        _currentAddress = 'Location coordinates saved. Please fill your address details.';
-      });
+        if (mounted) {
+          setState(() {
+            _currentPosition = position;
+            _isLoadingLocation = false;
+            
+            // Auto-fill address fields
+            if (place.locality != null && place.locality!.isNotEmpty) {
+              _cityController.text = place.locality!;
+            }
+            if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) {
+              _stateController.text = place.administrativeArea!;
+            }
+            if (place.postalCode != null && place.postalCode!.isNotEmpty) {
+              _pincodeController.text = place.postalCode!;
+            }
+            
+            // Create a readable address string
+            List<String> addressParts = [];
+            if (place.subLocality != null && place.subLocality!.isNotEmpty) {
+              addressParts.add(place.subLocality!);
+            }
+            if (place.locality != null && place.locality!.isNotEmpty) {
+              addressParts.add(place.locality!);
+            }
+            if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) {
+              addressParts.add(place.administrativeArea!);
+            }
+            
+            _currentAddress = addressParts.join(', ');
+          });
+        }
+        
+        _showSnackBar('Location and address details detected automatically!');
+      } else {
+        if (mounted) {
+          setState(() {
+            _currentPosition = position;
+            _isLoadingLocation = false;
+            _currentAddress = 'Location coordinates saved. Please fill your address details.';
+          });
+        }
+      }
     } catch (e) {
-      setState(() {
-        _locationError = e.toString();
-        _isLoadingLocation = false;
-      });
+      if (mounted) {
+        setState(() {
+          _locationError = e.toString();
+          _isLoadingLocation = false;
+        });
+      }
       _logger.e('Error getting location: $e');
+      _showSnackBar('Could not get location automatically. You can fill address manually.', isError: true);
     }
   }
 
+  // Manual location getter (for button press)
+  Future<void> _getCurrentLocation() async {
+    await _getCurrentLocationAndFillAddress();
+  }
+
   void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

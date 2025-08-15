@@ -1,10 +1,13 @@
 // Enhanced OrderProvider with better debugging
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/order_model.dart';
+import '../services/customer_service.dart';
 
 class OrderProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final CustomerService _customerService = CustomerService();
   
   List<OrderModel> _pendingPickups = [];
   List<OrderModel> _pendingDeliveries = [];
@@ -56,104 +59,112 @@ class OrderProvider extends ChangeNotifier {
       print('🚚 ❌ OrderProvider: Manual refresh failed - $e');
     }
   }
+
+  // SIMPLIFIED: Get orders using ONLY assignedDeliveryPerson field (your actual field)
+  Stream<List<OrderModel>> _getAllOrdersForDeliveryPartner(String deliveryPartnerId) {
+    print('🚚 📋 🆕 NEW VERSION: Setting up order stream for delivery partner: $deliveryPartnerId');
+    print('🚚 📋 🆕 USING ONLY assignedDeliveryPerson field');
+    
+    return _firestore
+        .collection('orders')
+        .where('assignedDeliveryPerson', isEqualTo: deliveryPartnerId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      print('🚚 📋 🆕 Direct query with assignedDeliveryPerson returned ${snapshot.docs.length} orders');
+      
+      final orders = snapshot.docs.map((doc) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          print('🚚 ✅ 🆕 Order ${doc.id} found:');
+          print('🚚      - assignedDeliveryPerson: ${data['assignedDeliveryPerson']}');
+          print('🚚      - status: ${data['status']}');
+          
+          return OrderModel.fromFirestore(doc);
+        } catch (e) {
+          print('🚚 ❌ Error parsing order ${doc.id}: $e');
+          return null;
+        }
+      }).where((order) => order != null).cast<OrderModel>().toList();
+      
+      print('🚚 📋 🆕 Successfully parsed ${orders.length} orders');
+      return orders;
+    }).handleError((error) {
+      print('🚚 ❌ 🆕 Stream error for delivery partner $deliveryPartnerId: $error');
+      return <OrderModel>[];
+    });
+  }
   
   // Enhanced pickup tasks with comprehensive debugging
   Stream<List<OrderModel>> getPickupTasksStream(String deliveryPartnerId) {
     print('🚚 📦 OrderProvider: Getting pickup tasks for delivery partner: $deliveryPartnerId');
     
-    return _firestore
-        .collection('orders')
-        .where('status', whereIn: ['assigned', 'confirmed', 'ready_for_pickup'])
-        .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      print('🚚 📦 OrderProvider: Pickup tasks query returned ${snapshot.docs.length} orders');
-      print('🚚 🔍 Debug Query Details:');
-      print('🚚    - Collection: orders');
-      print('🚚    - Status filter: [assigned, confirmed, ready_for_pickup]');
-      print('🚚    - assignedDeliveryPartner: $deliveryPartnerId');
-      print('🚚    - Order by: createdAt desc');
-      
-      if (snapshot.docs.isEmpty) {
-        print('🚚 ⚠️ No pickup tasks found for delivery partner: $deliveryPartnerId');
-        print('🚚 ⚠️ Troubleshooting suggestions:');
-        print('🚚    1. Check if orders exist with assignedDeliveryPartner = $deliveryPartnerId');
-        print('🚚    2. Verify order status is one of: assigned, confirmed, ready_for_pickup');
-        print('🚚    3. Check Firestore security rules allow this query');
-        print('🚚    4. Verify delivery partner ID is correct');
-        
-        // Perform diagnostic query to check for any orders with this delivery partner
-        _performDiagnosticQuery(deliveryPartnerId);
-      } else {
-        print('🚚 ✅ Found ${snapshot.docs.length} pickup tasks:');
-        for (var doc in snapshot.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          print('🚚 📦 Order ${doc.id}:');
-          print('🚚      - status: ${data['status']}');
-          print('🚚      - assignedDeliveryPartner: ${data['assignedDeliveryPartner']}');
-          print('🚚      - orderNumber: ${data['orderNumber']}');
-          print('🚚      - customerName: ${data['customer']?['name'] ?? data['customerName']}');
-          print('🚚      - createdAt: ${data['createdAt']}');
-        }
-      }
-      
-      return snapshot.docs.map((doc) {
-        return OrderModel.fromFirestore(doc);
+    return _getAllOrdersForDeliveryPartner(deliveryPartnerId)
+        .asyncMap((orders) async {
+      // Filter for pickup tasks
+      final pickupStatuses = ['assigned', 'confirmed', 'ready_for_pickup'];
+      final filteredOrders = orders.where((order) {
+        return pickupStatuses.contains(order.status);
       }).toList();
+      
+      print('🚚 📦 After filtering for pickup statuses: ${filteredOrders.length} orders');
+      
+      // Enrich with customer data
+      final enrichedOrders = await _enrichOrdersWithCustomerData(filteredOrders);
+      return enrichedOrders;
     }).handleError((error) {
       print('🚚 ❌ Error in pickup tasks stream: $error');
-      print('🚚 💡 Possible causes:');
-      print('🚚    - Firestore security rules blocking query');
-      print('🚚    - Network connectivity issues');
-      print('🚚    - Invalid delivery partner ID');
-      print('🚚    - Missing composite index for this query');
-      
       _error = 'Failed to load pickup tasks: $error';
       notifyListeners();
       return <OrderModel>[];
     });
   }
   
-  // Diagnostic query to check for orders with this delivery partner
+  // PUBLIC diagnostic method to help with troubleshooting
+  Future<void> performDiagnosticQuery(String deliveryPartnerId) async {
+    await _performDiagnosticQuery(deliveryPartnerId);
+  }
+
+  // Diagnostic query to check for orders with this delivery partner - FIXED to check assignedDeliveryPerson first
   Future<void> _performDiagnosticQuery(String deliveryPartnerId) async {
     try {
       print('🚚 🔍 Running diagnostic query for delivery partner: $deliveryPartnerId');
       
-      // Check for ANY orders with this delivery partner (regardless of status)
-      final allOrdersQuery = await _firestore
+      // Check for orders with assignedDeliveryPerson field (this is how your orders are stored)
+      final deliveryPersonQuery = await _firestore
           .collection('orders')
-          .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
+          .where('assignedDeliveryPerson', isEqualTo: deliveryPartnerId)
           .limit(10)
           .get();
       
-      print('🚚 🔍 Diagnostic: Found ${allOrdersQuery.docs.length} total orders for this delivery partner');
+      print('🚚 🔍 Diagnostic: Found ${deliveryPersonQuery.docs.length} orders with assignedDeliveryPerson');
       
-      if (allOrdersQuery.docs.isNotEmpty) {
+      if (deliveryPersonQuery.docs.isNotEmpty) {
         print('🚚 🔍 Order statuses found:');
         final statusCounts = <String, int>{};
-        for (var doc in allOrdersQuery.docs) {
+        for (var doc in deliveryPersonQuery.docs) {
           final status = doc.data()['status'] as String? ?? 'unknown';
           statusCounts[status] = (statusCounts[status] ?? 0) + 1;
+          print('🚚 📦 Order ${doc.id}: status=${status}');
         }
         statusCounts.forEach((status, count) {
           print('🚚     - $status: $count orders');
         });
       } else {
-        print('🚚 ⚠️ No orders found with assignedDeliveryPartner = $deliveryPartnerId');
-        print('🚚 💡 Check if orders are being assigned with the correct field name');
+        print('🚚 ⚠️ No orders found with assignedDeliveryPerson = $deliveryPartnerId');
       }
       
-      // Also check for orders with the old field name (assignedDeliveryPerson)
-      final oldFieldQuery = await _firestore
+      // Also check for orders with the new field name (assignedDeliveryPartner) - just in case
+      final newFieldQuery = await _firestore
           .collection('orders')
-          .where('assignedDeliveryPerson', isEqualTo: deliveryPartnerId)
+          .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
           .limit(5)
           .get();
       
-      if (oldFieldQuery.docs.isNotEmpty) {
-        print('🚚 ⚠️ Found ${oldFieldQuery.docs.length} orders using OLD field name "assignedDeliveryPerson"');
-        print('🚚 💡 Update admin code to use "assignedDeliveryPartner" instead');
+      if (newFieldQuery.docs.isNotEmpty) {
+        print('🚚 ✅ Found ${newFieldQuery.docs.length} orders using NEW field name "assignedDeliveryPartner"');
+      } else {
+        print('🚚 💡 No orders found with assignedDeliveryPartner field - orders are stored with assignedDeliveryPerson');
       }
       
     } catch (e) {
@@ -165,18 +176,19 @@ class OrderProvider extends ChangeNotifier {
   Stream<List<OrderModel>> getDeliveryTasksStream(String deliveryPartnerId) {
     print('🚚 🚛 OrderProvider: Getting delivery tasks for: $deliveryPartnerId');
     
-    return _firestore
-        .collection('orders')
-        .where('status', whereIn: ['picked_up', 'ready_for_delivery'])
-        .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      print('🚚 🚛 Delivery tasks query returned ${snapshot.docs.length} orders');
-      
-      return snapshot.docs.map((doc) {
-        return OrderModel.fromFirestore(doc);
+    return _getAllOrdersForDeliveryPartner(deliveryPartnerId)
+        .asyncMap((orders) async {
+      // Filter for delivery tasks
+      final deliveryStatuses = ['picked_up', 'ready_for_delivery'];
+      final filteredOrders = orders.where((order) {
+        return deliveryStatuses.contains(order.status);
       }).toList();
+      
+      print('🚚 🚛 After filtering for delivery statuses: ${filteredOrders.length} orders');
+      
+      // Enrich with customer data
+      final enrichedOrders = await _enrichOrdersWithCustomerData(filteredOrders);
+      return enrichedOrders;
     }).handleError((error) {
       print('🚚 ❌ Error in delivery tasks stream: $error');
       _error = 'Failed to load delivery tasks: $error';
@@ -185,24 +197,20 @@ class OrderProvider extends ChangeNotifier {
     });
   }
   
-  // Get all assigned orders for delivery partner with debugging
+  // Get all assigned orders for delivery partner with debugging - FIXED to check both field names
   Stream<List<OrderModel>> getAllAssignedOrdersStream(String deliveryPartnerId) {
     print('🚚 📋 OrderProvider: Getting ALL assigned orders for: $deliveryPartnerId');
     
-    return _firestore
-        .collection('orders')
-        .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
-        .orderBy('createdAt', descending: true)
-        .limit(50)
-        .snapshots()
-        .map((snapshot) {
-      print('🚚 📋 All assigned orders query returned ${snapshot.docs.length} orders');
+    // Use the same method that checks both field names
+    return _getAllOrdersForDeliveryPartner(deliveryPartnerId)
+        .map((orders) {
+      print('🚚 📋 All assigned orders returned ${orders.length} orders');
       
-      if (snapshot.docs.isNotEmpty) {
+      if (orders.isNotEmpty) {
         print('🚚 📋 Order breakdown:');
         final statusBreakdown = <String, int>{};
-        for (var doc in snapshot.docs) {
-          final status = doc.data()['status'] as String? ?? 'unknown';
+        for (var order in orders) {
+          final status = order.status ?? 'unknown';
           statusBreakdown[status] = (statusBreakdown[status] ?? 0) + 1;
         }
         statusBreakdown.forEach((status, count) {
@@ -210,9 +218,7 @@ class OrderProvider extends ChangeNotifier {
         });
       }
       
-      return snapshot.docs.map((doc) {
-        return OrderModel.fromFirestore(doc);
-      }).toList();
+      return orders;
     }).handleError((error) {
       print('🚚 ❌ Error in assigned orders stream: $error');
       return <OrderModel>[];
@@ -228,19 +234,16 @@ class OrderProvider extends ChangeNotifier {
     print('🚚 📅 Getting today\'s tasks for: $deliveryPartnerId');
     print('🚚 📅 Date range: ${startOfDay} to ${endOfDay}');
     
-    return _firestore
-        .collection('orders')
-        .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
-        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-        .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
-        .orderBy('createdAt', descending: false)
-        .snapshots()
-        .map((snapshot) {
-      print('🚚 📅 Today\'s tasks query returned ${snapshot.docs.length} orders');
-      
-      return snapshot.docs.map((doc) {
-        return OrderModel.fromFirestore(doc);
+    return _getAllOrdersForDeliveryPartner(deliveryPartnerId)
+        .map((orders) {
+      // Filter for today's orders
+      final todayOrders = orders.where((order) {
+        final orderDate = (order.createdAt ?? order.orderTimestamp).toDate();
+        return orderDate.isAfter(startOfDay) && orderDate.isBefore(endOfDay);
       }).toList();
+      
+      print('🚚 📅 Today\'s tasks filtered: ${todayOrders.length} orders');
+      return todayOrders;
     }).handleError((error) {
       print('🚚 ❌ Error in today tasks stream: $error');
       return <OrderModel>[];
@@ -255,13 +258,15 @@ class OrderProvider extends ChangeNotifier {
     try {
       print('🚚 📝 Updating order $orderId status to: $newStatus');
       
+      print('🚚 🔐 Using custom authentication (no Firebase Auth needed)');
+      
       _isLoading = true;
       _error = null;
       notifyListeners();
       
       Map<String, dynamic> updateData = {
         'status': newStatus,
-        'updatedAt': Timestamp.now(),
+        'updatedAt': FieldValue.serverTimestamp(),
       };
       
       // Add status history entry
@@ -312,6 +317,8 @@ class OrderProvider extends ChangeNotifier {
     }
   }
   
+
+
   // Mark pickup as complete
   Future<bool> markPickupComplete(String orderId, {String? notes}) async {
     return updateOrderStatus(orderId, 'picked_up', notes: notes);
@@ -373,7 +380,7 @@ class OrderProvider extends ChangeNotifier {
     }
   }
   
-  // Get delivery partner statistics
+  // Get delivery partner statistics - FIXED to check both field names
   Future<Map<String, dynamic>> getDeliveryPartnerStats(String deliveryPartnerId) async {
     try {
       print('🚚 📊 Getting stats for delivery partner: $deliveryPartnerId');
@@ -383,43 +390,65 @@ class OrderProvider extends ChangeNotifier {
       final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
       final startOfMonth = DateTime(today.year, today.month, 1);
       
-      // Today's completed tasks
-      final todayCompleted = await _firestore
+      // Get all orders for this delivery partner first (using both field names)
+      final allOrdersQuery = await _firestore
           .collection('orders')
-          .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
-          .where('status', isEqualTo: 'delivered')
-          .where('deliveredAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .orderBy('createdAt', descending: true)
           .get();
       
-      // Week's completed tasks
-      final weekCompleted = await _firestore
-          .collection('orders')
-          .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
-          .where('status', isEqualTo: 'delivered')
-          .where('deliveredAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
-          .get();
+      // Filter for orders assigned to this delivery partner (check both field names)
+      final assignedOrders = allOrdersQuery.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final newField = data['assignedDeliveryPartner'] as String?;
+        final oldField = data['assignedDeliveryPerson'] as String?;
+        return newField == deliveryPartnerId || oldField == deliveryPartnerId;
+      }).toList();
       
-      // Month's completed tasks
-      final monthCompleted = await _firestore
-          .collection('orders')
-          .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
-          .where('status', isEqualTo: 'delivered')
-          .where('deliveredAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-          .get();
+      print('🚚 📊 Found ${assignedOrders.length} total assigned orders');
       
-      // Today's pending tasks
-      final todayPending = await _firestore
-          .collection('orders')
-          .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
-          .where('status', whereIn: ['confirmed', 'ready_for_pickup', 'picked_up', 'ready_for_delivery'])
-          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-          .get();
+      // Count statistics from filtered results
+      int todayCompleted = 0;
+      int weekCompleted = 0;
+      int monthCompleted = 0;
+      int todayPending = 0;
+      
+      for (var doc in assignedOrders) {
+        final data = doc.data() as Map<String, dynamic>;
+        final status = data['status'] as String?;
+        final createdAt = data['createdAt'] as Timestamp?;
+        final deliveredAt = data['deliveredAt'] as Timestamp?;
+        
+        if (status == 'delivered' && deliveredAt != null) {
+          final deliveredDate = deliveredAt.toDate();
+          
+          // Today's completed
+          if (deliveredDate.isAfter(startOfDay)) {
+            todayCompleted++;
+          }
+          
+          // Week's completed
+          if (deliveredDate.isAfter(startOfWeek)) {
+            weekCompleted++;
+          }
+          
+          // Month's completed
+          if (deliveredDate.isAfter(startOfMonth)) {
+            monthCompleted++;
+          }
+        }
+        
+        // Today's pending tasks
+        if (['confirmed', 'ready_for_pickup', 'picked_up', 'ready_for_delivery'].contains(status) &&
+            createdAt != null && createdAt.toDate().isAfter(startOfDay)) {
+          todayPending++;
+        }
+      }
       
       final stats = {
-        'todayCompleted': todayCompleted.docs.length,
-        'weekCompleted': weekCompleted.docs.length,
-        'monthCompleted': monthCompleted.docs.length,
-        'todayPending': todayPending.docs.length,
+        'todayCompleted': todayCompleted,
+        'weekCompleted': weekCompleted,
+        'monthCompleted': monthCompleted,
+        'todayPending': todayPending,
       };
       
       print('🚚 📊 Stats for $deliveryPartnerId: $stats');
@@ -436,11 +465,145 @@ class OrderProvider extends ChangeNotifier {
     }
   }
   
+  // Force refresh all streams and data with immediate order check
+  Future<void> forceRefreshAllData(String deliveryPartnerId) async {
+    print('🚚 🔄 Force refreshing all data for: $deliveryPartnerId');
+    
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    
+    try {
+      // First do a direct query to check for orders immediately
+      await _checkOrdersImmediately(deliveryPartnerId);
+      
+      // Run diagnostic
+      await _performDiagnosticQuery(deliveryPartnerId);
+      
+      // Small delay to ensure Firestore consistency
+      await Future.delayed(Duration(milliseconds: 500));
+      
+      _isLoading = false;
+      notifyListeners();
+      
+      print('🚚 ✅ Force refresh completed');
+    } catch (e) {
+      print('🚚 ❌ Force refresh failed: $e');
+      _error = 'Force refresh failed: $e';
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Immediate order check method to verify orders exist
+  Future<void> _checkOrdersImmediately(String deliveryPartnerId) async {
+    try {
+      print('🚚 ⚡ Immediate order check for: $deliveryPartnerId');
+      
+      // Direct query for assignedDeliveryPerson (your primary field)
+      final immediateQuery = await _firestore
+          .collection('orders')
+          .where('assignedDeliveryPerson', isEqualTo: deliveryPartnerId)
+          .limit(5)
+          .get();
+      
+      print('🚚 ⚡ Immediate check found ${immediateQuery.docs.length} orders');
+      
+      if (immediateQuery.docs.isNotEmpty) {
+        for (var doc in immediateQuery.docs) {
+          final data = doc.data();
+          print('🚚 ⚡ Order ${doc.id}: status=${data['status']}');
+        }
+      }
+      
+    } catch (e) {
+      print('🚚 ❌ Immediate order check failed: $e');
+    }
+  }
+
+  // Enrich orders with customer data
+  Future<List<OrderModel>> _enrichOrdersWithCustomerData(List<OrderModel> orders) async {
+    if (orders.isEmpty) return orders;
+    
+    print('🚚 👥 OrderProvider: Enriching ${orders.length} orders with customer data');
+    
+    // Get unique customer IDs
+    final customerIds = orders
+        .where((order) => order.customerId != null)
+        .map((order) => order.customerId!)
+        .toSet()
+        .toList();
+    
+    if (customerIds.isEmpty) {
+      print('🚚 ⚠️ OrderProvider: No customer IDs found in orders');
+      return orders;
+    }
+    
+    print('🚚 👥 OrderProvider: Fetching data for ${customerIds.length} unique customers');
+    
+    // Fetch customer data
+    final customersMap = await _customerService.getCustomersByIds(customerIds);
+    
+    // Enrich orders with customer data
+    final enrichedOrders = orders.map((order) {
+      if (order.customerId != null && customersMap.containsKey(order.customerId)) {
+        final customer = customersMap[order.customerId];
+        print('🚚 ✅ OrderProvider: Enriched order ${order.id} with customer ${customer?.name}');
+        return order.copyWith(customerInfo: customer);
+      }
+      return order;
+    }).toList();
+    
+    print('🚚 👥 OrderProvider: Successfully enriched ${enrichedOrders.length} orders');
+    return enrichedOrders;
+  }
+
   // Refresh data
   void refreshData() {
     notifyListeners();
   }
   
+  // Update order items during pickup (allows editing)
+  Future<bool> updateOrderItems(String orderId, List<Map<String, dynamic>> newItems, double newTotalAmount, {String? pickupNotes}) async {
+    try {
+      print('🚚 📝 OrderProvider: Updating items for order: $orderId');
+      print('🚚 📝 New items count: ${newItems.length}');
+      print('🚚 📝 New total amount: ₹$newTotalAmount');
+      
+      print('🚚 🔐 Using custom authentication (no Firebase Auth needed)');
+      
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+      
+      final updateData = {
+        'items': newItems,
+        'totalAmount': newTotalAmount,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      
+      if (pickupNotes != null && pickupNotes.isNotEmpty) {
+        updateData['pickupNotes'] = pickupNotes;
+      }
+      
+      await _firestore.collection('orders').doc(orderId).update(updateData);
+      
+      print('🚚 ✅ OrderProvider: Successfully updated order items for: $orderId');
+      
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      print('🚚 ❌ OrderProvider: Failed to update order items: $e');
+      _error = 'Failed to update order items: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+
+
   // Clear error
   void clearError() {
     _error = null;

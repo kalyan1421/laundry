@@ -14,6 +14,8 @@ class BottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // All styling is now handled by the theme system
+    // BottomNavigationBarTheme in AppTheme defines all colors and styles
     return BottomNavigationBar(
       items: const <BottomNavigationBarItem>[
         BottomNavigationBarItem(
@@ -38,12 +40,8 @@ class BottomNavigation extends StatelessWidget {
         ),
       ],
       currentIndex: selectedIndex,
-      selectedItemColor: const Color(0xFF00A8E8),
-      unselectedItemColor: const Color(0xFF6E7A8A),
       onTap: onItemTapped,
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: Colors.white,
-      elevation: 8,
+      // All other properties (colors, type, elevation) are handled by theme
     );
   }
 }

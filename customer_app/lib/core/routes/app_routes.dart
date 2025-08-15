@@ -76,7 +76,7 @@ class AppRoutes {
         );
       
       case profileSetup:
-        return MaterialPageRoute(builder: (_) => const ProfileSetupScreen());
+        return MaterialPageRoute(builder: (_) => const MergedRegistrationScreen());
       
       case addAddress:
         return MaterialPageRoute(builder: (_) => const AddAddressScreen());

@@ -1,59 +1,46 @@
-# Cloud Ironing
+# Customer App - Cloud Ironing Factory
 
-A comprehensive Flutter application for professional laundry and ironing services, allowing customers to order, track, and manage their laundry services with real-time updates.
+## 📋 Complete Documentation
 
-## Features
+**For comprehensive documentation, please refer to:**
+👉 **[../COMPLETE_PROJECT_DOCUMENTATION.md](../COMPLETE_PROJECT_DOCUMENTATION.md)**
 
-- **Order Management**: Place new laundry orders with customizable service options
-- **Real-time Tracking**: Track your laundry status from pickup to delivery
-- **Location Services**: GPS-based pickup and delivery location tracking
-- **Secure Payments**: Multiple payment options including UPI, cards, and cash
-- **Push Notifications**: Real-time updates on order status changes
-- **Order History**: View past orders and reorder favorite services
-- **Profile Management**: Manage personal information and preferences
-- **QR Code Scanning**: Quick order tracking using QR codes
+## 🚀 Quick Start
 
-## Technical Stack
+```bash
+# Install dependencies
+flutter pub get
 
-- **Framework**: Flutter 3.2+
-- **Backend**: Firebase (Firestore, Auth, Storage, Messaging)
-- **Maps**: Google Maps integration
-- **State Management**: Provider pattern
-- **Notifications**: Firebase Cloud Messaging + Local Notifications
+# Run debug version
+flutter run
 
-## Getting Started
+# Build for testing
+flutter build apk --release
 
-### Prerequisites
-- Flutter SDK 3.2.0 or higher
-- Android Studio / VS Code
-- Firebase project setup
+# Build for Play Store
+flutter build appbundle --release
+```
 
-### Installation
-1. Clone the repository
-2. Run `flutter pub get` to install dependencies
-3. Configure Firebase for your project
-4. Run the app using `flutter run`
+## 📱 App Status
 
-## App Architecture
+- ✅ **Production Ready**
+- ✅ **AAB/APK Builds Available**
+- ✅ **Play Store Certificate Configured**
+- ✅ **All Features Implemented**
 
-The app follows a clean architecture pattern with:
-- **Providers**: State management using Provider package
-- **Services**: Firebase integration and API calls
-- **Models**: Data models for orders, users, and services
-- **Screens**: UI components organized by feature
+## 🔥 Latest Features
 
-## Play Store Readiness
+- ✅ Simplified OTP verification
+- ✅ Location auto-fill on registration
+- ✅ Call/WhatsApp integration
+- ✅ Allied services management
+- ✅ Sequential order IDs (100000+)
+- ✅ Rate app & share functionality
 
-This app is configured for Google Play Store publication with:
-- Proper app signing configuration
-- Appropriate permissions for location, camera, and storage
-- UPI payment integration with popular apps
-- Compliant with Google Play policies
+## 📞 Build Information
 
-## Support
+- **Release APK**: `build/app/outputs/flutter-apk/app-release.apk` (63.4MB)
+- **Release AAB**: `build/app/outputs/bundle/release/app-release.aab` (52.8MB)
+- **Certificate SHA1**: `CD:49:E8:C3:98:B2:FB:72:A2:D4:3B:29:AF:C6:71:AC:BA:0B:74:7D`
 
-For technical support or feature requests, please contact the development team.
-
----
-
-*Built with Flutter for modern laundry management solutions*
+For detailed setup, configuration, and troubleshooting, see the main documentation.

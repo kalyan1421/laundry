@@ -1104,11 +1104,13 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
         orderData['transactionId'] = transactionId;
       }
 
-      print('🔥 ORDER PLACEMENT: ✅ Saving order to Firestore...');
-      DocumentReference orderRef = await _firestore.collection('orders').add(orderData);
-      String orderId = orderRef.id;
+      print('🔥 ORDER PLACEMENT: ✅ Saving order to Firestore with order number as document ID...');
+      // Use the 6-digit order number as the document ID
+      DocumentReference orderRef = _firestore.collection('orders').doc(orderNumber);
+      await orderRef.set(orderData);
+      String orderId = orderRef.id; // This will be the 6-digit order number
       
-      print('🔥 ORDER PLACEMENT: ✅ Order saved successfully: $orderId');
+      print('🔥 ORDER PLACEMENT: ✅ Order saved successfully with ID: $orderId');
       
       // Send notification to admin using new OrderNotificationService
       try {
@@ -1626,30 +1628,7 @@ class _SchedulePickupDeliveryScreenState extends State<SchedulePickupDeliveryScr
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.blue.withOpacity(0.3)),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Delivery must be at least 20 hours after pickup time',
-                  style: TextStyle(
-                    color: Colors.blue[700],
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+       
         const SizedBox(height: 16),
         
         // Custom date selector button
@@ -2119,58 +2098,58 @@ Widget _buildDateSelector({
         ),
         
         // UPI Payment Option
-        Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _selectedPaymentMethod == PaymentMethod.upi 
-                  ? Colors.blue 
-                  : Colors.grey[300]!,
-              width: 2,
-            ),
-          ),
-          child: RadioListTile<PaymentMethod>(
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.payment, color: Colors.blue, size: 20),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'UPI Payment',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                      ),
-                      Text(
-                        'Pay using Google Pay, PhonePe, Paytm, etc.',
-                        style: TextStyle(color: Colors.grey, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            value: PaymentMethod.upi,
-            groupValue: _selectedPaymentMethod,
-            onChanged: (PaymentMethod? value) {
-              setState(() {
-                _selectedPaymentMethod = value!;
-              });
-            },
-            activeColor: Colors.blue,
-            contentPadding: const EdgeInsets.all(16),
-          ),
-        ),
+        // Container(
+        //   margin: const EdgeInsets.only(bottom: 12),
+        //   decoration: BoxDecoration(
+        //     color: Colors.white,
+        //     borderRadius: BorderRadius.circular(12),
+        //     border: Border.all(
+        //       color: _selectedPaymentMethod == PaymentMethod.upi 
+        //           ? Colors.blue 
+        //           : Colors.grey[300]!,
+        //       width: 2,
+        //     ),
+        //   ),
+        //   child: RadioListTile<PaymentMethod>(
+        //     title: Row(
+        //       children: [
+        //         Container(
+        //           padding: const EdgeInsets.all(8),
+        //           decoration: BoxDecoration(
+        //             color: Colors.blue.withOpacity(0.1),
+        //             shape: BoxShape.circle,
+        //           ),
+        //           child: const Icon(Icons.payment, color: Colors.blue, size: 20),
+        //         ),
+        //         const SizedBox(width: 12),
+        //         const Expanded(
+        //           child: Column(
+        //             crossAxisAlignment: CrossAxisAlignment.start,
+        //             children: [
+        //               Text(
+        //                 'UPI Payment',
+        //                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        //               ),
+        //               Text(
+        //                 'Pay using Google Pay, PhonePe, Paytm, etc.',
+        //                 style: TextStyle(color: Colors.grey, fontSize: 14),
+        //               ),
+        //             ],
+        //           ),
+        //         ),
+        //       ],
+        //     ),
+        //     value: PaymentMethod.upi,
+        //     groupValue: _selectedPaymentMethod,
+        //     onChanged: (PaymentMethod? value) {
+        //       setState(() {
+        //         _selectedPaymentMethod = value!;
+        //       });
+        //     },
+        //     activeColor: Colors.blue,
+        //     contentPadding: const EdgeInsets.all(16),
+        //   ),
+        // ),
         
         const SizedBox(height: 16),
         

@@ -38,7 +38,7 @@ android {
             if (keystoreProperties.containsKey("keyAlias")) {
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file("upload-keystore.jks")
+                storeFile = file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
             }
         }
@@ -55,11 +55,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (keystoreProperties.containsKey("keyAlias")) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

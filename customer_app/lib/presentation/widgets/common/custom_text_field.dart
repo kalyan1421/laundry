@@ -1,5 +1,3 @@
-import 'package:customer_app/core/theme/app_colors.dart';
-import 'package:customer_app/core/theme/app_text_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -50,40 +48,16 @@ class CustomTextField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: labelText,
         hintText: hintText,
-        // Using AppColors and AppTextTheme for styling if available
-        // If not, will use default ThemeData styles
-        labelStyle: AppTextTheme.bodyMedium.copyWith(color: AppColors.textSecondary),
-        hintStyle: AppTextTheme.bodyMedium.copyWith(color: AppColors.textHint),
-        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: AppColors.primaryLight) : null,
+        // All styling is now handled by the theme system
+        // InputDecorationTheme in AppTheme defines all styles
+        prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
         suffixIcon: suffixIcon != null
             ? IconButton(
-                icon: Icon(suffixIcon, color: AppColors.primaryLight),
+                icon: Icon(suffixIcon),
                 onPressed: onSuffixIconPressed,
               )
             : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.0),
-          borderSide: BorderSide(color: AppColors.lightGray),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.0),
-          borderSide: BorderSide(color: AppColors.lightGray),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.0),
-          borderSide: BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.0),
-          borderSide: BorderSide(color: AppColors.error, width: 1.5),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.0),
-          borderSide: BorderSide(color: AppColors.disabled),
-        ),
-        filled: true,
-        fillColor: AppColors.surface, // Or a light grey like Colors.grey[50]
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        // All border styles, colors, and other properties are handled by theme
       ),
       validator: validator,
       keyboardType: keyboardType,
@@ -96,7 +70,7 @@ class CustomTextField extends StatelessWidget {
       readOnly: readOnly,
       onTap: onTap,
       maxLines: maxLines,
-      style: AppTextTheme.bodyLarge.copyWith(color: AppColors.textPrimary), // Input text style
+      // Text style is handled by theme
     );
   }
 }

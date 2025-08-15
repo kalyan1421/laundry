@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../models/item_model.dart';
+import '../models/allied_service_model.dart';
 import '../models/order_model.dart';
 import '../models/banner_model.dart';
 import '../models/offer_model.dart';
@@ -184,10 +185,64 @@ class DatabaseService {
   }
 
   Future<void> assignOrder(String orderId, String deliveryPersonId) async {
-    await _firestore.collection('orders').doc(orderId).update({
-      'assignedTo': deliveryPersonId,
-      'status': 'assigned',
-    });
+    try {
+      // Get order details
+      final orderDoc = await _firestore.collection('orders').doc(orderId).get();
+      if (!orderDoc.exists) {
+        throw Exception('Order not found');
+      }
+
+      final orderData = orderDoc.data()!;
+      final batch = _firestore.batch();
+
+      // Update order with assignment
+      batch.update(
+        _firestore.collection('orders').doc(orderId),
+        {
+          'assignedTo': deliveryPersonId,
+          'status': 'assigned',
+          'assignedAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+      );
+
+      // Add order to delivery partner's current orders
+      batch.update(
+        _firestore.collection('delivery').doc(deliveryPersonId),
+        {
+          'currentOrders': FieldValue.arrayUnion([orderId]),
+          'updatedAt': Timestamp.now(),
+        },
+      );
+
+      // Create detailed order assignment record for delivery partner
+      batch.set(
+        _firestore.collection('delivery').doc(deliveryPersonId).collection('assigned_orders').doc(orderId),
+        {
+          'orderId': orderId,
+          'assignedAt': Timestamp.now(),
+          'status': 'assigned',
+          'orderDetails': {
+            'customerName': orderData['customerName'],
+            'customerPhone': orderData['customerPhone'],
+            'pickupAddress': orderData['pickupAddress'],
+            'deliveryAddress': orderData['deliveryAddress'],
+            'totalAmount': orderData['totalAmount'],
+            'items': orderData['items'],
+            'specialInstructions': orderData['specialInstructions'],
+            'orderType': orderData['orderType'],
+            'priority': orderData['priority'] ?? 'normal',
+          },
+        },
+      );
+
+      await batch.commit();
+      print('✅ Order $orderId assigned to delivery partner $deliveryPersonId');
+
+    } catch (e) {
+      print('❌ Error assigning order: $e');
+      throw Exception('Failed to assign order: $e');
+    }
   }
 
   Future<void> deleteOrder(String orderId) async {
@@ -310,5 +365,190 @@ class DatabaseService {
     }
     final snapshot = await query.get();
     return snapshot.docs.length;
+  }
+
+  // Allied Services Management
+  Stream<List<AlliedServiceModel>> getAlliedServices() {
+    return _firestore
+        .collection('allied_services')
+        .snapshots()
+        .map((snapshot) {
+      final services = snapshot.docs
+          .map((doc) => AlliedServiceModel.fromMap(doc.id, doc.data()))
+          .toList();
+      
+      // Sort services by position (sortOrder), then by name
+      services.sort((a, b) {
+        if (a.sortOrder != b.sortOrder) {
+          return a.sortOrder.compareTo(b.sortOrder);
+        }
+        return a.name.compareTo(b.name);
+      });
+      
+      return services;
+    });
+  }
+
+  Future<String?> uploadAlliedServiceImage(File imageFile, String serviceName) async {
+    try {
+      // Create a unique filename
+      String fileName = 'allied_services/${DateTime.now().millisecondsSinceEpoch}_${serviceName.replaceAll(' ', '_')}.jpg';
+      
+      // Upload image to Firebase Storage
+      Reference storageRef = _storage.ref().child(fileName);
+      UploadTask uploadTask = storageRef.putFile(imageFile);
+      
+      TaskSnapshot taskSnapshot = await uploadTask;
+      String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+      
+      return downloadUrl;
+    } catch (e) {
+      print('Error uploading allied service image: $e');
+      return null;
+    }
+  }
+
+  Future<void> deleteAlliedServiceImage(String imageUrl) async {
+    try {
+      Reference storageRef = _storage.refFromURL(imageUrl);
+      await storageRef.delete();
+    } catch (e) {
+      print('Error deleting allied service image: $e');
+    }
+  }
+
+  Future<void> addAlliedService(AlliedServiceModel service, {File? imageFile}) async {
+    try {
+      String? imageUrl;
+      
+      // Upload image if provided
+      if (imageFile != null) {
+        imageUrl = await uploadAlliedServiceImage(imageFile, service.name);
+      }
+
+      // Create service data
+      Map<String, dynamic> serviceData = service.toMap();
+      if (imageUrl != null) {
+        serviceData['imageUrl'] = imageUrl;
+      }
+
+      // Add to Firestore
+      await _firestore.collection('allied_services').add(serviceData);
+    } catch (e) {
+      print('Error adding allied service: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateAlliedService(String serviceId, Map<String, dynamic> data, {File? newImageFile, bool removeImage = false}) async {
+    try {
+      // Get current service data to handle image updates
+      DocumentSnapshot doc = await _firestore.collection('allied_services').doc(serviceId).get();
+      Map<String, dynamic>? docData = doc.data() as Map<String, dynamic>?;
+      String? currentImageUrl = docData?['imageUrl'];
+
+      // Handle image updates
+      if (removeImage && currentImageUrl != null) {
+        // Remove current image
+        await deleteAlliedServiceImage(currentImageUrl);
+        data['imageUrl'] = FieldValue.delete();
+      } else if (newImageFile != null) {
+        // Delete old image if exists
+        if (currentImageUrl != null) {
+          await deleteAlliedServiceImage(currentImageUrl);
+        }
+        
+        // Upload new image
+        String serviceName = data['name'] ?? 'service';
+        String? newImageUrl = await uploadAlliedServiceImage(newImageFile, serviceName);
+        if (newImageUrl != null) {
+          data['imageUrl'] = newImageUrl;
+        }
+      }
+
+      // Update service in Firestore
+      await _firestore.collection('allied_services').doc(serviceId).update(data);
+    } catch (e) {
+      print('Error updating allied service: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAlliedService(String serviceId, String? imageUrl) async {
+    try {
+      // Delete image from storage if exists
+      if (imageUrl != null) {
+        await deleteAlliedServiceImage(imageUrl);
+      }
+
+      // Delete service from Firestore
+      await _firestore.collection('allied_services').doc(serviceId).delete();
+    } catch (e) {
+      print('Error deleting allied service: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<AlliedServiceModel>> getActiveAlliedServices() async {
+    try {
+      final snapshot = await _firestore
+          .collection('allied_services')
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      final services = snapshot.docs
+          .map((doc) => AlliedServiceModel.fromMap(doc.id, doc.data()))
+          .toList();
+
+      // Sort services by position (sortOrder), then by name
+      services.sort((a, b) {
+        if (a.sortOrder != b.sortOrder) {
+          return a.sortOrder.compareTo(b.sortOrder);
+        }
+        return a.name.compareTo(b.name);
+      });
+
+      return services;
+    } catch (e) {
+      print('Error getting active allied services: $e');
+      return [];
+    }
+  }
+
+  // Delivery Partners Management
+  Future<List<Map<String, dynamic>>> getAvailableDeliveryPartners() async {
+    try {
+      final snapshot = await _firestore
+          .collection('delivery')
+          .where('isActive', isEqualTo: true)
+          .where('isAvailable', isEqualTo: true)
+          .orderBy('name')
+          .get();
+
+      return snapshot.docs.map((doc) {
+        return {
+          'id': doc.id,
+          ...doc.data(),
+        };
+      }).toList();
+    } catch (e) {
+      print('Error getting available delivery partners: $e');
+      return [];
+    }
+  }
+
+  Stream<List<Map<String, dynamic>>> getDeliveryPartnersStream() {
+    return _firestore
+        .collection('delivery')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return {
+          'id': doc.id,
+          ...doc.data(),
+        };
+      }).toList();
+    });
   }
 }

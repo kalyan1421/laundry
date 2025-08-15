@@ -4,20 +4,25 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
+import '../../providers/item_provider.dart';
+import '../../providers/order_provider.dart';
+import '../../providers/banner_provider.dart';
+import '../../providers/offer_provider.dart';
+import '../../providers/allied_service_provider.dart';
+import '../../providers/user_provider.dart';
 import 'offers_list_screen.dart';
 import 'manage_items.dart';
+import 'manage_allied_services.dart';
 import 'manage_banners.dart';
 import 'all_orders.dart';
-import 'admin_delivery_signup_screen.dart';
+// Removed missing imports - using new delivery partner system
 import 'admin_token_debug_screen.dart';
 import 'add_workshop_worker_screen.dart';
 import 'manage_workshop_workers_screen.dart';
-import 'order_notifications_screen.dart';
+// Removed unused import
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/delivery_partner_service.dart';
-import 'test_delivery_notification_screen.dart';
-import 'debug_delivery_assignment_screen.dart';
 import 'manage_admins_screen.dart';
 import 'manage_delivery_partners_screen.dart';
 
@@ -32,37 +37,78 @@ class _AdminHomeState extends State<AdminHome> {
   int _selectedIndex = 0;
 
   static final List<Widget> _pages = <Widget>[
+
+    
     const AdminDashboard(),
     const AllOrders(),
-    // const OrderNotificationsScreen(),
     const ManageClientsScreen(roleFilter: 'customer', pageTitle: 'Customers'),
-    const ManageClientsScreen(roleFilter: 'delivery', pageTitle: 'Delivery Staff'),
-    const ManageAdminsScreen(),
-    const ManageClientsScreen(roleFilter: 'supervisor', pageTitle: 'Supervisors'),
+    const ManageDeliveryPartnersScreen(),
+    // const ManageAdminsScreen(),
+    // const ManageClientsScreen(roleFilter: 'supervisor', pageTitle: 'Supervisors'),
     const ManageItems(),
+    const ManageAlliedServices(),
     const ManageBanners(),
     const OffersListScreen(),
-    AddDeliveryPartnerScreen(),
-    const AddDeliveryPartnerScreen(),
-    const AddWorkshopWorkerScreen(),
-    const ManageWorkshopWorkersScreen(),
+    // const ManageDeliveryPartnersScreen(),
+    // const AddWorkshopWorkerScreen(),
+    // const ManageWorkshopWorkersScreen(),
   ];
 
   static final List<String> _titles = <String>[
     'Dashboard',
     'All Orders',
-    // 'Order Notifications',
     'Customers',
     'Delivery Staff',
-    'Administrators',
-    'Supervisors',
+    // 'Administrators',
+    // 'Supervisors',
     'Manage Items',
+    'Allied Services',
     'Manage Banners',
     'Special Offers',
-    'Add Delivery Person',
-    'Add Workshop Worker',
-    'Manage Workshop Workers',
+    // 'Add Delivery Person',
+    // 'Add Workshop Worker',
+    // 'Manage Workshop Workers',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Force refresh all providers when admin home loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshAllProviders();
+    });
+  }
+
+  Future<void> _refreshAllProviders() async {
+    try {
+      print('🔄 Refreshing providers on admin home load...');
+      
+      // Force refresh providers that have load methods
+      final itemProvider = Provider.of<ItemProvider>(context, listen: false);
+      final alliedServiceProvider = Provider.of<AlliedServiceProvider>(context, listen: false);
+
+      // Refresh providers with available load methods
+      final futures = <Future>[];
+      
+      // Add load methods that exist
+      futures.add(itemProvider.loadItems().catchError((e) {
+        print('Error loading items: $e');
+        return null;
+      }));
+      
+      futures.add(alliedServiceProvider.loadAlliedServices().catchError((e) {
+        print('Error loading allied services: $e');
+        return null;
+      }));
+
+      // Wait for all futures to complete
+      await Future.wait(futures);
+
+      print('✅ Available providers refreshed successfully');
+    } catch (e) {
+      print('❌ Error refreshing providers: $e');
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -155,89 +201,81 @@ class _AdminHomeState extends State<AdminHome> {
             // _buildDrawerItemWithBadge(Icons.notifications_rounded, 'Order Notifications', 2),
             _buildDrawerItem(Icons.people_alt_rounded, 'Customers', 2),
             _buildDrawerItem(Icons.delivery_dining_rounded, 'Delivery Staff',  3),
-            ListTile(
-              leading: const Icon(Icons.add_road_rounded),
-              title: const Text('Manage Delivery Partners'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pushNamed('/manage-delivery-partners');
-              },
-            ),
-            _buildDrawerItem(Icons.admin_panel_settings_rounded, 'Administrators', 4),
-            ListTile(
-              leading: const Icon(Icons.person_add_rounded),
-              title: const Text('Add New Admin'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pushNamed('/add-admin');
-              },
-            ),
-            _buildDrawerItem(Icons.groups_rounded, 'Supervisors', 5),
-              _buildDrawerItem(Icons.inventory_2_rounded, 'Manage Items', 6),
-            _buildDrawerItem(Icons.photo_library_rounded, 'Manage Banners', 7),
-            _buildDrawerItem(Icons.local_offer_rounded, 'Special Offers', 8),
+            
+            // _buildDrawerItem(Icons.admin_panel_settings_rounded, 'Administrators', 4),
+            // ListTile(
+            //   leading: const Icon(Icons.person_add_rounded),
+            //   title: const Text('Add New Admin'),
+            //   onTap: () {
+            //     Navigator.of(context).pop();
+            //     Navigator.of(context).pushNamed('/add-admin');
+            //   },
+            // ),
+            // _buildDrawerItem(Icons.groups_rounded, 'Supervisors', 5),
+              _buildDrawerItem(Icons.inventory_2_rounded, 'Manage Items', 4),
+            _buildDrawerItem(Icons.local_laundry_service_rounded, 'Allied Services', 5),
+            _buildDrawerItem(Icons.photo_library_rounded, 'Manage Banners', 6),
+            _buildDrawerItem(Icons.local_offer_rounded, 'Special Offers', 7),
             const Divider(),
-            ListTile(
-              leading: const Icon(Icons.notifications_active),
-              title: const Text('Notification Tokens'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const AdminTokenDebugScreen(),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.send),
-              title: const Text('Test Delivery Notifications'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const TestDeliveryNotificationScreen(),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.bug_report),
-              title: const Text('Debug Order Assignments'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const DebugDeliveryAssignmentScreen(),
-                  ),
-                );
-              },
-            ),
-            // _buildDrawerItem(Icons.receipt_long_rounded, 'All Orders', 7),
-            _buildDrawerItem(Icons.person_add_alt_1_rounded, 'Add Delivery Person', 10),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 4.0),
-              child: Text(
-                'Workshop Management',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ),
-            _buildDrawerItem(Icons.engineering_rounded, 'Add Workshop Worker', 11),
-            _buildDrawerItem(Icons.groups_rounded, 'Manage Workshop Workers', 12),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.exit_to_app_rounded),
-              title: const Text('Logout'),
-              onTap: () async {
-                Navigator.pop(context);
-                await authProvider.signOut();
-              },
-            ),
+            // ListTile(
+            //   leading: const Icon(Icons.notifications_active),
+            //   title: const Text('Notification Tokens'),
+            //   onTap: () {
+            //     Navigator.of(context).pop();
+            //     Navigator.of(context).push(
+            //       MaterialPageRoute(
+            //         builder: (context) => const AdminTokenDebugScreen(),
+            //       ),
+            //     );
+            //   },
+            // ),
+            // ListTile(
+            //   leading: const Icon(Icons.send),
+            //   title: const Text('Test Delivery Notifications'),
+            //   onTap: () {
+            //     Navigator.of(context).pop();
+            //     // Test notification screen removed - using new delivery system
+            //     ScaffoldMessenger.of(context).showSnackBar(
+            //       const SnackBar(content: Text('Test notification feature removed')),
+            //     );
+            //   },
+            // ),
+            // ListTile(
+            //   leading: const Icon(Icons.bug_report),
+            //   title: const Text('Debug Order Assignments'),
+            //   onTap: () {
+            //     Navigator.of(context).pop();
+            //     // Debug assignment screen removed - using new delivery system
+            //     ScaffoldMessenger.of(context).showSnackBar(
+            //       const SnackBar(content: Text('Debug assignment feature removed')),
+            //     );
+            //   },
+            // ),
+            // // _buildDrawerItem(Icons.receipt_long_rounded, 'All Orders', 7),
+            // _buildDrawerItem(Icons.person_add_alt_1_rounded, 'Add Delivery Person', 11),
+            // const Divider(),
+            // Padding(
+            //   padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 4.0),
+            //   child: Text(
+            //     'Workshop Management',
+            //     style: TextStyle(
+            //       fontSize: 12,
+            //       fontWeight: FontWeight.bold,
+            //       color: Colors.grey[600],
+            //     ),
+            //   ),
+            // ),
+            // _buildDrawerItem(Icons.engineering_rounded, 'Add Workshop Worker', 12),
+            // _buildDrawerItem(Icons.groups_rounded, 'Manage Workshop Workers', 13),
+            // const Divider(),
+            // ListTile(
+            //   leading: const Icon(Icons.exit_to_app_rounded),
+            //   title: const Text('Logout'),
+            //   onTap: () async {
+            //     Navigator.pop(context);
+            //     await authProvider.signOut();
+            //   },
+            // ),
           ],
         ),
       ),
@@ -626,9 +664,9 @@ class AdminDashboard extends StatelessWidget {
           ),
         );
 
-                 // Run migration using the service
+                 // Migration method removed - new delivery system handles indexing automatically
          final deliveryPartnerService = DeliveryPartnerService();
-         await deliveryPartnerService.migrateExistingDeliveryPartnersToPhoneIndex();
+         // Migration is no longer needed with new phone+code system
 
         // Close loading dialog
         Navigator.of(context).pop();

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/delivery_partner_model.dart';
 import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
@@ -34,6 +35,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadStats() async {
     final orderProvider = context.read<OrderProvider>();
+    
+    print('🚚 🆕 Dashboard: Loading stats with NEW simplified approach');
+    
     final stats = await orderProvider.getDeliveryPartnerStats(widget.deliveryPartner.id);
     if (mounted) {
       setState(() {
@@ -54,10 +58,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Refresh stats
           await _loadStats();
           
-          // Refresh order data via OrderProvider
+          // Force refresh all order data via OrderProvider
           final orderProvider = context.read<OrderProvider>();
-          await orderProvider.refreshOrderData(widget.deliveryPartner.id);
-          orderProvider.refreshData();
+          await orderProvider.forceRefreshAllData(widget.deliveryPartner.id);
           
           // Show feedback
           if (mounted) {
@@ -123,12 +126,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // TODO: Navigate to notifications
           },
         ),
+
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),
           onSelected: (value) {
             switch (value) {
               case 'profile':
                 _showProfileDialog();
+                break;
+              case 'debug':
+                _runDiagnostics();
                 break;
               case 'logout':
                 _showLogoutDialog();
@@ -143,6 +150,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Icon(Icons.person_outline),
                   SizedBox(width: 8),
                   Text('Profile'),
+                ],
+              ),
+            ),
+            const PopupMenuItem<String>(
+              value: 'debug',
+              child: Row(
+                children: [
+                  Icon(Icons.bug_report),
+                  SizedBox(width: 8),
+                  Text('Debug Orders'),
                 ],
               ),
             ),
@@ -599,7 +616,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildTaskItem(OrderModel order) {
-    bool isPickup = order.status == 'confirmed' || order.status == 'ready_for_pickup';
+    // Match the same statuses used in OrderProvider.getPickupTasksStream
+    final pickupStatuses = ['assigned', 'confirmed', 'ready_for_pickup'];
+    bool isPickup = pickupStatuses.contains(order.status);
     
     return ListTile(
       leading: Container(
@@ -664,6 +683,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _runDiagnostics() async {
+    final orderProvider = context.read<OrderProvider>();
+    
+    // Show loading
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
+            SizedBox(width: 12),
+            Text('🔍 Running diagnostics...'),
+          ],
+        ),
+        backgroundColor: Colors.blue,
+        duration: Duration(seconds: 2),
+      ),
+    );
+    
+    // Run full diagnostic and refresh
+    await orderProvider.forceRefreshAllData(widget.deliveryPartner.id);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🔍 Diagnostics completed. Check console logs for details.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   void _showLogoutDialog() {
     showDialog(
       context: context,
@@ -686,4 +741,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+
+
 } 

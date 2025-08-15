@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
-import 'providers/auth_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/earnings_provider.dart';
-import 'auth_wrapper.dart';
+import 'screens/dashboard_screen.dart';
 import 'utils/app_theme.dart';
 import 'utils/app_colors.dart';
 
@@ -24,7 +23,6 @@ class WorkshopApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => OrderProvider()),
         ChangeNotifierProvider(create: (_) => EarningsProvider()),
       ],
@@ -41,7 +39,7 @@ class WorkshopApp extends StatelessWidget {
           cardTheme: AppTheme.cardTheme,
         ),
         debugShowCheckedModeBanner: false,
-        home: const AuthWrapper(),
+        home: const DashboardScreen(),
       ),
     );
   }

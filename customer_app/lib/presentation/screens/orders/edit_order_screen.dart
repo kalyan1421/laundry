@@ -556,13 +556,14 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                     },
                   ),
           ),
+          SizedBox(height: 120,),
         ],
       ),
       
       // Bottom Sheet with Total and Update Button
       bottomSheet: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
         decoration: const BoxDecoration(
               color: Colors.white,
               boxShadow: [
@@ -604,7 +605,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                   
                   // Update Button
                 SizedBox(
-                    width: 140,
+                    width: 150,
                     height: 48,
                     child: ElevatedButton(
                     onPressed: _selectedItems.isEmpty || _isSaving ? null : _saveChanges,
@@ -627,7 +628,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                           : const Text(
                               'Update Order',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),

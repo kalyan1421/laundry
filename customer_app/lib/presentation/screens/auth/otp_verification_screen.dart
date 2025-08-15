@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:pinput/pinput.dart';
 import 'package:sms_autofill/sms_autofill.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import '../../providers/auth_provider.dart';
 
@@ -19,11 +19,9 @@ class OTPVerificationScreen extends StatefulWidget {
   State<OTPVerificationScreen> createState() => _OTPVerificationScreenState();
 }
 
-class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
-  final List<TextEditingController> _otpControllers = 
-      List.generate(6, (index) => TextEditingController());
-  final List<FocusNode> _focusNodes = 
-      List.generate(6, (index) => FocusNode());
+class _OTPVerificationScreenState extends State<OTPVerificationScreen> with CodeAutoFill {
+  final TextEditingController _pinController = TextEditingController();
+  final FocusNode _pinFocusNode = FocusNode();
   
   int _resendCooldown = 30;
   Timer? _timer;
@@ -31,117 +29,91 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   bool _hasNavigated = false;
   bool _isDisposed = false;
   bool _showLoading = true;
-  bool _otpAutofillEnabled = false;
-  String _signature = '';
-  
-  final _formKey = GlobalKey<FormState>();
-  final _otpController = TextEditingController();
+  String _currentOTP = '';
+  String? _appSignature;
 
   @override
   void initState() {
     super.initState();
     _startResendTimer();
     _initializeOTPScreen();
+    _initializeSMSAutofill();
   }
   
   Future<void> _initializeOTPScreen() async {
-    // Show loading animation for 3 seconds
-    Timer(const Duration(seconds: 3), () {
+    // Show loading animation for 2 seconds
+    Timer(const Duration(seconds: 2), () {
       if (mounted && !_isDisposed) {
         setState(() {
           _showLoading = false;
         });
       }
     });
-    
-    // Ask user for OTP autofill permission
-    _showOTPAutofillDialog();
-    
-    // Initialize SMS autofill
-    await _initializeSMSAutofill();
   }
-  
-  Future<void> _showOTPAutofillDialog() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (!mounted || _isDisposed) return;
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Enable OTP Auto-fill?'),
-          content: const Text(
-            'Would you like to enable automatic OTP detection from SMS? This will help fill the OTP automatically when received.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _otpAutofillEnabled = false;
-                });
-                Navigator.of(context).pop();
-              },
-              child: const Text('No, thanks'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final status = await Permission.sms.request();
-                setState(() {
-                  _otpAutofillEnabled = status.isGranted;
-                });
-                Navigator.of(context).pop();
-                if (_otpAutofillEnabled) {
-                  _startListeningForOTP();
-                }
-              },
-              child: const Text('Enable'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-  
+
   Future<void> _initializeSMSAutofill() async {
     try {
-      _signature = await SmsAutoFill().getAppSignature;
-    } catch (e) {
-      print('SMS signature error: $e');
-    }
-  }
-  
-  void _startListeningForOTP() async {
-    if (!_otpAutofillEnabled) return;
-    
-    try {
+      // Get app signature for SMS autofill
+      _appSignature = await SmsAutoFill().getAppSignature;
+      print('App signature for SMS autofill: $_appSignature');
+      
+      // Start listening for SMS
       await SmsAutoFill().listenForCode();
+      
+      // Listen for code changes
+      SmsAutoFill().code.listen((code) {
+        if (code != null && code.length == 6 && !_isDisposed && mounted) {
+          print('Auto-detected OTP: $code');
+          _pinController.text = code;
+          _currentOTP = code;
+          setState(() {});
+          
+          // Auto-verify the detected OTP
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (!_isDisposed && mounted && !_isAutoVerifying) {
+              _verifyOTP(code);
+            }
+          });
+        }
+      });
     } catch (e) {
-      print('SMS listening error: $e');
+      print('Error initializing SMS autofill: $e');
     }
   }
 
   @override
+  void codeUpdated() {
+    // This method is called when SMS code is detected
+    if (code != null && code!.length == 6 && !_isDisposed && mounted) {
+      print('Code updated via mixin: $code');
+      _pinController.text = code!;
+      _currentOTP = code!;
+      setState(() {});
+      
+      // Auto-verify the detected OTP
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!_isDisposed && mounted && !_isAutoVerifying) {
+          _verifyOTP(code!);
+        }
+      });
+    }
+  }
+  
+
+  
+
+  
+
+
+  @override
   void dispose() {
     _isDisposed = true;
-    
-    // Cancel timer first
     _timer?.cancel();
-    _timer = null;
-    
-    // Stop SMS autofill listening
-    if (_otpAutofillEnabled) {
-      SmsAutoFill().unregisterListener();
-    }
-    
-    // Dispose controllers and focus nodes
-    for (var controller in _otpControllers) {
-      controller.dispose();
-    }
-    for (var focusNode in _focusNodes) {
-      focusNode.dispose();
-    }
-    
+    _pinController.dispose();
+    _pinFocusNode.dispose();
+    // Stop listening for SMS codes
+    SmsAutoFill().unregisterListener();
+    cancel(); // Cancel the CodeAutoFill mixin listener
     super.dispose();
   }
 
@@ -169,50 +141,48 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     });
   }
 
-  Future<void> _verifyOTP() async {
-    if (_isDisposed || !mounted) return;
+  Future<void> _verifyOTP(String otp) async {
+    if (_isDisposed || !mounted || otp.length != 6) return;
     
-    String otp = '';
-    try {
-      otp = _otpControllers.map((controller) => controller.text).join();
-    } catch (e) {
-      print('Error collecting OTP: $e');
-      _showMessage('Error reading OTP. Please try again.', isError: true);
-      return;
-    }
+    // Prevent multiple simultaneous verifications
+    if (_isAutoVerifying) return;
     
-    if (otp.length != 6) {
-      _showMessage('Please enter complete OTP', isError: true);
-      return;
-    }
+    setState(() {
+      _isAutoVerifying = true;
+    });
 
     try {
-      // Get provider safely
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
-      // Remove focus from text fields
-      if (mounted) {
-        FocusScope.of(context).unfocus();
-      }
+      // Remove focus from any active field
+      FocusScope.of(context).unfocus();
       
       bool success = await authProvider.verifyOTP(otp);
       
-      // Check if widget is still mounted after async operation
       if (_isDisposed || !mounted) return;
       
       if (success) {
         _handleSuccessfulVerification(authProvider);
       } else {
+        setState(() {
+          _isAutoVerifying = false;
+        });
+        
         if (authProvider.errorMessage != null) {
           _showMessage(authProvider.errorMessage!, isError: true);
         }
-        _clearOTPFields();
+        _clearOTPField();
       }
     } catch (e) {
       if (_isDisposed || !mounted) return;
+      
+      setState(() {
+        _isAutoVerifying = false;
+      });
+      
       print('Error in _verifyOTP: $e');
       _showMessage('Verification failed. Please try again.', isError: true);
-      _clearOTPFields();
+      _clearOTPField();
     }
   }
 
@@ -221,8 +191,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     
     _hasNavigated = true;
     
-    // Clear OTP fields
-    _clearOTPFields();
+    _showMessage('Verification successful!', isError: false);
     
     // Navigate based on user status
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -240,19 +209,15 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     });
   }
 
-  void _clearOTPFields() {
-    if (_isDisposed) return;
+  void _clearOTPField() {
+    if (_isDisposed || !mounted) return;
     
     try {
-      for (var controller in _otpControllers) {
-        controller.clear();
-      }
-      
-      if (_focusNodes.isNotEmpty && _focusNodes[0].canRequestFocus && mounted) {
-        _focusNodes[0].requestFocus();
-      }
+      _pinController.clear();
+      _currentOTP = '';
+      setState(() {});
     } catch (e) {
-      print('Error clearing OTP fields: $e');
+      print('Error clearing OTP field: $e');
     }
   }
 
@@ -262,7 +227,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
-      // Extract phone number (remove +91)
       String phoneNumber = widget.phoneNumber.replaceFirst('+91', '');
       
       await authProvider.sendOTP(phoneNumber);
@@ -272,7 +236,9 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       if (authProvider.otpStatus == OTPStatus.sent) {
         _startResendTimer();
         _showMessage('OTP sent successfully', isError: false);
-        _clearOTPFields();
+        _clearOTPField();
+        
+
       } else if (authProvider.errorMessage != null) {
         _showMessage(authProvider.errorMessage!, isError: true);
       }
@@ -300,10 +266,35 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     try {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
-          backgroundColor: isError ? Colors.red : Colors.green,
+          content: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  isError ? Icons.error_outline : Icons.check_circle_outline,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: isError ? Colors.red[600] : Colors.green[600],
           behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: isError ? 3 : 2),
+          duration: Duration(seconds: isError ? 4 : 2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: EdgeInsets.all(16),
+          elevation: 4,
         ),
       );
     } catch (e) {
@@ -335,7 +326,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
           style: TextStyle(
             color: Color(0xFF2D3748),
             fontSize: 18,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         centerTitle: true,
@@ -352,43 +343,60 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
             }
           });
 
-          // Show loading animation for 3 seconds
+          // Show loading animation
           if (_showLoading) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0066CC)),
-                    strokeWidth: 3,
+                  Container(
+                    width: 80,
+                    height: 80,
+                    padding: EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF4299E1).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(40),
+                    ),
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4299E1)),
+                      strokeWidth: 3,
+                    ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
                   Text(
                     'Setting up verification...',
                     style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
+                      fontSize: 18,
+                      color: Color(0xFF2D3748),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                  // const SizedBox(height: 8),
+                  // Text(
+                  //   'Preparing SMS auto-detection',
+                  //   style: TextStyle(
+                  //     fontSize: 14,
+                  //     color: Colors.grey[500],
+                  //   ),
+                  // ),
                 ],
               ),
             );
           }
 
-          return Padding(
+          return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
                 const SizedBox(height: 40),
                 
-                // Instructions
+                // Instructions with auto-fill status
                 _buildInstructions(),
                 
                 const SizedBox(height: 50),
                 
-                // OTP Input Fields
-                _buildOTPFields(authProvider),
+                // OTP Input Field using OTPTextField
+                _buildOTPField(authProvider),
                 
                 const SizedBox(height: 40),
                 
@@ -405,31 +413,42 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                 // Change number
                 _buildChangeNumberButton(),
                 
+                const SizedBox(height: 20),
+                
                 // Show verification status
-                if (authProvider.otpStatus == OTPStatus.verifying)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 20),
+                if (authProvider.otpStatus == OTPStatus.verifying || _isAutoVerifying)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF4299E1).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Color(0xFF4299E1).withOpacity(0.3)),
+                    ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4299E1)),
+                          ),
                         ),
-                        SizedBox(width: 8),
+                        SizedBox(width: 12),
                         Text(
-                          'Verifying...',
+                          'Verifying your code...',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Color(0xFF718096),
+                            color: Color(0xFF4299E1),
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
                     ),
                   ),
                 
-                const Spacer(),
+                const SizedBox(height: 40),
               ],
             ),
           );
@@ -451,177 +470,217 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          widget.phoneNumber,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF2D3748),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Color(0xFF2D3748).withOpacity(0.05),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            widget.phoneNumber,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF2D3748),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.green.shade200),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.sms,
+                color: Colors.green.shade600,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'SMS Auto-detection enabled',
+                style: TextStyle(
+                  color: Colors.green.shade700,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildOTPFields(AuthProvider authProvider) {
+  Widget _buildOTPField(AuthProvider authProvider) {
+    final defaultPinTheme = PinTheme(
+      width: 48,
+      height: 52,
+      textStyle: const TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFF2D3748),
+      ),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+
+    final focusedPinTheme = defaultPinTheme.copyWith(
+      decoration: defaultPinTheme.decoration!.copyWith(
+        border: Border.all(color: const Color(0xFF4299E1), width: 2),
+        color: Colors.white,
+      ),
+    );
+
+    final submittedPinTheme = defaultPinTheme.copyWith(
+      decoration: defaultPinTheme.decoration!.copyWith(
+        border: Border.all(color: const Color(0xFF4299E1)),
+        color: Colors.blue.shade50,
+      ),
+    );
+
+    final errorPinTheme = defaultPinTheme.copyWith(
+      decoration: defaultPinTheme.decoration!.copyWith(
+        border: Border.all(color: Colors.red),
+        color: Colors.red.shade50,
+      ),
+    );
+
     return Column(
       children: [
-        // SMS autofill widget
-        if (_otpAutofillEnabled)
-          PinFieldAutoFill(
-            decoration: UnderlineDecoration(
-              textStyle: const TextStyle(fontSize: 20, color: Colors.black),
-              colorBuilder: FixedColorBuilder(Colors.black.withOpacity(0.3)),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Pinput(
+            controller: _pinController,
+            focusNode: _pinFocusNode,
+            length: 6,
+            defaultPinTheme: defaultPinTheme,
+            focusedPinTheme: focusedPinTheme,
+            submittedPinTheme: submittedPinTheme,
+            errorPinTheme: errorPinTheme,
+            pinputAutovalidateMode: PinputAutovalidateMode.onSubmit,
+            showCursor: true,
+            cursor: Container(
+              height: 20,
+              width: 2,
+              decoration: BoxDecoration(
+                color: const Color(0xFF4299E1),
+                borderRadius: BorderRadius.circular(1),
+              ),
             ),
-            currentCode: _otpControllers.map((controller) => controller.text).join(),
-            onCodeSubmitted: (code) {
-              if (code.length == 6) {
-                for (int i = 0; i < 6; i++) {
-                  _otpControllers[i].text = code[i];
-                }
-                _verifyOTP();
-              }
-            },
-            onCodeChanged: (code) {
-              if (code?.length == 6) {
-                for (int i = 0; i < 6; i++) {
-                  if (i < code!.length) {
-                    _otpControllers[i].text = code[i];
-                  }
-                }
-              }
-            },
-          ),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: List.generate(6, (index) {
-        return SizedBox(
-          width: 45,
-          height: 55,
-          child: TextField(
-            controller: _otpControllers[index],
-            focusNode: _focusNodes[index],
-            textAlign: TextAlign.center,
-            enabled: !authProvider.isVerifying && !_isDisposed,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D3748),
-            ),
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(1),
-            ],
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: authProvider.isVerifying 
-                  ? Colors.grey[100] 
-                  : Colors.grey[50],
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF4299E1)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              disabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey[200]!),
-              ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            onChanged: (value) {
-              if (_isDisposed || !mounted) return;
+            onChanged: (pin) {
+              _currentOTP = pin;
               
-              try {
-                // Clear error when user starts typing
-                if (authProvider.errorMessage != null) {
-                  authProvider.clearError();
-                }
-                
-                // Handle focus navigation
-                if (value.isNotEmpty && index < 5) {
-                  _focusNodes[index + 1].requestFocus();
-                } else if (value.isEmpty && index > 0) {
-                  _focusNodes[index - 1].requestFocus();
-                }
-                
-                // Auto verify when all fields are filled
-                String otp = '';
-                try {
-                  otp = _otpControllers.map((controller) => controller.text).join();
-                } catch (e) {
-                  print('Error getting OTP: $e');
-                  return;
-                }
-                
-                if (otp.length == 6 && !_isAutoVerifying && !_isDisposed && mounted) {
-                  _isAutoVerifying = true;
-                  Future.delayed(const Duration(milliseconds: 500), () {
-                    if (!_isDisposed && mounted) {
-                      _verifyOTP().then((_) {
-                        if (!_isDisposed) {
-                          _isAutoVerifying = false;
-                        }
-                      }).catchError((e) {
-                        if (!_isDisposed) {
-                          _isAutoVerifying = false;
-                        }
-                      });
-                    }
-                  });
-                }
-              } catch (e) {
-                print('Error in onChanged: $e');
+              // Clear error when user starts typing
+              if (authProvider.errorMessage != null) {
+                authProvider.clearError();
+              }
+              
+              setState(() {});
+            },
+            onCompleted: (pin) {
+              _currentOTP = pin;
+              HapticFeedback.lightImpact();
+              
+              // Auto-verify when 6 digits are entered
+              if (pin.length == 6 && !_isAutoVerifying) {
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  if (!_isDisposed && mounted) {
+                    _verifyOTP(pin);
+                  }
+                });
               }
             },
+            // Enable SMS autofill
+            androidSmsAutofillMethod: AndroidSmsAutofillMethod.smsUserConsentApi,
+            listenForMultipleSmsOnAndroid: true,
           ),
-        );
-      }),
         ),
+        
+        const SizedBox(height: 16),
+        
+        // Auto-fill status indicator
+        if (_currentOTP.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  color: Colors.blue.shade600,
+                  size: 16,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Code entered',
+                  style: TextStyle(
+                    color: Colors.blue.shade700,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
 
   Widget _buildVerifyButton(AuthProvider authProvider) {
-    String otp = '';
-    try {
-      otp = _otpControllers.map((controller) => controller.text).join();
-    } catch (e) {
-      print('Error getting OTP for button: $e');
-    }
-    
-    bool isValid = otp.length == 6;
+    bool isValid = _currentOTP.length == 6;
     bool isLoading = authProvider.isVerifying || _isAutoVerifying;
     
     return SizedBox(
       width: double.infinity,
       height: 52,
       child: ElevatedButton(
-        onPressed: isValid && !isLoading && !_isDisposed ? _verifyOTP : null,
+        onPressed: isValid && !isLoading && !_isDisposed 
+            ? () => _verifyOTP(_currentOTP) 
+            : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: isValid && !isLoading
-              ? const Color(0xFF4A5568)
-              : const Color(0xFF4A5568).withOpacity(0.6),
+              ? const Color(0xFF4299E1)
+              : const Color(0xFF4299E1).withOpacity(0.6),
           foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          elevation: isValid ? 3 : 0,
+          shadowColor: Color(0xFF4299E1).withOpacity(0.4),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         child: isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    'Verifying...',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               )
             : const Text(
                 'Verify Code',
@@ -641,7 +700,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          "Didn't receive code? ",
+          "Didn't receive the code? ",
           style: TextStyle(
             fontSize: 14,
             color: Colors.grey[600],
@@ -649,16 +708,24 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         ),
         GestureDetector(
           onTap: canResend ? _resendOTP : null,
-          child: Text(
-            _resendCooldown > 0 
-                ? 'Resend in 00:${_resendCooldown.toString().padLeft(2, '0')}'
-                : 'Resend',
-            style: TextStyle(
-              fontSize: 14,
-              color: canResend 
-                  ? const Color(0xFF4299E1)
-                  : Colors.grey[400],
-              fontWeight: FontWeight.w500,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              color: canResend ? Color(0xFF4299E1).withOpacity(0.1) : Colors.transparent,
+              border: canResend ? Border.all(color: Color(0xFF4299E1).withOpacity(0.3)) : null,
+            ),
+            child: Text(
+              _resendCooldown > 0 
+                  ? 'Resend in 00:${_resendCooldown.toString().padLeft(2, '0')}'
+                  : 'Resend Code',
+              style: TextStyle(
+                fontSize: 14,
+                color: canResend 
+                    ? const Color(0xFF4299E1)
+                    : Colors.grey[400],
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -669,12 +736,27 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   Widget _buildChangeNumberButton() {
     return GestureDetector(
       onTap: _isDisposed ? null : _changeNumber,
-      child: const Text(
-        'Change Number',
-        style: TextStyle(
-          fontSize: 14,
-          color: Color(0xFF4299E1),
-          fontWeight: FontWeight.w500,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Color(0xFF4299E1).withOpacity(0.5)),
+          color: Colors.white,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.edit, size: 16, color: Color(0xFF4299E1)),
+            SizedBox(width: 8),
+            Text(
+              'Change Number',
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF4299E1),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

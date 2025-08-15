@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:customer_app/presentation/screens/orders/schedule_pickup_delivery_screen.dart';
 import 'package:customer_app/data/models/item_model.dart';
+import 'package:customer_app/presentation/providers/allied_service_provider.dart';
 
 class AlliedServicesScreen extends StatefulWidget {
   const AlliedServicesScreen({super.key});
@@ -11,45 +14,16 @@ class AlliedServicesScreen extends StatefulWidget {
 
 class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
   // Service items with their quantities
-  Map<String, int> serviceQuantities = {
-    'bed_sheet': 0,
-    'pillow_cover': 0,
-    'stain_removal': 0,
-  };
-
-  // Service definitions
-  final List<Map<String, dynamic>> _services = [
-    {
-      'id': 'bed_sheet',
-      'name': 'Bed Sheet',
-      'description': 'Professional washing and ironing',
-      'price': 100.0,
-      'unit': 'piece',
-      'icon': Icons.bed,
-      'color': Colors.blue,
-      'hasPrice': true,
-    },
-    {
-      'id': 'pillow_cover',
-      'name': 'Pillow Cover',
-      'description': 'Deep washing and fresh ironing',
-      'price': 20.0,
-      'unit': 'piece',
-      'icon': Icons.airline_seat_individual_suite,
-      'color': Colors.green,
-      'hasPrice': true,
-    },
-    {
-      'id': 'stain_removal',
-      'name': 'Stain Removal',
-      'description': 'Price will be notified after inspection',
-      'price': 0.0,
-      'unit': 'item',
-      'icon': Icons.local_laundry_service,
-      'color': Colors.orange,
-      'hasPrice': false,
-    },
-  ];
+  Map<String, int> serviceQuantities = {};
+  
+  @override
+  void initState() {
+    super.initState();
+    // Load allied services when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<AlliedServiceProvider>(context, listen: false).loadAlliedServices();
+    });
+  }
 
   void _incrementQuantity(String serviceId) {
     setState(() {
@@ -66,12 +40,17 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
   }
 
   double get totalAmount {
+    final alliedServiceProvider = Provider.of<AlliedServiceProvider>(context, listen: false);
     return serviceQuantities.entries.fold<double>(0.0, (sum, entry) {
-      final service = _services.firstWhere((s) => s['id'] == entry.key);
-      if (service['hasPrice']) {
-        return sum + (service['price'] * entry.value);
+      try {
+        final service = alliedServiceProvider.getServiceById(entry.key);
+        if (service != null && service.hasPrice) {
+          return sum + (service.effectivePrice * entry.value);
+        }
+        return sum;
+      } catch (e) {
+        return sum;
       }
-      return sum;
     });
   }
 
@@ -81,18 +60,23 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
     // Convert selected services to ItemModel format for compatibility
     final selectedItems = <ItemModel, int>{};
     
+    final alliedServiceProvider = Provider.of<AlliedServiceProvider>(context, listen: false);
+    
     serviceQuantities.entries.where((entry) => entry.value > 0).forEach((entry) {
-      final service = _services.firstWhere((s) => s['id'] == entry.key);
-      final item = ItemModel(
-        id: service['id'],
-        name: service['name'],
-        pricePerPiece: service['price'],
-        category: 'Allied Services',
-        unit: service['unit'],
-        isActive: true,
-        order: 1,
-      );
-      selectedItems[item] = entry.value;
+      final service = alliedServiceProvider.getServiceById(entry.key);
+      if (service != null) {
+        final item = ItemModel(
+          id: service.id,
+          name: service.name,
+          pricePerPiece: service.effectivePrice,
+          offerPrice: service.hasOffer ? service.effectivePrice : null,
+          category: service.category,
+          unit: service.unit,
+          isActive: service.isActive,
+          order: service.sortOrder,
+        );
+        selectedItems[item] = entry.value;
+      }
     });
 
     if (selectedItems.isEmpty) {
@@ -136,8 +120,88 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black),
+            onPressed: () {
+              Provider.of<AlliedServiceProvider>(context, listen: false).refreshServices();
+            },
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
+      body: Consumer<AlliedServiceProvider>(
+        builder: (context, alliedServiceProvider, child) {
+          if (alliedServiceProvider.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          if (alliedServiceProvider.error != null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading services',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    alliedServiceProvider.error!,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => alliedServiceProvider.refreshServices(),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final services = alliedServiceProvider.alliedServices;
+
+          if (services.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.local_laundry_service, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'No allied services available',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Check back later for new services',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,10 +270,10 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                   ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _services.length,
+                    itemCount: services.length,
                     itemBuilder: (context, index) {
-                      final service = _services[index];
-                      final quantity = serviceQuantities[service['id']] ?? 0;
+                      final service = services[index];
+                      final quantity = serviceQuantities[service.id] ?? 0;
                       
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -231,47 +295,107 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                             children: [
                               Row(
                                 children: [
+                                  // Service Image or Icon
                                   Container(
-                                    padding: const EdgeInsets.all(12),
+                                    width: 60,
+                                    height: 60,
                                     decoration: BoxDecoration(
-                                      color: (service['color'] as Color).withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(12),
+                                      color: Colors.blue.withOpacity(0.1),
                                     ),
-                                    child: Icon(
-                                      service['icon'] as IconData,
-                                      color: service['color'] as Color,
-                                      size: 24,
-                                    ),
+                                    child: service.imageUrl != null
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(12),
+                                            child: CachedNetworkImage(
+                                              imageUrl: service.imageUrl!,
+                                              fit: BoxFit.cover,
+                                              placeholder: (context, url) => const Center(
+                                                child: CircularProgressIndicator(),
+                                              ),
+                                              errorWidget: (context, url, error) => Icon(
+                                                Icons.local_laundry_service,
+                                                color: Colors.blue.shade600,
+                                                size: 24,
+                                              ),
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.local_laundry_service,
+                                            color: Colors.blue.shade600,
+                                            size: 24,
+                                          ),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          service['name'],
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 16,
-                                          ),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                service.name,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                            ),
+                                            if (service.hasOffer)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.red.shade100,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  '${service.discountPercentage.toInt()}% OFF',
+                                                  style: TextStyle(
+                                                    color: Colors.red.shade700,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          service['description'],
+                                          service.description,
                                           style: TextStyle(
                                             color: Colors.grey[600],
                                             fontSize: 14,
                                           ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                         const SizedBox(height: 8),
-                                        if (service['hasPrice'])
-                                          Text(
-                                            '₹${service['price'].toInt()} per ${service['unit']}',
-                                            style: TextStyle(
-                                              color: Colors.green[600],
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                                        if (service.hasPrice)
+                                          Row(
+                                            children: [
+                                              if (service.hasOffer) ...[
+                                                Text(
+                                                  '₹${service.price.toInt()}',
+                                                  style: TextStyle(
+                                                    color: Colors.grey[500],
+                                                    fontSize: 12,
+                                                    decoration: TextDecoration.lineThrough,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                              ],
+                                              Text(
+                                                '₹${service.effectivePrice.toInt()} per ${service.unit}',
+                                                style: TextStyle(
+                                                  color: Colors.green[600],
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
                                           )
                                         else
                                           Container(
@@ -305,7 +429,7 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                                       children: [
                                         IconButton(
                                           onPressed: quantity > 0 
-                                              ? () => _decrementQuantity(service['id'])
+                                              ? () => _decrementQuantity(service.id)
                                               : null,
                                           icon: Icon(
                                             Icons.remove,
@@ -329,7 +453,7 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                                           ),
                                         ),
                                         IconButton(
-                                          onPressed: () => _incrementQuantity(service['id']),
+                                          onPressed: () => _incrementQuantity(service.id),
                                           icon: Container(
                                             padding: const EdgeInsets.all(2),
                                             decoration: BoxDecoration(
@@ -403,7 +527,9 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                   if (totalItems > 0) const SizedBox(height: 120),
                 ],
               ),
-            ),
+            );
+        },
+      ),
       bottomSheet: totalItems > 0 ? _buildStickyCartSummary() : null,
     );
   }

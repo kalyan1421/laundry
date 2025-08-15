@@ -264,6 +264,79 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionId": "orders",
+      "fields": [
+        {
+          "fieldPath": "assignedDeliveryPartner",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionId": "orders",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "assignedDeliveryPartner",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionId": "orders",
+      "fields": [
+        {
+          "fieldPath": "assignedDeliveryPartner",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionId": "orders",
+      "fields": [
+        {
+          "fieldPath": "assignedDeliveryPartner",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "deliveredAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionId": "orders",
+      "fields": [
+        {
+          "fieldPath": "assignedDeliveryPartner",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "deliveredAt",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

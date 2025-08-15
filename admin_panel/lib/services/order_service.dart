@@ -9,7 +9,7 @@ class OrderService {
   Stream<List<OrderModel>> getOrdersForDeliveryPartner(String deliveryPartnerId) {
     return _firestore
         .collection('orders')
-        .where('assignedDeliveryPerson', isEqualTo: deliveryPartnerId)
+        .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
         .snapshots()
         .asyncMap((snapshot) async {
       List<OrderModel> orders = [];
@@ -104,7 +104,7 @@ class OrderService {
       }
       
       if (deliveryPartnerId != null) {
-        query = query.where('assignedDeliveryPerson', isEqualTo: deliveryPartnerId);
+        query = query.where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId);
       }
       
              // Order by creation time - try multiple field options
@@ -242,7 +242,8 @@ class OrderService {
         'status': 'rejected_by_delivery_partner',
         'rejectedAt': FieldValue.serverTimestamp(),
         'rejectionReason': reason,
-        'assignedDeliveryPerson': null, // Unassign from this delivery person
+        'assignedDeliveryPartner': null, // Unassign from this delivery partner
+        'assignedDeliveryPerson': null, // Keep old field for backward compatibility
         'assignedDeliveryPersonName': null,
         'statusHistory': FieldValue.arrayUnion([
           {
@@ -268,7 +269,7 @@ class OrderService {
       // Get all orders for this delivery person
       QuerySnapshot ordersSnapshot = await _firestore
           .collection('orders')
-          .where('assignedDeliveryPerson', isEqualTo: deliveryPartnerId)
+          .where('assignedDeliveryPartner', isEqualTo: deliveryPartnerId)
           .get();
 
       Map<String, int> stats = {

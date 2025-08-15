@@ -1,112 +1,66 @@
-// services/delivery_partner_service.dart - No Firebase Auth operations
+// services/delivery_partner_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:math';
-
-import '../models/delivery_partner_model.dart';
 
 class DeliveryPartnerService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Toggle delivery person active status
-  Future<bool> toggleDeliveryPartnerStatus(String id, bool isActive) async {
-    try {
-      await _firestore.collection('delivery').doc(id).update({
-        'isActive': isActive,
-        'updatedAt': Timestamp.now(),
-      });
-      return true;
-    } catch (e) {
-      print('Error toggling delivery person status: $e');
-      return false;
-    }
-  }
-
-  // Delete delivery person (soft delete)
-  Future<bool> deleteDeliveryPartner(String id) async {
-    try {
-      await _firestore.collection('delivery').doc(id).update({
-        'isActive': false,
-        'isDeleted': true,
-        'deletedAt': Timestamp.now(),
-        'updatedAt': Timestamp.now(),
-      });
-      return true;
-    } catch (e) {
-      print('Error deleting delivery person: $e');
-      return false;
-    }
-  }
-
-  // Get delivery person statistics
-  Future<Map<String, int>> getDeliveryPartnerStats() async {
-    try {
-      final snapshot = await _firestore
-          .collection('delivery')
-          .where('isDeleted', isNotEqualTo: true)
-          .get();
-
-      int total = snapshot.docs.length;
-      int active = snapshot.docs.where((doc) => doc.data()['isActive'] == true).length;
-      int online = snapshot.docs.where((doc) => doc.data()['isOnline'] == true).length;
-      int available = snapshot.docs.where((doc) => 
-        doc.data()['isActive'] == true && 
-        doc.data()['isAvailable'] == true
-      ).length;
-
-      return {
-        'total': total,
-        'active': active,
-        'offline': active - online,
-        'online': online,
-      };
-    } catch (e) {
-      print('Error getting delivery person stats: $e');
-      return {
-        'total': 0,
-        'active': 0,
-        'offline': 0,
-        'online': 0,
-      };
-    }
-  }
-
-  // Create delivery person by admin with proper authentication setup
-  Future<DeliveryPartnerModel?> createDeliveryPartnerByAdmin({
+  /// Add a new delivery partner with phone + code authentication
+  Future<void> addDeliveryPartner({
     required String name,
-    required String email,
     required String phoneNumber,
+    required String email,
     required String licenseNumber,
-    String? createdByUid,
+    required String aadharNumber,
+    required String loginCode,
+    required bool isActive,
+    required String createdBy,
+    required String createdByRole,
   }) async {
     try {
-      // Format phone number consistently
-      String formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : '+91$phoneNumber';
+      // Format phone number
+      String formattedPhone = phoneNumber.startsWith('+91') 
+          ? phoneNumber 
+          : '+91$phoneNumber';
+
+      // Check if phone number already exists
+      final existingQuery = await _firestore
+          .collection('delivery')
+          .where('phoneNumber', isEqualTo: formattedPhone)
+          .limit(1)
+          .get();
+
+      if (existingQuery.docs.isNotEmpty) {
+        throw Exception('A delivery partner with this phone number already exists');
+      }
+
+      // Check if login code already exists
+      final codeQuery = await _firestore
+          .collection('delivery')
+          .where('loginCode', isEqualTo: loginCode)
+          .limit(1)
+          .get();
+
+      if (codeQuery.docs.isNotEmpty) {
+        throw Exception('This login code is already in use. Please choose a different code.');
+      }
+
+      final now = Timestamp.now();
       
-      // Generate a unique ID for the delivery person
-      String deliveryPartnerId = _firestore.collection('delivery').doc().id;
-      
-      // Generate a simple 4-digit login code
-      final random = Random.secure();
-      String loginCode = (1000 + random.nextInt(9000)).toString();
-      
-      // Create delivery person data with authentication setup
-      final deliveryPartnerData = {
-        'id': deliveryPartnerId,
-        'uid': null, // Will be set when they first login and verify phone
+      // Create delivery partner document
+      final deliveryData = {
         'name': name,
-        'email': email.toLowerCase(),
         'phoneNumber': formattedPhone,
-        'licenseNumber': licenseNumber.toUpperCase(),
-        'role': 'delivery',
-        'isActive': true,
+        'email': email,
+        'licenseNumber': licenseNumber,
+        'aadharNumber': aadharNumber,
+        'loginCode': loginCode,
+        'isActive': isActive,
         'isAvailable': true,
         'isOnline': false,
-        'isRegistered': false, // Will be set to true on first login
-        'authenticationStatus': 'pending_verification', // New field to track auth status
-        'canLogin': true, // Allow login attempts
-        'firstLoginRequired': true, // Indicates first-time login needed
-        'loginCode': loginCode,
-        'registrationToken': loginCode, // Keep for backward compatibility
+        'isRegistered': false,
+        'firstLoginRequired': true,
+        'authenticationStatus': 'pending',
+        'role': 'delivery',
         'rating': 0.0,
         'totalDeliveries': 0,
         'completedDeliveries': 0,
@@ -115,359 +69,383 @@ class DeliveryPartnerService {
         'currentOrders': [],
         'orderHistory': [],
         'vehicleInfo': {},
-        'documents': {
-          'license': {
-            'number': licenseNumber.toUpperCase(),
-            'verified': false,
-          }
-        },
+        'documents': {},
         'bankDetails': {},
         'address': {},
-        'createdAt': Timestamp.now(),
-        'updatedAt': Timestamp.now(),
-        'createdBy': createdByUid ?? 'admin',
-        'createdByRole': 'admin',
-        // Add metadata for tracking
+        'createdAt': now,
+        'updatedAt': now,
+        'createdBy': createdBy,
+        'createdByRole': createdByRole,
         'metadata': {
-          'createdByAdmin': true,
-          'needsPhoneVerification': true,
           'loginAttempts': 0,
           'lastLoginAttempt': null,
-        }
+          'lastSuccessfulLogin': null,
+          'firstLoginCompleted': false,
+          'linkedToFirebaseAuth': false,
+          'linkedAt': null,
+        },
       };
 
-      // Save to Firestore with the phone number as a searchable field
-      await _firestore.collection('delivery').doc(deliveryPartnerId).set(deliveryPartnerData);
+      // Add to delivery collection
+      final docRef = await _firestore.collection('delivery').add(deliveryData);
       
-      // Also create an index entry for quick phone lookup during login
-      await _firestore.collection('delivery_phone_index').doc(formattedPhone.replaceAll('+', '')).set({
+      // Create phone index for faster lookups
+      final phoneKey = formattedPhone.replaceAll('+', '');
+      await _firestore.collection('delivery_phone_index').doc(phoneKey).set({
+        'deliveryPartnerId': docRef.id,
         'phoneNumber': formattedPhone,
-        'deliveryPartnerId': deliveryPartnerId,
-        'isActive': true,
-        'createdAt': Timestamp.now(),
-        'createdBy': createdByUid ?? 'admin',
+        'isActive': isActive,
+        'createdAt': now,
       });
-      
-      print('✅ Delivery person created successfully with ID: $deliveryPartnerId');
-      print('📱 Phone indexed for login: $formattedPhone');
-      
-      // Return the created delivery person
-      return DeliveryPartnerModel.fromMap(deliveryPartnerData);
-      
+
+      print('✅ Delivery partner added successfully: ${docRef.id}');
+
     } catch (e) {
-      print('❌ Error creating delivery person: $e');
-      throw Exception('Failed to create delivery person: ${e.toString()}');
+      print('❌ Error adding delivery partner: $e');
+      rethrow;
     }
   }
 
-  // Check if phone number is available
-  Future<bool> isPhoneNumberAvailable(String phoneNumber) async {
+  /// Update delivery partner information
+  Future<void> updateDeliveryPartner({
+    required String partnerId,
+    required String name,
+    required String phoneNumber,
+    required String email,
+    required String licenseNumber,
+    required String aadharNumber,
+    required String loginCode,
+    required bool isActive,
+  }) async {
     try {
-      String formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : '+91$phoneNumber';
+      // Format phone number
+      String formattedPhone = phoneNumber.startsWith('+91') 
+          ? phoneNumber 
+          : '+91$phoneNumber';
+
+      // Get current partner data
+      final currentDoc = await _firestore.collection('delivery').doc(partnerId).get();
+      if (!currentDoc.exists) {
+        throw Exception('Delivery partner not found');
+      }
+
+      final currentData = currentDoc.data()!;
+      final currentPhone = currentData['phoneNumber'];
+      final currentCode = currentData['loginCode'];
+
+      // Check if phone number is changing and if new number already exists
+      if (formattedPhone != currentPhone) {
+        final existingQuery = await _firestore
+            .collection('delivery')
+            .where('phoneNumber', isEqualTo: formattedPhone)
+            .limit(1)
+            .get();
+
+        if (existingQuery.docs.isNotEmpty) {
+          throw Exception('A delivery partner with this phone number already exists');
+        }
+      }
+
+      // Check if login code is changing and if new code already exists
+      if (loginCode != currentCode) {
+        final codeQuery = await _firestore
+            .collection('delivery')
+            .where('loginCode', isEqualTo: loginCode)
+            .limit(1)
+            .get();
+
+        if (codeQuery.docs.isNotEmpty) {
+          throw Exception('This login code is already in use. Please choose a different code.');
+        }
+      }
+
+      // Update delivery partner
+      await _firestore.collection('delivery').doc(partnerId).update({
+        'name': name,
+        'phoneNumber': formattedPhone,
+        'email': email,
+        'licenseNumber': licenseNumber,
+        'aadharNumber': aadharNumber,
+        'loginCode': loginCode,
+        'isActive': isActive,
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Update phone index if phone number changed
+      if (formattedPhone != currentPhone) {
+        // Remove old index
+        if (currentPhone != null) {
+          final oldPhoneKey = currentPhone.replaceAll('+', '');
+          await _firestore.collection('delivery_phone_index').doc(oldPhoneKey).delete();
+        }
+
+        // Create new index
+        final phoneKey = formattedPhone.replaceAll('+', '');
+        await _firestore.collection('delivery_phone_index').doc(phoneKey).set({
+          'deliveryPartnerId': partnerId,
+          'phoneNumber': formattedPhone,
+          'isActive': isActive,
+          'createdAt': Timestamp.now(),
+        });
+      } else {
+        // Update existing index
+        final phoneKey = formattedPhone.replaceAll('+', '');
+        await _firestore.collection('delivery_phone_index').doc(phoneKey).update({
+          'isActive': isActive,
+        });
+      }
+
+      print('✅ Delivery partner updated successfully: $partnerId');
+
+    } catch (e) {
+      print('❌ Error updating delivery partner: $e');
+      rethrow;
+    }
+  }
+
+  /// Toggle delivery partner active status
+  Future<void> togglePartnerStatus(String partnerId, bool isActive) async {
+    try {
+      await _firestore.collection('delivery').doc(partnerId).update({
+        'isActive': isActive,
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Update phone index
+      final doc = await _firestore.collection('delivery').doc(partnerId).get();
+      if (doc.exists) {
+        final phoneNumber = doc.data()!['phoneNumber'];
+        if (phoneNumber != null) {
+          final phoneKey = phoneNumber.replaceAll('+', '');
+          await _firestore.collection('delivery_phone_index').doc(phoneKey).update({
+            'isActive': isActive,
+          });
+        }
+      }
+
+      print('✅ Partner status toggled: $partnerId -> $isActive');
+
+    } catch (e) {
+      print('❌ Error toggling partner status: $e');
+      rethrow;
+    }
+  }
+
+  /// Reset delivery partner login code
+  Future<void> resetLoginCode(String partnerId, String newCode) async {
+    try {
+      // Check if new code already exists
+      final codeQuery = await _firestore
+          .collection('delivery')
+          .where('loginCode', isEqualTo: newCode)
+          .limit(1)
+          .get();
+
+      if (codeQuery.docs.isNotEmpty && codeQuery.docs.first.id != partnerId) {
+        throw Exception('This login code is already in use. Please choose a different code.');
+      }
+
+      await _firestore.collection('delivery').doc(partnerId).update({
+        'loginCode': newCode,
+        'updatedAt': Timestamp.now(),
+        'firstLoginRequired': true, // Require them to login again
+      });
+
+      print('✅ Login code reset for partner: $partnerId');
+
+    } catch (e) {
+      print('❌ Error resetting login code: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete delivery partner
+  Future<void> deleteDeliveryPartner(String partnerId) async {
+    try {
+      // Get partner data to clean up phone index
+      final doc = await _firestore.collection('delivery').doc(partnerId).get();
       
-      // Check phone index first for faster lookup
-      String phoneKey = formattedPhone.replaceAll('+', '');
+      if (doc.exists) {
+        final phoneNumber = doc.data()!['phoneNumber'];
+        
+        // Delete phone index
+        if (phoneNumber != null) {
+          final phoneKey = phoneNumber.replaceAll('+', '');
+          await _firestore.collection('delivery_phone_index').doc(phoneKey).delete();
+        }
+      }
+
+      // Delete delivery partner
+      await _firestore.collection('delivery').doc(partnerId).delete();
+
+      print('✅ Delivery partner deleted: $partnerId');
+
+    } catch (e) {
+      print('❌ Error deleting delivery partner: $e');
+      rethrow;
+    }
+  }
+
+  /// Authenticate delivery partner with phone + code
+  Future<Map<String, dynamic>?> authenticateDeliveryPartner({
+    required String phoneNumber,
+    required String loginCode,
+  }) async {
+    try {
+      // Format phone number
+      String formattedPhone = phoneNumber.startsWith('+91') 
+          ? phoneNumber 
+          : '+91$phoneNumber';
+
+      // First try phone index for faster lookup
+      final phoneKey = formattedPhone.replaceAll('+', '');
       final indexDoc = await _firestore
           .collection('delivery_phone_index')
           .doc(phoneKey)
           .get();
-      
-      if (indexDoc.exists && indexDoc.data()?['isActive'] == true) {
-        print('Phone number $formattedPhone already exists in index');
-        return false;
-      }
-      
-      // Check in delivery collection for backward compatibility
-      final deliveryQuery = await _firestore
-          .collection('delivery')
-          .where('phoneNumber', isEqualTo: formattedPhone)
-          .limit(1)
-          .get();
-          
-      // Also check in delivery collection for legacy data
-      final personnelQuery = await _firestore
-          .collection('delivery')
-          .where('phoneNumber', isEqualTo: formattedPhone)
-          .limit(1)
-          .get();
-      
-      return deliveryQuery.docs.isEmpty && personnelQuery.docs.isEmpty;
-    } catch (e) {
-      print('Error checking phone availability: $e');
-      // Return false to prevent duplicate creation on error
-      return false;
-    }
-  }
 
-  // Check if email is available
-  Future<bool> isEmailAvailable(String email) async {
-    try {
-      String lowerEmail = email.toLowerCase();
-      
-      // Check in delivery collection
-      final deliveryQuery = await _firestore
-          .collection('delivery')
-          .where('email', isEqualTo: lowerEmail)
-          .limit(1)
-          .get();
-          
-      // Also check in delivery collection for legacy data
-      final personnelQuery = await _firestore
-          .collection('delivery')
-          .where('email', isEqualTo: lowerEmail)
-          .limit(1)
-          .get();
-      
-      return deliveryQuery.docs.isEmpty && personnelQuery.docs.isEmpty;
-    } catch (e) {
-      print('Error checking email availability: $e');
-      // Return false to prevent duplicate creation on error
-      return false;
-    }
-  }
+      String? partnerId;
 
-  // Check if license number is available
-  Future<bool> isLicenseNumberAvailable(String licenseNumber) async {
-    try {
-      String upperLicense = licenseNumber.toUpperCase();
-      
-      // Check in delivery collection
-      final deliveryQuery = await _firestore
-          .collection('delivery')
-          .where('licenseNumber', isEqualTo: upperLicense)
-          .limit(1)
-          .get();
-      
-      // Also check in documents.license.number field
-      final docsQuery = await _firestore
-          .collection('delivery')
-          .where('documents.license.number', isEqualTo: upperLicense)
-          .limit(1)
-          .get();
-          
-      // Check in delivery collection for legacy data
-      final personnelQuery = await _firestore
-          .collection('delivery')
-          .where('licenseNumber', isEqualTo: upperLicense)
-          .limit(1)
-          .get();
-      
-      return deliveryQuery.docs.isEmpty && docsQuery.docs.isEmpty && personnelQuery.docs.isEmpty;
-    } catch (e) {
-      print('Error checking license availability: $e');
-      // Return false to prevent duplicate creation on error
-      return false;
-    }
-  }
+      if (indexDoc.exists && indexDoc.data()!['isActive'] == true) {
+        partnerId = indexDoc.data()!['deliveryPartnerId'];
+      } else {
+        // Fallback: search in main collection
+        final query = await _firestore
+            .collection('delivery')
+            .where('phoneNumber', isEqualTo: formattedPhone)
+            .where('isActive', isEqualTo: true)
+            .limit(1)
+            .get();
 
-  // Get all delivery persons
-  Stream<List<DeliveryPartnerModel>> getDeliveryPartners() {
-    return _firestore
-        .collection('delivery')
-        .where('isDeleted', isNotEqualTo: true)
-        .orderBy('isDeleted')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => DeliveryPartnerModel.fromMap({
-                ...doc.data(),
-                'id': doc.id,
-              }))
-          .toList();
-    }).handleError((error) {
-      print('Error in delivery persons stream: $error');
-      return <DeliveryPartnerModel>[];
-    });
-  }
-
-  // Get active delivery persons
-  Stream<List<DeliveryPartnerModel>> getActiveDeliveryPartners() {
-    return _firestore
-        .collection('delivery')
-        .where('isActive', isEqualTo: true)
-        .where('isDeleted', isNotEqualTo: true)
-        .orderBy('isDeleted')
-        .orderBy('name')
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => DeliveryPartnerModel.fromMap({
-                ...doc.data(),
-                'id': doc.id,
-              }))
-          .toList();
-    }).handleError((error) {
-      print('Error in active delivery persons stream: $error');
-      return <DeliveryPartnerModel>[];
-    });
-  }
-
-  // Get delivery person by ID
-  Future<DeliveryPartnerModel?> getDeliveryPartnerById(String id) async {
-    try {
-      final doc = await _firestore.collection('delivery').doc(id).get();
-      if (doc.exists && doc.data() != null) {
-        return DeliveryPartnerModel.fromMap({
-          ...doc.data()!,
-          'id': doc.id,
-        });
-      }
-      return null;
-    } catch (e) {
-      print('Error getting delivery person: $e');
-      return null;
-    }
-  }
-
-  // Update delivery person
-  Future<bool> updateDeliveryPartner(String id, Map<String, dynamic> data) async {
-    try {
-      await _firestore.collection('delivery').doc(id).update({
-        ...data,
-        'updatedAt': Timestamp.now(),
-      });
-      return true;
-    } catch (e) {
-      print('Error updating delivery person: $e');
-      return false;
-    }
-  }
-
-  // Update delivery partner online status
-  Future<void> updateOnlineStatus(String deliveryPartnerId, bool isOnline) async {
-    try {
-      await _firestore.collection('delivery').doc(deliveryPartnerId).update({
-        'isOnline': isOnline,
-        'lastStatusUpdate': Timestamp.now(),
-        'updatedAt': Timestamp.now(),
-      });
-      print('✅ Updated online status for $deliveryPartnerId: $isOnline');
-    } catch (e) {
-      print('❌ Error updating online status: $e');
-      throw Exception('Failed to update online status');
-    }
-  }
-
-  // Get all delivery partners with real-time updates
-  Stream<List<DeliveryPartnerModel>> getAllDeliveryPartners() {
-    return _firestore
-        .collection('delivery')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => DeliveryPartnerModel.fromMap(doc.data() as Map<String, dynamic>))
-            .toList());
-  }
-
-  // Get only online delivery partners
-  Stream<List<DeliveryPartnerModel>> getOnlineDeliveryPartners() {
-    return _firestore
-        .collection('delivery')
-        .where('isOnline', isEqualTo: true)
-        .where('isActive', isEqualTo: true)
-        .orderBy('name')
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => DeliveryPartnerModel.fromMap(doc.data() as Map<String, dynamic>))
-            .toList());
-  }
-
-  // Toggle delivery partner active status
-  Future<void> toggleActiveStatus(String deliveryPartnerId, bool isActive) async {
-    try {
-      await _firestore.collection('delivery').doc(deliveryPartnerId).update({
-        'isActive': isActive,
-        'updatedAt': Timestamp.now(),
-      });
-      print('✅ Updated active status for $deliveryPartnerId: $isActive');
-    } catch (e) {
-      print('❌ Error updating active status: $e');
-      throw Exception('Failed to update active status');
-    }
-  }
-
-
-
-  // Generate new login code for delivery partner
-  Future<void> generateNewLoginCode(String deliveryPartnerId) async {
-    try {
-      final random = Random.secure();
-      String newLoginCode = (1000 + random.nextInt(9000)).toString();
-      
-      await _firestore.collection('delivery').doc(deliveryPartnerId).update({
-        'loginCode': newLoginCode,
-        'registrationToken': newLoginCode, // Keep for backward compatibility
-        'updatedAt': Timestamp.now(),
-      });
-      
-      print('✅ Generated new login code for $deliveryPartnerId: $newLoginCode');
-    } catch (e) {
-      print('❌ Error generating new login code: $e');
-      throw Exception('Failed to generate new login code');
-    }
-  }
-
-  // Migration function to create phone index for existing delivery partners
-  Future<void> migrateExistingDeliveryPartnersToPhoneIndex() async {
-    try {
-      print('🔄 Starting migration of existing delivery partners to phone index...');
-      
-      // Get all active delivery partners
-      final QuerySnapshot deliverySnapshot = await _firestore
-          .collection('delivery')
-          .where('isActive', isEqualTo: true)
-          .get();
-      
-      int migrated = 0;
-      int skipped = 0;
-      
-      for (var doc in deliverySnapshot.docs) {
-        try {
-          final data = doc.data() as Map<String, dynamic>;
-          final phoneNumber = data['phoneNumber'] as String?;
-          
-          if (phoneNumber != null && phoneNumber.isNotEmpty) {
-            String phoneKey = phoneNumber.replaceAll('+', '');
-            
-            // Check if phone index already exists
-            final indexDoc = await _firestore
-                .collection('delivery_phone_index')
-                .doc(phoneKey)
-                .get();
-            
-            if (!indexDoc.exists) {
-              // Create phone index entry
-              await _firestore.collection('delivery_phone_index').doc(phoneKey).set({
-                'phoneNumber': phoneNumber,
-                'deliveryPartnerId': doc.id,
-                'isActive': true,
-                'createdAt': Timestamp.now(),
-                'createdBy': 'migration',
-                'migratedAt': Timestamp.now(),
-              });
-              
-              print('✅ Migrated delivery partner ${doc.id} with phone $phoneNumber');
-              migrated++;
-            } else {
-              print('⏭️ Phone index already exists for ${doc.id}');
-              skipped++;
-            }
-          } else {
-            print('⚠️ Delivery partner ${doc.id} has no phone number');
-            skipped++;
-          }
-        } catch (e) {
-          print('❌ Error migrating delivery partner ${doc.id}: $e');
-          skipped++;
+        if (query.docs.isNotEmpty) {
+          partnerId = query.docs.first.id;
         }
       }
+
+      if (partnerId == null) {
+        throw Exception('No active delivery partner found with this phone number');
+      }
+
+      // Get partner data and verify code
+      final partnerDoc = await _firestore.collection('delivery').doc(partnerId).get();
       
-      print('🎉 Migration completed: $migrated migrated, $skipped skipped');
+      if (!partnerDoc.exists) {
+        throw Exception('Delivery partner not found');
+      }
+
+      final partnerData = partnerDoc.data()!;
       
+      if (partnerData['loginCode'] != loginCode) {
+        // Update failed login attempt
+        await _firestore.collection('delivery').doc(partnerId).update({
+          'metadata.lastLoginAttempt': Timestamp.now(),
+          'metadata.loginAttempts': FieldValue.increment(1),
+        });
+        
+        throw Exception('Invalid login code');
+      }
+
+      // Update successful login
+      await _firestore.collection('delivery').doc(partnerId).update({
+        'metadata.lastSuccessfulLogin': Timestamp.now(),
+        'metadata.lastLoginAttempt': Timestamp.now(),
+        'isOnline': true,
+      });
+
+      return {
+        'id': partnerId,
+        ...partnerData,
+      };
+
     } catch (e) {
-      print('❌ Error during migration: $e');
-      throw Exception('Migration failed: ${e.toString()}');
+      print('❌ Error authenticating delivery partner: $e');
+      rethrow;
+    }
+  }
+
+  /// Get delivery partner by ID
+  Future<Map<String, dynamic>?> getDeliveryPartner(String partnerId) async {
+    try {
+      final doc = await _firestore.collection('delivery').doc(partnerId).get();
+      
+      if (!doc.exists) {
+        return null;
+      }
+
+      return {
+        'id': partnerId,
+        ...doc.data()!,
+      };
+
+    } catch (e) {
+      print('❌ Error getting delivery partner: $e');
+      return null;
+    }
+  }
+
+  /// Get all delivery partners
+  Stream<List<Map<String, dynamic>>> getAllDeliveryPartners() {
+    return _firestore
+        .collection('delivery')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return {
+          'id': doc.id,
+          ...doc.data(),
+        };
+      }).toList();
+    });
+  }
+
+  /// Assign order to delivery partner
+  Future<void> assignOrderToPartner({
+    required String orderId,
+    required String partnerId,
+    required Map<String, dynamic> orderDetails,
+  }) async {
+    try {
+      final batch = _firestore.batch();
+
+      // Update order with assignment
+      batch.update(
+        _firestore.collection('orders').doc(orderId),
+        {
+          'assignedTo': partnerId,
+          'status': 'assigned',
+          'assignedAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+      );
+
+      // Add order to delivery partner's current orders
+      batch.update(
+        _firestore.collection('delivery').doc(partnerId),
+        {
+          'currentOrders': FieldValue.arrayUnion([orderId]),
+          'updatedAt': Timestamp.now(),
+        },
+      );
+
+      // Create order assignment record for delivery partner
+      batch.set(
+        _firestore.collection('delivery').doc(partnerId).collection('assigned_orders').doc(orderId),
+        {
+          'orderId': orderId,
+          'assignedAt': Timestamp.now(),
+          'status': 'assigned',
+          'orderDetails': orderDetails,
+        },
+      );
+
+      await batch.commit();
+
+      print('✅ Order $orderId assigned to partner $partnerId');
+
+    } catch (e) {
+      print('❌ Error assigning order to partner: $e');
+      rethrow;
     }
   }
 }

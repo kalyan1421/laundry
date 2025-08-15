@@ -6,6 +6,7 @@ import 'package:customer_app/presentation/providers/address_provider.dart';
 import 'package:customer_app/data/models/address_model.dart';
 import 'package:customer_app/core/theme/app_colors.dart';
 import 'package:customer_app/core/theme/app_text_theme.dart';
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:customer_app/core/utils/address_formatter.dart';
 
 class ManageAddressesScreen extends StatefulWidget {
@@ -135,13 +136,12 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Manage Addresses'),
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.primary,
+        // AppBar theme is handled by the theme system
         actions: [
-          IconButton(
-            icon: const Icon(Icons.bug_report,),
-            onPressed: _testCoordinateSaving,
-          ),
+          // IconButton(
+          //   icon: const Icon(Icons.bug_report,),
+          //   onPressed: _testCoordinateSaving,
+          // ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadAddresses,
@@ -176,7 +176,6 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
                         icon: const Icon(Icons.add_location, color: Colors.white),
                         label: const Text('Add Address', style: TextStyle(color: Colors.white)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                         ),
                       ),
@@ -198,7 +197,7 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
             _loadAddresses();
           });
         },
-        backgroundColor: AppColors.primary,
+        // FAB theme is handled by the theme system
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );

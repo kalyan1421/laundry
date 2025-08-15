@@ -1,6 +1,7 @@
 // lib/widgets/common/custom_button.dart
 import 'package:flutter/material.dart' hide TextButton, IconButton;
-import 'package:flutter/material.dart' as material show TextButton, IconButton;
+import 'package:customer_app/core/theme/app_colors.dart';
+import 'package:customer_app/core/theme/app_text_theme.dart';
 
 class CustomButton extends StatelessWidget {
   final String text;
@@ -57,11 +58,11 @@ class CustomButton extends StatelessWidget {
     final theme = Theme.of(context);
     final bool isButtonDisabled = isDisabled || onPressed == null || isLoading;
     
-    // Default colors
-    final Color defaultBackgroundColor = backgroundColor ?? const Color(0xFF0F3057); // Primary color
-    final Color defaultTextColor = textColor ?? Colors.white;
-    final Color defaultDisabledBgColor = disabledBackgroundColor ?? Colors.grey[300]!;
-    final Color defaultDisabledTextColor = disabledTextColor ?? Colors.grey[600]!;
+    // Default colors from theme
+    final Color defaultBackgroundColor = backgroundColor ?? theme.colorScheme.primary;
+    final Color defaultTextColor = textColor ?? theme.colorScheme.onPrimary;
+    final Color defaultDisabledBgColor = disabledBackgroundColor ?? AppColors.disabled;
+    final Color defaultDisabledTextColor = disabledTextColor ?? AppColors.textDisabled;
     
     return Container(
       width: width ?? double.infinity,
@@ -87,10 +88,7 @@ class CustomButton extends StatelessWidget {
             borderRadius: borderRadius ?? BorderRadius.circular(8),
           ),
           padding: padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          textStyle: textStyle ?? const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
+          textStyle: textStyle ?? AppTextTheme.buttonText,
         ),
         child: child ?? _buildButtonContent(
           isButtonDisabled ? defaultDisabledTextColor : defaultTextColor,
@@ -251,13 +249,14 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return CustomButton(
       text: text,
       onPressed: onPressed,
       isLoading: isLoading,
       isDisabled: isDisabled,
-      backgroundColor: const Color(0xFF0F3057), // Primary color
-      textColor: Colors.white,
+      backgroundColor: theme.colorScheme.primary,
+      textColor: theme.colorScheme.onPrimary,
       width: width,
       height: height ?? 50,
       icon: icon,
@@ -290,14 +289,15 @@ class SecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return CustomButton(
       text: text,
       onPressed: onPressed,
       isLoading: isLoading,
       isDisabled: isDisabled,
-      backgroundColor: Colors.white,
-      textColor: const Color(0xFF0F3057), // Primary color
-      border: Border.all(color: const Color(0xFF0F3057)), // Primary color
+      backgroundColor: theme.colorScheme.surface,
+      textColor: theme.colorScheme.primary,
+      border: Border.all(color: theme.colorScheme.primary),
       width: width,
       height: height ?? 50,
       icon: icon,
@@ -334,8 +334,9 @@ class OutlineButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color defaultBorderColor = borderColor ?? const Color(0xFF4299E1);
-    final Color defaultTextColor = textColor ?? const Color(0xFF4299E1);
+    final theme = Theme.of(context);
+    final Color defaultBorderColor = borderColor ?? theme.colorScheme.tertiary;
+    final Color defaultTextColor = textColor ?? theme.colorScheme.tertiary;
 
     return CustomButton(
       text: text,
@@ -377,13 +378,14 @@ class DangerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return CustomButton(
       text: text,
       onPressed: onPressed,
       isLoading: isLoading,
       isDisabled: isDisabled,
-      backgroundColor: const Color(0xFFEF4444),
-      textColor: Colors.white,
+      backgroundColor: theme.colorScheme.error,
+      textColor: theme.colorScheme.onError,
       width: width,
       height: height ?? 50,
       icon: icon,
@@ -421,8 +423,8 @@ class SuccessButton extends StatelessWidget {
       onPressed: onPressed,
       isLoading: isLoading,
       isDisabled: isDisabled,
-      backgroundColor: const Color(0xFF10B981),
-      textColor: Colors.white,
+      backgroundColor: AppColors.success,
+      textColor: AppColors.textOnSuccess,
       width: width,
       height: height ?? 50,
       icon: icon,
@@ -458,13 +460,14 @@ class AppTextButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return CustomButton(
       text: text,
       onPressed: onPressed,
       isLoading: isLoading,
       isDisabled: isDisabled,
       backgroundColor: Colors.transparent,
-      textColor: textColor ?? const Color(0xFF0F3057), // Primary color
+      textColor: textColor ?? theme.colorScheme.primary,
       elevation: 0,
       width: width,
       height: height ?? 40,
@@ -500,18 +503,19 @@ class FloatingButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return CustomButton(
       text: text,
       onPressed: onPressed,
       isLoading: isLoading,
       isDisabled: isDisabled,
-      backgroundColor: backgroundColor ?? const Color(0xFF0F3057), // Primary color
-      textColor: Colors.white,
+      backgroundColor: backgroundColor ?? theme.colorScheme.primary,
+      textColor: theme.colorScheme.onPrimary,
       borderRadius: BorderRadius.circular(25),
       elevation: 4,
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
+          color: theme.colorScheme.shadow.withOpacity(0.1),
           blurRadius: 8,
           offset: const Offset(0, 4),
         ),
@@ -558,7 +562,7 @@ class AppIconButton extends StatelessWidget {
       onPressed: onPressed,
       isLoading: isLoading,
       isDisabled: isDisabled,
-      backgroundColor: backgroundColor ?? const Color(0xFF4A5568),
+      backgroundColor: backgroundColor ?? AppColors.darkGray,
       width: buttonSize,
       height: buttonSize,
       borderRadius: borderRadius ?? BorderRadius.circular(buttonSize / 2),
@@ -576,7 +580,7 @@ class AppIconButton extends StatelessWidget {
           : Icon(
               icon,
               size: iconSize ?? 24,
-              color: iconColor ?? Colors.white,
+              color: iconColor ?? AppColors.white,
             ),
     );
   }

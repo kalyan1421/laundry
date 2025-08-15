@@ -131,18 +131,27 @@ class AuthProvider extends ChangeNotifier {
       _logger.i("Auth state changed: User is null. Setting to Unauthenticated.");
       _authStatus = AuthStatus.unauthenticated;
       _userModel = null;
+      _clearUserData();
       _safeNotifyListeners();
     } else {
       _logger.i("Auth state changed: User found with UID: ${firebaseUser.uid}. Loading data.");
+      _firebaseUser = firebaseUser;
       _authStatus = AuthStatus.authenticating;
       _safeNotifyListeners();
-      await _loadUserDataWithRetry(firebaseUser.uid);
+      
+      // Attempt to load user data with enhanced error handling
+      final success = await _loadUserDataWithRetry(firebaseUser.uid);
+      if (!success && !_isDisposed) {
+        // If loading fails persistently, trigger automatic logout
+        _logger.e("Persistent failure to load user data. Triggering automatic logout.");
+        await _handlePersistentAuthFailure();
+      }
     }
   }
 
   // FIXED: Load user data with retry mechanism to handle Firestore eventual consistency
-  Future<UserModel?> _loadUserDataWithRetry(String uid) async {
-    if (_isDisposed) return null;
+  Future<bool> _loadUserDataWithRetry(String uid) async {
+    if (_isDisposed) return false;
     
     const int maxRetries = 5;
     const Duration baseDelay = Duration(milliseconds: 300);
@@ -160,7 +169,7 @@ class AuthProvider extends ChangeNotifier {
 
         final userModel = await _authService.getUserData(uid);
         
-        if (_isDisposed) return null;
+        if (_isDisposed) return false;
         
         if (userModel != null) {
           _userModel = userModel;
@@ -178,7 +187,7 @@ class AuthProvider extends ChangeNotifier {
           OrderNotificationService.setupOrderStatusListener();
           
           _safeNotifyListeners();
-          return _userModel;
+          return true;
         } else {
           _logger.w("AuthProvider: User document not found for UID $uid on attempt ${attempt + 1}");
           
@@ -207,16 +216,17 @@ class AuthProvider extends ChangeNotifier {
                   OrderNotificationService.setupOrderStatusListener();
                   
                   _safeNotifyListeners();
-                  return _userModel;
+                  return true;
                 }
               }
             }
             
-            // If all attempts failed, show error but don't immediately sign out
-            _setError('Unable to load your profile. Please check your connection and try again.');
+            // If all attempts failed, return false to trigger logout
+            _logger.e("AuthProvider: All attempts to load user data failed for UID $uid");
+            _setError('Unable to load your profile. Logging out for fresh start.');
             _authStatus = AuthStatus.failed;
             _safeNotifyListeners();
-            return null;
+            return false;
           }
         }
       } catch (e) {
@@ -225,19 +235,67 @@ class AuthProvider extends ChangeNotifier {
         // If this is the last attempt, handle the error
         if (attempt == maxRetries - 1) {
           _authStatus = AuthStatus.failed;
-          _setError(ErrorHandler.getUserFriendlyMessage(e));
+          _setError('Failed to load your profile. Logging out for fresh start.');
           _safeNotifyListeners();
-          return null;
+          return false;
         }
       }
     }
     
-    return null;
+    return false;
   }
 
-  // DEPRECATED: Keep for backward compatibility but use _loadUserDataWithRetry instead
-  Future<UserModel?> _loadUserData(String uid) async {
-    return _loadUserDataWithRetry(uid);
+  // Handle persistent authentication failures
+  Future<void> _handlePersistentAuthFailure() async {
+    if (_isDisposed) return;
+    
+    _logger.w("Handling persistent authentication failure - forcing logout");
+    
+    // Set error message before logout
+    _setError('Authentication failed. Please login again.');
+    
+    // Force logout with error state preserved
+    await signOut(isErrorState: true, isForced: true);
+  }
+  
+  // Clear all user-related data
+  void _clearUserData() {
+    _userModel = null;
+    _firebaseUser = null;
+    _phoneNumber = null;
+    _verificationId = null;
+    isNewUser = false;
+  }
+  
+  // Public method to check and handle authentication inconsistencies
+  Future<void> validateAuthenticationState() async {
+    if (_isDisposed) return;
+    
+    final firebaseUser = _authService.currentUser;
+    
+    // Check for authentication inconsistencies
+    if (firebaseUser == null && _authStatus == AuthStatus.authenticated) {
+      _logger.w("Authentication inconsistency detected: Firebase user is null but status is authenticated");
+      await _handlePersistentAuthFailure();
+      return;
+    }
+    
+    if (firebaseUser != null && _userModel == null && _authStatus == AuthStatus.authenticated) {
+      _logger.w("Authentication inconsistency detected: Firebase user exists but UserModel is null");
+      // Try to reload user data
+      final success = await _loadUserDataWithRetry(firebaseUser.uid);
+      if (!success) {
+        await _handlePersistentAuthFailure();
+      }
+      return;
+    }
+    
+    // Check for UID mismatch
+    if (firebaseUser != null && _userModel != null && firebaseUser.uid != _userModel!.uid) {
+      _logger.e("UID mismatch detected: Firebase UID (${firebaseUser.uid}) != UserModel UID (${_userModel!.uid})");
+      await _handlePersistentAuthFailure();
+      return;
+    }
   }
 
   // Send OTP to phone number
@@ -337,15 +395,23 @@ class AuthProvider extends ChangeNotifier {
     await sendOTP(_phoneNumber!);
   }
 
-  // FIXED: Modified sign out to be less aggressive
-  Future<void> signOut({bool isErrorState = false}) async {
+  // Enhanced sign out with better error handling
+  Future<void> signOut({bool isErrorState = false, bool isForced = false}) async {
     if (_isDisposed) return;
-    _logger.i("Signing out user.");
+    
+    if (isForced) {
+      _logger.w("Forced sign out due to persistent authentication issues.");
+    } else {
+      _logger.i("User initiated sign out.");
+    }
     
     try {
+      // Clear user data first
+      _clearUserData();
+      
+      // Sign out from Firebase
       await _authService.signOut();
-      _userModel = null;
-      _firebaseUser = null;
+      
       _authStatus = AuthStatus.unauthenticated;
       
       if (!isErrorState) {
@@ -353,12 +419,13 @@ class AuthProvider extends ChangeNotifier {
       } else {
         _logger.w("Signed out due to error. Error message preserved.");
       }
+      
       _safeNotifyListeners();
+      
     } catch (e) {
       _logger.e("Error during sign out: $e");
       // Even if sign out fails, reset local state
-      _userModel = null;
-      _firebaseUser = null;
+      _clearUserData();
       _authStatus = AuthStatus.unauthenticated;
       _safeNotifyListeners();
     }

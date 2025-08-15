@@ -342,7 +342,8 @@ class OrderProvider extends ChangeNotifier {
   Future<void> assignOrder(String orderId, String deliveryPersonId) async {
     try {
       await _firestore.collection('orders').doc(orderId).update({
-        'assignedDeliveryPerson': deliveryPersonId, // Fixed field name
+        'assignedDeliveryPartner': deliveryPersonId, // Updated to use consistent field name
+        'assignedDeliveryPerson': deliveryPersonId, // Keep old field for backward compatibility
         'status': 'assigned',
         'assignedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),

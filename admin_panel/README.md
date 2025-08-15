@@ -1,16 +1,40 @@
-# admin_panel
+# Admin Panel - Cloud Ironing Factory
 
-A new Flutter project.
+## 📋 Complete Documentation
 
-## Getting Started
+**For comprehensive documentation, please refer to:**
+👉 **[../COMPLETE_PROJECT_DOCUMENTATION.md](../COMPLETE_PROJECT_DOCUMENTATION.md)**
 
-This project is a starting point for a Flutter application.
+## 🚀 Quick Start
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+# Install dependencies
+flutter pub get
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+# Run web version
+flutter run -d chrome
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+# Run mobile version
+flutter run
+
+# Build for web
+flutter build web
+```
+
+## 📱 App Status
+
+- ✅ **Production Ready**
+- ✅ **Web & Mobile Support**
+- ✅ **Firebase Integration**
+- ✅ **Allied Services Management**
+
+## 🔥 Key Features
+
+- ✅ Order management dashboard
+- ✅ Items catalog management
+- ✅ Allied services CRUD system
+- ✅ Customer management
+- ✅ Delivery partner assignment
+- ✅ Real-time notifications
+
+For detailed setup, configuration, and usage instructions, see the main documentation.

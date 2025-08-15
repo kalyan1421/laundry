@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../../presentation/providers/auth_provider.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
@@ -105,17 +106,67 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _logger.i('Longitude: ${position.longitude} (Type: ${position.longitude.runtimeType})');
       _logger.i('Accuracy: ${position.accuracy} meters');
       _logger.i('Timestamp: ${position.timestamp}');
+      
+      // Perform reverse geocoding to get address details
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude, 
+        position.longitude
+      );
+      
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        _logger.i('Address details obtained:');
+        _logger.i('Locality: ${place.locality}');
+        _logger.i('SubLocality: ${place.subLocality}');
+        _logger.i('AdministrativeArea: ${place.administrativeArea}');
+        _logger.i('PostalCode: ${place.postalCode}');
+        _logger.i('Country: ${place.country}');
         
         setState(() {
           _currentPosition = position;
-        _isLoadingLocation = false;
+          _isLoadingLocation = false;
           
           _logger.i('Position set in state:');
           _logger.i('_currentPosition.latitude: ${_currentPosition?.latitude}');
           _logger.i('_currentPosition.longitude: ${_currentPosition?.longitude}');
           
-        _currentAddress = 'Location coordinates saved. Please manually fill your address details.';
-      });
+          // Auto-fill address fields
+          if (place.locality != null && place.locality!.isNotEmpty) {
+            _cityController.text = place.locality!;
+          }
+          if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) {
+            _stateController.text = place.administrativeArea!;
+          }
+          if (place.postalCode != null && place.postalCode!.isNotEmpty) {
+            _pincodeController.text = place.postalCode!;
+          }
+          
+          // Create a readable address string
+          List<String> addressParts = [];
+          if (place.subLocality != null && place.subLocality!.isNotEmpty) {
+            addressParts.add(place.subLocality!);
+          }
+          if (place.locality != null && place.locality!.isNotEmpty) {
+            addressParts.add(place.locality!);
+          }
+          if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) {
+            addressParts.add(place.administrativeArea!);
+          }
+          
+          _currentAddress = addressParts.join(', ');
+        });
+      } else {
+        setState(() {
+          _currentPosition = position;
+          _isLoadingLocation = false;
+          
+          _logger.i('Position set in state:');
+          _logger.i('_currentPosition.latitude: ${_currentPosition?.latitude}');
+          _logger.i('_currentPosition.longitude: ${_currentPosition?.longitude}');
+          
+          _currentAddress = 'Location coordinates saved. Please manually fill your address details.';
+        });
+      }
     } catch (e) {
       setState(() {
         _locationError = e.toString();

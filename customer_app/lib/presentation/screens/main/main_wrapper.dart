@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:customer_app/core/routes/app_routes.dart';
+import 'package:customer_app/core/utils/auth_validator.dart';
 
 import 'bottom_navigation.dart';
 
@@ -19,7 +20,7 @@ class MainWrapper extends StatefulWidget {
   State<MainWrapper> createState() => _MainWrapperState();
 }
 
-class _MainWrapperState extends State<MainWrapper> {
+class _MainWrapperState extends State<MainWrapper> with AuthValidationMixin {
   int _currentIndex = 0;
   final Logger _logger = Logger();
 
@@ -66,34 +67,17 @@ class _MainWrapperState extends State<MainWrapper> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
-     appBar: AppBar(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      // leading: IconButton(
-      //   icon: const Icon(Icons.menu, color: Colors.black),
-      //   onPressed: () {},
-      // ),
-      title: const Text(
-        'Cloud Ironing Factory',
-        style: TextStyle(
-          color: Colors.black,
-          fontWeight: FontWeight.bold,
-          fontSize: 22,
+      appBar: AppBar(
+        // AppBar theme is now handled by the theme system
+        title: Text(
+          'Cloud Ironing Factory',
+          style: theme.textTheme.headlineSmall,
         ),
+        // All other AppBar properties are handled by theme
       ),
-      centerTitle: true,
-      // actions: [
-      //   IconButton(
-      //     icon: const Icon(Icons.notifications_outlined, color: Colors.black),
-      //     onPressed: () {},
-      //   ),
-      //   IconButton(
-      //     icon: const Icon(Icons.person_outline, color: Colors.black),
-      //     onPressed: () {},
-      //   ),
-      // ],
-    ),
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigation(
         selectedIndex: _currentIndex,

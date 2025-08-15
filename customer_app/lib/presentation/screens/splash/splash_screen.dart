@@ -1,5 +1,6 @@
 // lib/screens/splash/splash_screen.dart
 import 'package:flutter/material.dart';
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'dart:async';
 
 class SplashScreen extends StatefulWidget {
@@ -14,7 +15,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.backgroundColor,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -31,31 +32,26 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 30),
             // App title
-            const Text(
+            Text(
               'CLOUD IRONING FACTORY',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2D3748),
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 letterSpacing: 1.5,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
-            const Text(
+            Text(
               '.FACTORY.',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2D3748),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 letterSpacing: 1.0,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Ironing Service',
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFF718096),
-                fontWeight: FontWeight.w400,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ],

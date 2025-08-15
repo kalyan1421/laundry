@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:customer_app/presentation/providers/auth_provider.dart';
+import 'package:customer_app/presentation/providers/theme_provider.dart';
+import 'package:customer_app/presentation/widgets/theme_selector_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -18,7 +20,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _reminderNotifications = true;
   
   // App Settings
-  bool _darkMode = false;
   String _language = 'English';
   String _currency = 'INR';
   bool _biometricAuth = false;
@@ -40,7 +41,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _orderUpdates = prefs.getBool('order_updates') ?? true;
       _promotionalNotifications = prefs.getBool('promotional_notifications') ?? false;
       _reminderNotifications = prefs.getBool('reminder_notifications') ?? true;
-      _darkMode = prefs.getBool('dark_mode') ?? false;
       _language = prefs.getString('language') ?? 'English';
       _currency = prefs.getString('currency') ?? 'INR';
       _biometricAuth = prefs.getBool('biometric_auth') ?? false;
@@ -125,20 +125,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSection(
               'App Preferences',
               [
-                _buildSwitchTile(
-                  'Dark Mode',
-                  'Use dark theme for the app',
-                  Icons.dark_mode,
-                  _darkMode,
-                  (value) {
-                    setState(() => _darkMode = value);
-                    _saveSetting('dark_mode', value);
-                    // TODO: Implement theme switching
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Theme will change after app restart')),
-                    );
-                  },
-                ),
+                // Theme Selection - Use the new theme selector widget
+                _buildThemeSelectionTile(),
                 _buildDropdownTile(
                   'Language',
                   'Select your preferred language',
@@ -201,45 +189,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 12),
 
-            // Privacy Section
-            _buildSection(
-              'Privacy',
-              [
-                _buildSwitchTile(
-                  'Share Usage Data',
-                  'Help improve app experience',
-                  Icons.analytics,
-                  _shareUsageData,
-                  (value) {
-                    setState(() => _shareUsageData = value);
-                    _saveSetting('share_usage_data', value);
-                  },
-                ),
-                _buildSwitchTile(
-                  'Personalized Ads',
-                  'Show ads based on your preferences',
-                  Icons.ads_click,
-                  _personalizedAds,
-                  (value) {
-                    setState(() => _personalizedAds = value);
-                    _saveSetting('personalized_ads', value);
-                  },
-                ),
-                _buildActionTile(
-                  'Download My Data',
-                  'Get a copy of your personal data',
-                  Icons.download,
-                  () => _requestDataDownload(),
-                ),
-                _buildActionTile(
-                  'Delete Account',
-                  'Permanently delete your account',
-                  Icons.delete_forever,
-                  () => _showDeleteAccountDialog(),
-                  isDestructive: true,
-                ),
-              ],
-            ),
+            // // Privacy Section
+            // _buildSection(
+            //   'Privacy',
+            //   [
+            //     _buildSwitchTile(
+            //       'Share Usage Data',
+            //       'Help improve app experience',
+            //       Icons.analytics,
+            //       _shareUsageData,
+            //       (value) {
+            //         setState(() => _shareUsageData = value);
+            //         _saveSetting('share_usage_data', value);
+            //       },
+            //     ),
+            //     _buildSwitchTile(
+            //       'Personalized Ads',
+            //       'Show ads based on your preferences',
+            //       Icons.ads_click,
+            //       _personalizedAds,
+            //       (value) {
+            //         setState(() => _personalizedAds = value);
+            //         _saveSetting('personalized_ads', value);
+            //       },
+            //     ),
+            //     _buildActionTile(
+            //       'Download My Data',
+            //       'Get a copy of your personal data',
+            //       Icons.download,
+            //       () => _requestDataDownload(),
+            //     ),
+            //     _buildActionTile(
+            //       'Delete Account',
+            //       'Permanently delete your account',
+            //       Icons.delete_forever,
+            //       () => _showDeleteAccountDialog(),
+            //       isDestructive: true,
+            //     ),
+            //   ],
+            // ),
 
             const SizedBox(height: 12),
 
@@ -386,6 +374,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontWeight: FontWeight.w500,
         ),
       ),
+    );
+  }
+
+  Widget _buildThemeSelectionTile() {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return ListTile(
+          leading: Icon(
+            themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+            color: Colors.grey[700],
+          ),
+          title: const Text(
+            'Theme',
+            style: TextStyle(fontWeight: FontWeight.w500),
+          ),
+          subtitle: Text(
+            themeProvider.getThemeModeDescription(),
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                themeProvider.getThemeModeDisplayName(),
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.grey[400],
+              ),
+            ],
+          ),
+          onTap: () {
+            ThemeSelectionBottomSheet.show(context);
+          },
+        );
+      },
     );
   }
 

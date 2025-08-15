@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key});
@@ -41,7 +42,7 @@ class HelpScreen extends StatelessWidget {
                         context,
                         Icons.phone,
                         'Call Us',
-                        'tel:+918888888888',
+                        'tel:+916382654316',
                       ),
                       _buildQuickActionButton(
                         context,
@@ -53,13 +54,13 @@ class HelpScreen extends StatelessWidget {
                         context,
                         Icons.email,
                         'Email',
-                        'mailto:support@laundryapp.com',
+                        'mailto:cloudironingfactory@gmail.com',
                       ),
                       _buildQuickActionButton(
                         context,
                         Icons.messenger,
                         'WhatsApp',
-                        'https://wa.me/918888888888',
+                        'https://wa.me/916382654316',
                       ),
                     ],
                   ),
@@ -135,19 +136,19 @@ class HelpScreen extends StatelessWidget {
                   _buildContactItem(
                     Icons.phone,
                     'Customer Care',
-                    '+91 88888 88888',
+                    '+91 6382654316',
                     'Available 24/7',
                   ),
                   _buildContactItem(
                     Icons.email,
                     'Email Support',
-                    'support@laundryapp.com',
+                    'cloudironingfactory@gmail.com',
                     'Response within 24 hours',
                   ),
                   _buildContactItem(
                     Icons.location_on,
                     'Head Office',
-                    '123 Business District, City Name',
+                    'B10, 3rd street, Mogappair West, Chennai',
                     'Mon-Sat: 9 AM - 6 PM',
                   ),
                 ],
@@ -425,14 +426,41 @@ class HelpScreen extends StatelessWidget {
     }
   }
 
-  void _rateApp() {
-    // Implement rate app functionality
-    print('Rate app tapped');
+  void _rateApp() async {
+    const String playStoreUrl = 'https://play.google.com/store/apps/details?id=com.cloudironingfactory.customer';
+    
+    try {
+      final Uri uri = Uri.parse(playStoreUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Could not launch $playStoreUrl';
+      }
+    } catch (e) {
+      print('Error opening Play Store: $e');
+      // Could show a snackbar here if context was available
+    }
   }
 
   void _shareApp() {
-    // Implement share app functionality
-    print('Share app tapped');
+    const String playStoreUrl = 'https://play.google.com/store/apps/details?id=com.cloudironingfactory.customer';
+    const String shareMessage = '''🧺 Experience the convenience of cloud-based laundry service! 
+
+📱 Download "Cloud Ironing" app and enjoy:
+✨ Easy pickup & delivery scheduling
+📍 Real-time order tracking  
+👔 Professional cleaning & ironing
+🚚 Doorstep delivery
+
+Say goodbye to laundry days! Download now:
+$playStoreUrl
+
+#LaundryService #CloudIroning #ConvenientLiving''';
+
+    Share.share(
+      shareMessage,
+      subject: 'Check out Cloud Ironing App!',
+    );
   }
 
   void _reportBug(BuildContext context) {
@@ -441,7 +469,7 @@ class HelpScreen extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Text('Report a Bug'),
         content: const Text(
-          'To report a bug, please contact us at support@laundryapp.com with details about the issue you encountered.',
+          'To report a bug, please contact us at cloudironingfactory@gmail.com with details about the issue you encountered.',
         ),
         actions: [
           TextButton(

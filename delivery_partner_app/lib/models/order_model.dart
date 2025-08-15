@@ -116,6 +116,7 @@ class OrderModel {
 
   // Assignment and delivery person fields
   final String? assignedDeliveryPerson;
+  final String? assignedDeliveryPartner; // New field name used by admin panel
   final String? assignedDeliveryPersonName;
   final Timestamp? assignedAt;
   final bool isAcceptedByDeliveryPerson;
@@ -158,6 +159,7 @@ class OrderModel {
     this.customer, // Added to constructor
     // Assignment fields
     this.assignedDeliveryPerson,
+    this.assignedDeliveryPartner,
     this.assignedDeliveryPersonName,
     this.assignedAt,
     this.isAcceptedByDeliveryPerson = false,
@@ -205,6 +207,11 @@ class OrderModel {
   // Get customer phone from customer object or default
   String get customerPhone {
     return customer?.phoneNumber ?? 'No phone';
+  }
+
+  // Get assigned delivery partner ID (supports both field names)
+  String? get assignedDeliveryPartnerId {
+    return assignedDeliveryPartner ?? assignedDeliveryPerson;
   }
 
   factory OrderModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -280,6 +287,7 @@ class OrderModel {
       customer: null, // Customer will be populated by the service layer
       // Assignment fields
       assignedDeliveryPerson: safeExtract<String>('assignedDeliveryPerson', null),
+      assignedDeliveryPartner: safeExtract<String>('assignedDeliveryPartner', null),
       assignedDeliveryPersonName: safeExtract<String>('assignedDeliveryPersonName', null),
       assignedAt: data['assignedAt'] != null ? _parseTimestamp(data['assignedAt']) : null,
       isAcceptedByDeliveryPerson: safeExtract<bool>('isAcceptedByDeliveryPerson', false) ?? false,
@@ -361,6 +369,7 @@ class OrderModel {
       customer: customerInfo ?? customer, // Use new customerInfo or keep existing
       // Assignment fields
       assignedDeliveryPerson: assignedDeliveryPerson,
+      assignedDeliveryPartner: assignedDeliveryPartner,
       assignedDeliveryPersonName: assignedDeliveryPersonName,
       assignedAt: assignedAt,
       isAcceptedByDeliveryPerson: isAcceptedByDeliveryPerson,
@@ -398,6 +407,7 @@ class OrderModel {
       if (assignedBy != null) 'assignedBy': assignedBy,
       // Assignment fields
       if (assignedDeliveryPerson != null) 'assignedDeliveryPerson': assignedDeliveryPerson,
+      if (assignedDeliveryPartner != null) 'assignedDeliveryPartner': assignedDeliveryPartner,
       if (assignedDeliveryPersonName != null) 'assignedDeliveryPersonName': assignedDeliveryPersonName,
       if (assignedAt != null) 'assignedAt': assignedAt,
       'isAcceptedByDeliveryPerson': isAcceptedByDeliveryPerson,

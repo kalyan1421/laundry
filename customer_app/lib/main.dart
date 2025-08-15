@@ -17,9 +17,13 @@ import 'package:customer_app/presentation/providers/address_provider.dart';
 import 'package:customer_app/presentation/providers/banner_provider.dart';
 import 'package:customer_app/presentation/providers/home_provider.dart';
 import 'package:customer_app/presentation/providers/item_provider.dart';
+import 'package:customer_app/presentation/providers/allied_service_provider.dart';
 import 'package:customer_app/presentation/providers/order_provider.dart';
 import 'package:customer_app/presentation/providers/special_offer_provider.dart';
 import 'package:customer_app/presentation/providers/payment_provider.dart';
+import 'package:customer_app/presentation/providers/app_update_provider.dart';
+import 'package:customer_app/presentation/providers/theme_provider.dart';
+import 'package:customer_app/presentation/widgets/update_dialog.dart';
 
 // Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -42,25 +46,68 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => AddressProvider()),
         ChangeNotifierProvider(create: (_) => BannerProvider()),
         ChangeNotifierProvider(create: (_) => HomeProvider()),
         ChangeNotifierProvider(create: (_) => ItemProvider()),
+        ChangeNotifierProvider(create: (_) => AlliedServiceProvider()),
         ChangeNotifierProvider(create: (_) => OrderProvider()),
         ChangeNotifierProvider(create: (_) => SpecialOfferProvider()),
         ChangeNotifierProvider(create: (_) => PaymentProvider()),
+        ChangeNotifierProvider(create: (_) => AppUpdateProvider()),
       ],
-      child: MaterialApp(
-        title: 'Cloud Ironing Factory',
-        theme: AppTheme.lightTheme,
-        debugShowCheckedModeBanner: false,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
-        navigatorKey: navigatorKey, // Set the navigator key
-        home: const AuthWrapper(), // Use AuthWrapper as the main entry point
-        onGenerateRoute: AppRoutes.generateRoute,
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'Cloud Ironing Factory',
+            theme: AppTheme.lightTheme,
+            debugShowCheckedModeBanner: false,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeProvider.themeMode,
+            navigatorKey: navigatorKey, // Set the navigator key
+            home: const ThemeInitializer(), // Initialize theme before showing main app
+            onGenerateRoute: AppRoutes.generateRoute,
+          );
+        },
       ),
+    );
+  }
+}
+
+class ThemeInitializer extends StatefulWidget {
+  const ThemeInitializer({super.key});
+
+  @override
+  State<ThemeInitializer> createState() => _ThemeInitializerState();
+}
+
+class _ThemeInitializerState extends State<ThemeInitializer> {
+  @override
+  void initState() {
+    super.initState();
+    _initializeTheme();
+  }
+
+  Future<void> _initializeTheme() async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    await themeProvider.initializeTheme();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        if (!themeProvider.isInitialized) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        return const AuthWrapper();
+      },
     );
   }
 }
@@ -70,8 +117,43 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, child) {
+    return const AppUpdateWrapper();
+  }
+}
+
+class AppUpdateWrapper extends StatefulWidget {
+  const AppUpdateWrapper({super.key});
+
+  @override
+  State<AppUpdateWrapper> createState() => _AppUpdateWrapperState();
+}
+
+class _AppUpdateWrapperState extends State<AppUpdateWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    // Check for updates when app starts
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForUpdates();
+    });
+  }
+
+  Future<void> _checkForUpdates() async {
+    final updateProvider = Provider.of<AppUpdateProvider>(context, listen: false);
+    await updateProvider.initializeVersionControl();
+    await updateProvider.checkForUpdates();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer2<AuthProvider, AppUpdateProvider>(
+      builder: (context, authProvider, updateProvider, child) {
+        // Show update dialog if update is required and hasn't been shown yet
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _handleUpdateDialog(context, updateProvider);
+        });
+
+        // Show appropriate screen based on auth status
         switch (authProvider.authStatus) {
           case AuthStatus.authenticating:
           case AuthStatus.unknown:
@@ -88,6 +170,21 @@ class AuthWrapper extends StatelessWidget {
         }
       },
     );
+  }
+
+  void _handleUpdateDialog(BuildContext context, AppUpdateProvider updateProvider) {
+    if (updateProvider.updateInfo != null && 
+        !updateProvider.hasShownDialog &&
+        (updateProvider.isUpdateRequired || updateProvider.isUpdateAvailable)) {
+      
+      updateProvider.markDialogShown();
+      
+      showUpdateDialog(
+        context,
+        updateProvider.updateInfo!,
+        barrierDismissible: !updateProvider.isUpdateRequired,
+      );
+    }
   }
 }
 

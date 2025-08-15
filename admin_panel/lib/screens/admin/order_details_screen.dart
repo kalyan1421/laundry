@@ -1080,17 +1080,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                               : Colors.orange[600],
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          _order!.isAcceptedByDeliveryPerson 
-                              ? 'Accepted by delivery person'
-                              : 'Waiting for acceptance',
-                          style: TextStyle(
-                            color: _order!.isAcceptedByDeliveryPerson 
-                                ? Colors.green[600] 
-                                : Colors.orange[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        // Text(
+                        //   _order!.isAcceptedByDeliveryPerson 
+                        //       ? 'Accepted by delivery person'
+                        //       : 'Waiting for acceptance',
+                        //   style: TextStyle(
+                        //     color: _order!.isAcceptedByDeliveryPerson 
+                        //         ? Colors.green[600] 
+                        //         : Colors.orange[600],
+                        //     fontWeight: FontWeight.w500,
+                        //   ),
+                        // ),
                       ],
                     ),
                   ],
@@ -1515,9 +1515,9 @@ Future<void> _assignDeliveryPerson(DocumentSnapshot deliveryPersonDoc) async {
     print('🚚 📋 From: $previousDeliveryPartner');
     print('🚚 📋 To: $newDeliveryPartnerId (${person['name']})');
     
-    // Prepare the update data
+    // Prepare the update data - Using assignedDeliveryPerson as primary field
     Map<String, dynamic> updateData = {
-      'assignedDeliveryPerson': newDeliveryPartnerId,
+      'assignedDeliveryPerson': newDeliveryPartnerId, // Primary field for delivery partner assignment
       'assignedDeliveryPersonName': person['name'] ?? 'Unknown',
       'assignedBy': _auth.currentUser?.uid,
       'assignedAt': FieldValue.serverTimestamp(),

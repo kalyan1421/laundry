@@ -60,31 +60,15 @@ class UserModel {
     );
   }
 
-  factory UserModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>?;
-    if (data == null) {
-      throw Exception("User document data is null for doc ID: ${doc.id}");
-    }
-    
-    // Add debug logging
-    print('UserModel.fromFirestore - Document ID: ${doc.id}');
-    print('UserModel.fromFirestore - Raw data: $data');
-    print('UserModel.fromFirestore - Available keys: ${data.keys.toList()}');
-    
-    // Extract fields with debug logging
+  factory UserModel.fromMap(Map<String, dynamic> data, {String? documentId}) {
+    // Extract fields with safe casting
     final name = data['name'] as String? ?? '';
     final email = data['email'] as String? ?? '';
     final phoneNumber = data['phoneNumber'] as String? ?? '';
     final role = data['role'] as String? ?? 'customer';
     
-    print('UserModel.fromFirestore - Extracted fields:');
-    print('  name: "$name"');
-    print('  email: "$email"');
-    print('  phoneNumber: "$phoneNumber"');
-    print('  role: "$role"');
-    
     return UserModel(
-      uid: doc.id,
+      uid: documentId ?? data['uid'] as String? ?? '',
       clientId: data['clientId'] as String?,
       name: name,
       email: email,
@@ -99,7 +83,39 @@ class UserModel {
     );
   }
 
+  factory UserModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>?;
+    if (data == null) {
+      throw Exception("User document data is null for doc ID: ${doc.id}");
+    }
+    
+    // Add debug logging
+    print('UserModel.fromFirestore - Document ID: ${doc.id}');
+    print('UserModel.fromFirestore - Raw data: $data');
+    print('UserModel.fromFirestore - Available keys: ${data.keys.toList()}');
+    
+    // Use fromMap method to avoid code duplication
+    return UserModel.fromMap(data, documentId: doc.id);
+  }
+
   Map<String, dynamic> toFirestore() {
+    return {
+      'uid': uid,
+      'clientId': clientId,
+      'name': name,
+      'email': email,
+      'phoneNumber': phoneNumber,
+      'role': role,
+      'isProfileComplete': isProfileComplete,
+      'profileImageUrl': profileImageUrl,
+      'qrCodeUrl': qrCodeUrl,
+      'createdAt': createdAt,
+      'lastSignIn': lastSignIn,
+      'updatedAt': updatedAt,
+    };
+  }
+
+  Map<String, dynamic> toMap() {
     return {
       'uid': uid,
       'clientId': clientId,

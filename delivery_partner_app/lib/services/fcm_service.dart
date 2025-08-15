@@ -1,16 +1,13 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/order_provider.dart';
+import '../providers/auth_provider.dart';
 
 class FcmService {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  // Assuming your admin users are in the 'users' collection with role 'admin'
-  // or in a separate 'admins' collection. Adjust if necessary.
-  final FirebaseAuth _auth = FirebaseAuth.instance; 
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; 
 
   Future<void> initialize(BuildContext? context) async {
     // Request permission (iOS and web)
@@ -23,7 +20,7 @@ class FcmService {
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
       print('FCM: User granted permission');
-      _saveTokenToFirestore(); // Save token once permission is granted
+      _saveTokenToFirestore(context); // Save token once permission is granted
     } else {
       print('FCM: User declined or has not accepted permission');
       return;
@@ -31,7 +28,7 @@ class FcmService {
 
     // Listen for token refresh
     _firebaseMessaging.onTokenRefresh.listen((token) {
-      _saveTokenToFirestore(token: token);
+      _saveTokenToFirestore(context, token: token);
     });
 
     // Handle foreground messages - Enhanced for delivery partners
@@ -168,123 +165,52 @@ class FcmService {
     }
   }
 
-  Future<void> _saveTokenToFirestore({String? token}) async {
+  Future<void> _saveTokenToFirestore(BuildContext? context, {String? token}) async {
     String? currentToken = token ?? await _firebaseMessaging.getToken();
-    print("Admin FCM Token: $currentToken");
+    print("Delivery Partner FCM Token: $currentToken");
 
-    User? currentAdmin = _auth.currentUser;
-    if (currentAdmin != null && currentToken != null) {
+    if (context != null && currentToken != null) {
       try {
-        // Save token to admins collection
-        await _saveTokenToAdminCollection(currentAdmin.uid, currentToken);
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final deliveryPartner = authProvider.deliveryPartner;
         
-        // Also save to delivery collection if applicable (for dual role users)
-        await _saveTokenToDeliveryCollection(currentAdmin.uid, currentToken);
-        
-        print("Admin FCM token saved to Firestore for user: ${currentAdmin.uid}");
+        if (deliveryPartner != null) {
+          // Save token to delivery partner's document
+          await _firestore.collection('delivery').doc(deliveryPartner.id).update({
+            'fcmToken': currentToken,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          
+          print("Delivery Partner FCM token saved to Firestore for: ${deliveryPartner.name}");
+        } else {
+          print("Delivery Partner FCM: No delivery partner logged in. Token not saved.");
+        }
       } catch (e) {
-        print("Admin FCM: Error saving token to Firestore: $e");
+        print("Delivery Partner FCM: Error saving token to Firestore: $e");
       }
     } else {
-      print("Admin FCM: No user logged in or token is null. Token not saved.");
+      print("Delivery Partner FCM: Context or token is null. Token not saved.");
     }
   }
 
-  Future<void> _saveTokenToAdminCollection(String uid, String token) async {
-    try {
-      // Check if user exists in admins collection
-      DocumentSnapshot adminDoc = await _firestore.collection('admins').doc(uid).get();
-      if (adminDoc.exists) {
-        await _firestore.collection('admins').doc(uid).update({
-          'fcmToken': token,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        print("FCM token saved to admins collection for: $uid");
-      } else {
-        // Search by phone number in case UID doesn't match
-        String? userPhone = _auth.currentUser?.phoneNumber;
-        if (userPhone != null) {
-          QuerySnapshot adminQuery = await _firestore
-              .collection('admins')
-              .where('phoneNumber', isEqualTo: userPhone)
-              .limit(1)
-              .get();
-          
-          if (adminQuery.docs.isNotEmpty) {
-            String adminDocId = adminQuery.docs.first.id;
-            await _firestore.collection('admins').doc(adminDocId).update({
-              'fcmToken': token,
-              'uid': uid, // Update UID as well
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-            print("FCM token saved to admins collection by phone for: $adminDocId");
-          }
-        }
-      }
-    } catch (e) {
-      print("Error saving token to admins collection: $e");
-    }
-  }
 
-  Future<void> _saveTokenToDeliveryCollection(String uid, String token) async {
-    try {
-      // Check if user exists in delivery collection
-      DocumentSnapshot deliveryDoc = await _firestore.collection('delivery').doc(uid).get();
-      if (deliveryDoc.exists) {
-        await _firestore.collection('delivery').doc(uid).update({
-          'fcmToken': token,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        print("FCM token saved to delivery collection for: $uid");
-      } else {
-        // Search by phone number in case UID doesn't match
-        String? userPhone = _auth.currentUser?.phoneNumber;
-        if (userPhone != null) {
-          QuerySnapshot deliveryQuery = await _firestore
-              .collection('delivery')
-              .where('phoneNumber', isEqualTo: userPhone)
-              .limit(1)
-              .get();
-          
-          if (deliveryQuery.docs.isNotEmpty) {
-            String deliveryDocId = deliveryQuery.docs.first.id;
-            await _firestore.collection('delivery').doc(deliveryDocId).update({
-              'fcmToken': token,
-              'uid': uid, // Update UID as well
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-            print("FCM token saved to delivery collection by phone for: $deliveryDocId");
-          }
-        }
-      }
-    } catch (e) {
-      print("Error saving token to delivery collection: $e");
-    }
-  }
 
-  Future<void> deleteTokenForCurrentUser() async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser != null) {
+  Future<void> deleteTokenForCurrentUser(BuildContext? context) async {
+    if (context != null) {
       try {
-        // Delete from admins collection
-        DocumentSnapshot adminDoc = await _firestore.collection('admins').doc(currentUser.uid).get();
-        if (adminDoc.exists) {
-          await _firestore.collection('admins').doc(currentUser.uid).update({
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final deliveryPartner = authProvider.deliveryPartner;
+        
+        if (deliveryPartner != null) {
+          // Delete from delivery collection
+          await _firestore.collection('delivery').doc(deliveryPartner.id).update({
             'fcmToken': FieldValue.delete(),
           });
+          
+          // Delete the instance ID token itself
+          await _firebaseMessaging.deleteToken(); 
+          print("FCM token deleted from Firestore for delivery partner: ${deliveryPartner.name}");
         }
-        
-        // Delete from delivery collection
-        DocumentSnapshot deliveryDoc = await _firestore.collection('delivery').doc(currentUser.uid).get();
-        if (deliveryDoc.exists) {
-          await _firestore.collection('delivery').doc(currentUser.uid).update({
-            'fcmToken': FieldValue.delete(),
-          });
-        }
-        
-        // Delete the instance ID token itself
-        await _firebaseMessaging.deleteToken(); 
-        print("FCM token deleted from Firestore for user: ${currentUser.uid}");
       } catch (e) {
          print("FCM: Error deleting token from Firestore: $e");
       }
@@ -292,11 +218,10 @@ class FcmService {
   }
 
   // Method to manually save/update FCM token (to be called after login)
-  Future<void> saveFCMTokenAfterLogin() async {
+  Future<void> saveFCMTokenAfterLogin(BuildContext? context) async {
     try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        print("FCM: No current user found during token save");
+      if (context == null) {
+        print("FCM: No context provided for token save");
         return;
       }
 
@@ -306,18 +231,20 @@ class FcmService {
         return;
       }
 
-      print("FCM: Saving token for user ${currentUser.uid}: $token");
-
-      // Try to save to both collections to ensure token is saved
-      bool adminSaved = await _saveTokenToAdminCollectionWithRetry(currentUser.uid, token);
-      bool deliverySaved = await _saveTokenToDeliveryCollectionWithRetry(currentUser.uid, token);
-
-      if (adminSaved || deliverySaved) {
-        print("FCM: Token successfully saved");
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final deliveryPartner = authProvider.deliveryPartner;
+      
+      if (deliveryPartner != null) {
+        print("FCM: Saving token for delivery partner ${deliveryPartner.name}: $token");
+        
+        await _firestore.collection('delivery').doc(deliveryPartner.id).update({
+          'fcmToken': token,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        
+        print("FCM: Token successfully saved for delivery partner");
       } else {
-        print("FCM: Failed to save token to any collection");
-        // If both fail, try with phone number matching
-        await _saveTokenByPhoneNumber(token);
+        print("FCM: No delivery partner logged in");
       }
 
     } catch (e) {
@@ -325,107 +252,7 @@ class FcmService {
     }
   }
 
-  Future<bool> _saveTokenToAdminCollectionWithRetry(String uid, String token) async {
-    try {
-      // First try by UID
-      DocumentSnapshot adminDoc = await _firestore.collection('admins').doc(uid).get();
-      if (adminDoc.exists) {
-        await _firestore.collection('admins').doc(uid).update({
-          'fcmToken': token,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        print("FCM token saved to admins collection for UID: $uid");
-        return true;
-      }
-      return false;
-    } catch (e) {
-      print("Error saving token to admins collection by UID: $e");
-      return false;
-    }
-  }
 
-  Future<bool> _saveTokenToDeliveryCollectionWithRetry(String uid, String token) async {
-    try {
-      // First try by UID
-      DocumentSnapshot deliveryDoc = await _firestore.collection('delivery').doc(uid).get();
-      if (deliveryDoc.exists) {
-        await _firestore.collection('delivery').doc(uid).update({
-          'fcmToken': token,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        print("FCM token saved to delivery collection for UID: $uid");
-        return true;
-      }
-      return false;
-    } catch (e) {
-      print("Error saving token to delivery collection by UID: $e");
-      return false;
-    }
-  }
-
-  Future<void> _saveTokenByPhoneNumber(String token) async {
-    try {
-      String? userPhone = _auth.currentUser?.phoneNumber;
-      if (userPhone == null) {
-        print("FCM: No phone number available for token save");
-        return;
-      }
-
-      print("FCM: Trying to save token by phone number: $userPhone");
-
-      // Try different phone number formats
-      List<String> phoneFormats = [
-        userPhone,                              // +919063290632
-        userPhone.replaceAll('+91', ''),        // 9063290632
-        '+91${userPhone.replaceAll('+91', '')}', // Ensure +91 prefix
-      ];
-
-      // Try admins collection
-      for (String phoneFormat in phoneFormats) {
-        QuerySnapshot adminQuery = await _firestore
-            .collection('admins')
-            .where('phoneNumber', isEqualTo: phoneFormat)
-            .limit(1)
-            .get();
-        
-        if (adminQuery.docs.isNotEmpty) {
-          String adminDocId = adminQuery.docs.first.id;
-          await _firestore.collection('admins').doc(adminDocId).update({
-            'fcmToken': token,
-            'uid': _auth.currentUser!.uid,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-          print("FCM token saved to admins collection by phone ($phoneFormat): $adminDocId");
-          return;
-        }
-      }
-
-      // Try delivery collection
-      for (String phoneFormat in phoneFormats) {
-        QuerySnapshot deliveryQuery = await _firestore
-            .collection('delivery')
-            .where('phoneNumber', isEqualTo: phoneFormat)
-            .limit(1)
-            .get();
-        
-        if (deliveryQuery.docs.isNotEmpty) {
-          String deliveryDocId = deliveryQuery.docs.first.id;
-          await _firestore.collection('delivery').doc(deliveryDocId).update({
-            'fcmToken': token,
-            'uid': _auth.currentUser!.uid,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-          print("FCM token saved to delivery collection by phone ($phoneFormat): $deliveryDocId");
-          return;
-        }
-      }
-
-      print("FCM: No matching documents found for any phone format");
-
-    } catch (e) {
-      print("Error saving FCM token by phone number: $e");
-    }
-  }
 
   // Enhanced method specifically for delivery person during login
   static Future<void> ensureDeliveryPersonTokenSaved({
@@ -512,20 +339,26 @@ class FcmService {
   }
 
   // Instance method wrapper for backward compatibility
-  Future<void> ensureDeliveryPartnerTokenSaved() async {
+  Future<void> ensureDeliveryPartnerTokenSaved(BuildContext? context) async {
     try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        print("FCM: No current user for delivery token save");
+      if (context == null) {
+        print("FCM: No context for delivery token save");
+        return;
+      }
+
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final deliveryPartner = authProvider.deliveryPartner;
+      
+      if (deliveryPartner == null) {
+        print("FCM: No delivery partner for token save");
         return;
       }
 
       String? token = await _firebaseMessaging.getToken();
-      String? phoneNumber = currentUser.phoneNumber;
       
-      if (phoneNumber != null) {
+      if (deliveryPartner.phoneNumber != null) {
         await ensureDeliveryPersonTokenSaved(
-          phoneNumber: phoneNumber,
+          phoneNumber: deliveryPartner.phoneNumber,
           token: token,
         );
       }
@@ -745,15 +578,20 @@ class FcmService {
   }
 
   // Method to check if delivery partner has FCM token
-  Future<Map<String, dynamic>> checkDeliveryPartnerFCMToken() async {
+  Future<Map<String, dynamic>> checkDeliveryPartnerFCMToken(BuildContext? context) async {
     try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        return {'hasToken': false, 'error': 'No current user'};
+      if (context == null) {
+        return {'hasToken': false, 'error': 'No context provided'};
       }
 
-      String uid = currentUser.uid;
-      String? userPhone = currentUser.phoneNumber;
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final deliveryPartner = authProvider.deliveryPartner;
+      
+      if (deliveryPartner == null) {
+        return {'hasToken': false, 'error': 'No delivery partner logged in'};
+      }
+
+      String? userPhone = deliveryPartner.phoneNumber;
 
       // Check all delivery documents
       QuerySnapshot allDelivery = await _firestore.collection('delivery').get();
@@ -762,8 +600,8 @@ class FcmService {
         try {
           Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
           
-          // Check if this document matches by UID or phone
-          bool uidMatch = data['uid']?.toString() == uid;
+          // Check if this document matches by ID or phone
+          bool idMatch = doc.id == deliveryPartner.id;
           bool phoneMatch = false;
           
           if (userPhone != null && data['phoneNumber'] != null) {
@@ -779,13 +617,13 @@ class FcmService {
                         docPhone == userPhone.replaceAll('+91', '');
           }
           
-          if (uidMatch || phoneMatch) {
+          if (idMatch || phoneMatch) {
             String? fcmToken = data['fcmToken'];
             return {
               'hasToken': fcmToken != null && fcmToken.isNotEmpty,
               'token': fcmToken,
               'documentId': doc.id,
-              'matchedBy': uidMatch ? 'UID' : 'Phone',
+              'matchedBy': idMatch ? 'ID' : 'Phone',
               'deliveryPartnerName': data['name'] ?? 'Unknown',
               'phoneNumber': data['phoneNumber'] ?? 'Unknown',
               'isActive': data['isActive'] ?? false,
@@ -805,11 +643,17 @@ class FcmService {
   }
 
   // Method to force refresh FCM token for current delivery partner
-  Future<Map<String, dynamic>> forceRefreshDeliveryToken() async {
+  Future<Map<String, dynamic>> forceRefreshDeliveryToken(BuildContext? context) async {
     try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        return {'success': false, 'error': 'No current user'};
+      if (context == null) {
+        return {'success': false, 'error': 'No context provided'};
+      }
+
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final deliveryPartner = authProvider.deliveryPartner;
+      
+      if (deliveryPartner == null) {
+        return {'success': false, 'error': 'No delivery partner logged in'};
       }
 
       // Delete existing token and get new one
@@ -822,14 +666,12 @@ class FcmService {
       }
 
       // Save the new token
-      if (currentUser != null) {
-        String? phoneNumber = currentUser.phoneNumber;
-        if (phoneNumber != null) {
-          await ensureDeliveryPersonTokenSaved(
-            phoneNumber: phoneNumber,
-            token: newToken,
-          );
-        }
+      String? phoneNumber = deliveryPartner.phoneNumber;
+      if (phoneNumber != null) {
+        await ensureDeliveryPersonTokenSaved(
+          phoneNumber: phoneNumber,
+          token: newToken,
+        );
       }
       
       return {
@@ -959,21 +801,27 @@ class FcmService {
   }
 
   // Method to test complete delivery partner notification flow with enhanced order details
-  Future<Map<String, dynamic>> testEnhancedDeliveryPartnerNotificationFlow({
+  Future<Map<String, dynamic>> testEnhancedDeliveryPartnerNotificationFlow(
+    BuildContext? context, {
     String? testOrderId,
   }) async {
     try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        return {'success': false, 'error': 'No current user'};
+      if (context == null) {
+        return {'success': false, 'error': 'No context provided'};
       }
 
-      String uid = currentUser.uid;
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final deliveryPartner = authProvider.deliveryPartner;
+      
+      if (deliveryPartner == null) {
+        return {'success': false, 'error': 'No delivery partner logged in'};
+      }
+
       print("=== Enhanced Delivery Partner Notification Test ===");
-      print("Current User: $uid");
+      print("Current Delivery Partner: ${deliveryPartner.name}");
 
       // Step 1: Check if delivery partner exists and has FCM token
-      Map<String, dynamic> tokenCheck = await checkDeliveryPartnerFCMToken();
+      Map<String, dynamic> tokenCheck = await checkDeliveryPartnerFCMToken(context);
       print("Token Check Result: $tokenCheck");
 
       if (!tokenCheck['hasToken']) {

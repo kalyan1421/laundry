@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:sms_autofill/sms_autofill.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:lottie/lottie.dart';
 import 'dart:async';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common/custom_text_field.dart';
@@ -31,6 +32,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Timer? _countdownTimer;
   int _remainingSeconds = 0;
   bool _isRateLimited = false;
+  
+  // Loading animation state
+  bool _showLoadingAnimation = false;
+  Timer? _animationTimer;
 
   @override
   void initState() {
@@ -79,6 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _phoneController.dispose();
     _phoneFocusNode.dispose();
     _countdownTimer?.cancel();
+    _animationTimer?.cancel();
     super.dispose();
   }
 
@@ -121,18 +127,45 @@ class _LoginScreenState extends State<LoginScreen> {
     // Remove focus from text field
     FocusScope.of(context).unfocus();
 
+    // Show loading animation
+    setState(() {
+      _showLoadingAnimation = true;
+    });
+
     try {
       await authProvider.sendOTP(_phoneController.text.trim());
 
-      // Check if OTP was sent successfully and navigate
+      // Check if OTP was sent successfully
       if (mounted && authProvider.otpStatus == OTPStatus.sent) {
         // Create the full phone number with country code
         final fullPhoneNumber = '+91${_phoneController.text.trim()}';
 
-        // Navigate using the route helper
-        AppRoutes.navigateToOTP(context, fullPhoneNumber);
+        // Wait for animation middle point (0.88 seconds) before navigation
+        _animationTimer = Timer(const Duration(milliseconds: 1880), () {
+          if (mounted) {
+            setState(() {
+              _showLoadingAnimation = false;
+            });
+            // Navigate using the route helper
+            AppRoutes.navigateToOTP(context, fullPhoneNumber);
+          }
+        });
+      } else {
+        // If OTP sending failed, hide animation immediately
+        if (mounted) {
+          setState(() {
+            _showLoadingAnimation = false;
+          });
+        }
       }
     } catch (e) {
+      // Hide animation on error
+      if (mounted) {
+        setState(() {
+          _showLoadingAnimation = false;
+        });
+      }
+      
       // Error handling is managed by the provider
       print('Error sending OTP: $e');
       
@@ -210,70 +243,114 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Consumer<AuthProvider>(
-          builder: (context, authProvider, child) {
-            // Listen for OTP status changes for navigation
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (authProvider.otpStatus == OTPStatus.sent && 
-                  _phoneController.text.isNotEmpty) {
-                final fullPhoneNumber = '+91${_phoneController.text.trim()}';
-                AppRoutes.navigateToOTP(context, fullPhoneNumber);
-              }
-              
-              // Show error dialog if there's an error (but avoid during navigation)
-              if (authProvider.errorMessage != null && 
-                  authProvider.errorMessage!.isNotEmpty &&
-                  authProvider.otpStatus != OTPStatus.sent) {
-                // _showErrorDialog(authProvider.errorMessage!);
-                authProvider.clearError();
-              }
-            });
+        child: Stack(
+          children: [
+            Consumer<AuthProvider>(
+              builder: (context, authProvider, child) {
+                // Listen for OTP status changes for navigation (but only if not showing animation)
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!_showLoadingAnimation &&
+                      authProvider.otpStatus == OTPStatus.sent && 
+                      _phoneController.text.isNotEmpty) {
+                    final fullPhoneNumber = '+91${_phoneController.text.trim()}';
+                    AppRoutes.navigateToOTP(context, fullPhoneNumber);
+                  }
+                  
+                  // Show error dialog if there's an error (but avoid during navigation)
+                  if (authProvider.errorMessage != null && 
+                      authProvider.errorMessage!.isNotEmpty &&
+                      authProvider.otpStatus != OTPStatus.sent &&
+                      !_showLoadingAnimation) {
+                    // _showErrorDialog(authProvider.errorMessage!);
+                    authProvider.clearError();
+                  }
+                });
 
-            return SingleChildScrollView( // Fixed: Added scroll view to prevent overflow
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: MediaQuery.of(context).size.height - 
-                           MediaQuery.of(context).padding.top - 48,
-                ),
-                child: IntrinsicHeight(
-                  child: Form(
-                    key: _formKey,
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: MediaQuery.of(context).size.height - 
+                               MediaQuery.of(context).padding.top - 48,
+                    ),
+                    child: IntrinsicHeight(
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 20),
+
+                            // Logo and welcome text
+                            _buildHeader(),
+
+                            const SizedBox(height: 20),
+
+                            // Phone number input
+                            _buildPhoneInput(authProvider),
+
+                            const SizedBox(height: 40),
+
+                            // Continue button
+                            _buildContinueButton(authProvider),
+
+                            const SizedBox(height: 20),
+
+                            // Social login section
+                            _buildSocialLogin(),
+
+                            const Spacer(),
+
+                            // Already have account
+                            _buildFooter(),
+                            
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        
+            // Loading animation overlay
+            if (_showLoadingAnimation)
+              Container(
+                color: Colors.black54,
+                child: Center(
+                  child: Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const SizedBox(height: 20), // Reduced from 40
-
-                        // Logo and welcome text
-                        _buildHeader(),
-
-                        const SizedBox(height: 20), // Reduced from 20
-
-                        // Phone number input
-                        _buildPhoneInput(authProvider),
-
-                        const SizedBox(height: 40), // Reduced from 60
-
-                        // Continue button
-                        _buildContinueButton(authProvider),
-
-                        const SizedBox(height: 20), // Reduced from 35
-
-                        // Social login section
-                        _buildSocialLogin(),
-
-                        const Spacer(),
-
-                        // Already have account
-                        _buildFooter(),
-                        
-                        const SizedBox(height: 16), // Add bottom spacing
+                        SizedBox(
+                          width: 120,
+                          height: 120,
+                          child: Lottie.asset(
+                            'assets/loading.json',
+                            fit: BoxFit.contain,
+                            repeat: true,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Sending OTP...',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: const Color(0xFF2D3748),
+                            fontWeight: FontConstants.medium,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ),
-            );
-          },
+          ],
         ),
       ),
     );

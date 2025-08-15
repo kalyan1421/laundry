@@ -1,8 +1,10 @@
+// screens/admin/manage_delivery_partners_screen.dart
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+// Removed unused import
 import '../../services/delivery_partner_service.dart';
-import '../../models/delivery_partner_model.dart';
-import 'admin_delivery_signup_screen.dart';
 
 class ManageDeliveryPartnersScreen extends StatefulWidget {
   const ManageDeliveryPartnersScreen({super.key});
@@ -13,164 +15,207 @@ class ManageDeliveryPartnersScreen extends StatefulWidget {
 
 class _ManageDeliveryPartnersScreenState extends State<ManageDeliveryPartnersScreen> {
   final DeliveryPartnerService _deliveryService = DeliveryPartnerService();
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-  String _filterStatus = 'all'; // all, online, offline, active, inactive
-
+  
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  List<DeliveryPartnerModel> _filterPartners(List<DeliveryPartnerModel> partners) {
-    List<DeliveryPartnerModel> filtered = partners;
-
-    // Apply search filter
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((partner) {
-        final query = _searchQuery.toLowerCase();
-        return partner.name.toLowerCase().contains(query) ||
-               partner.phoneNumber.toLowerCase().contains(query) ||
-               partner.email.toLowerCase().contains(query) ||
-               partner.licenseNumber.toLowerCase().contains(query);
-      }).toList();
-    }
-
-    // Apply status filter
-    switch (_filterStatus) {
-      case 'online':
-        filtered = filtered.where((partner) => partner.isOnline && partner.isActive).toList();
-        break;
-      case 'offline':
-        filtered = filtered.where((partner) => !partner.isOnline && partner.isActive).toList();
-        break;
-      case 'active':
-        filtered = filtered.where((partner) => partner.isActive).toList();
-        break;
-      case 'inactive':
-        filtered = filtered.where((partner) => !partner.isActive).toList();
-        break;
-    }
-
-    return filtered;
-  }
-
-  void _showPartnerActions(DeliveryPartnerModel partner) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              partner.name,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: Icon(
-                partner.isActive ? Icons.block : Icons.check_circle,
-                color: partner.isActive ? Colors.red : Colors.green,
-              ),
-              title: Text(partner.isActive ? 'Deactivate Partner' : 'Activate Partner'),
-              onTap: () async {
-                Navigator.pop(context);
-                await _toggleActiveStatus(partner);
-              },
-            ),
-            if (partner.isActive)
-              ListTile(
-                leading: Icon(
-                  partner.isOnline ? Icons.wifi_off : Icons.wifi,
-                  color: partner.isOnline ? Colors.orange : Colors.blue,
-                ),
-                title: Text(partner.isOnline ? 'Set Offline' : 'Set Online'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await _toggleOnlineStatus(partner);
-                },
-              ),
-            ListTile(
-              leading: const Icon(Icons.info, color: Colors.grey),
-              title: const Text('View Details'),
-              onTap: () {
-                Navigator.pop(context);
-                _showPartnerDetails(partner);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.refresh, color: Colors.blue),
-              title: const Text('Generate New Login Code'),
-              onTap: () {
-                Navigator.pop(context);
-                _generateNewLoginCode(partner);
-              },
-            ),
-          ],
+  Widget build(BuildContext context) {
+    return Scaffold(
+      
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+       floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddDeliveryPartnerDialog(),
+        foregroundColor: Colors.white,
+        backgroundColor: Colors.blue,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
         ),
+        child: const Icon(Icons.add),
+      ),
+       
+    
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('delivery')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.delivery_dining, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No delivery partners found'),
+                  Text('Tap + to add a new delivery partner'),
+                ],
+              ),
+            );
+          }
+
+          final deliveryPartners = snapshot.data!.docs;
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: deliveryPartners.length,
+            itemBuilder: (context, index) {
+              final doc = deliveryPartners[index];
+              final data = doc.data() as Map<String, dynamic>;
+              final partnerId = doc.id;
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: data['isActive'] == true ? Colors.green : Colors.red,
+                    child: Text(
+                      (data['name'] ?? 'N/A').substring(0, 1).toUpperCase(),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  title: Text(data['name'] ?? 'Unknown'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Phone: ${data['phoneNumber'] ?? 'N/A'}'),
+                      Text('Email: ${data['email'] ?? 'N/A'}'),
+                      Text('License: ${data['licenseNumber'] ?? 'N/A'}'),
+                      Text('Aadhar: ${data['aadharNumber'] ?? 'N/A'}'),
+                      Text('Code: ${data['loginCode'] ?? 'Not set'}'),
+                      Text('Status: ${data['isActive'] == true ? 'Active' : 'Inactive'}'),
+                    ],
+                  ),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'edit':
+                          _showEditDeliveryPartnerDialog(partnerId, data);
+                          break;
+                        case 'toggle_status':
+                          _togglePartnerStatus(partnerId, data['isActive'] == true);
+                          break;
+                        case 'reset_code':
+                          _showResetCodeDialog(partnerId, data);
+                          break;
+                        case 'delete':
+                          _showDeleteConfirmation(partnerId, data['name'] ?? 'Unknown');
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      PopupMenuItem(
+                        value: 'toggle_status',
+                        child: Text(data['isActive'] == true ? 'Deactivate' : 'Activate'),
+                      ),
+                      const PopupMenuItem(value: 'reset_code', child: Text('Reset Code')),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Delete', style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
 
-  Future<void> _toggleActiveStatus(DeliveryPartnerModel partner) async {
-    try {
-      await _deliveryService.toggleActiveStatus(partner.id, !partner.isActive);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            partner.isActive 
-              ? 'Partner deactivated successfully' 
-              : 'Partner activated successfully'
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
+  void _showAddDeliveryPartnerDialog() {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final emailController = TextEditingController();
+    final licenseController = TextEditingController();
+    final aadharController = TextEditingController();
+    final codeController = TextEditingController();
+    bool isActive = true;
 
-  Future<void> _toggleOnlineStatus(DeliveryPartnerModel partner) async {
-    try {
-      await _deliveryService.updateOnlineStatus(partner.id, !partner.isOnline);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            partner.isOnline 
-              ? 'Partner set to offline' 
-              : 'Partner set to online'
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  void _generateNewLoginCode(DeliveryPartnerModel partner) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Generate New Login Code'),
-        content: Text(
-          'This will generate a new login code for ${partner.name}. '
-          'The old code will no longer work. Continue?'
+        title: const Text('Add Delivery Partner'),
+        content: StatefulBuilder(
+          builder: (context, setState) => SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number *',
+                    hintText: '9876543210',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email Address *',
+                    hintText: 'example@email.com',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: licenseController,
+                  decoration: const InputDecoration(
+                    labelText: 'Driving License Number *',
+                    hintText: 'DL1234567890123',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: aadharController,
+                  decoration: const InputDecoration(
+                    labelText: 'Aadhar Number *',
+                    hintText: '123456789012',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 12,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: codeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Login Code *',
+                    hintText: '4-6 digits',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                ),
+                const SizedBox(height: 16),
+                CheckboxListTile(
+                  title: const Text('Active'),
+                  value: isActive,
+                  onChanged: (value) => setState(() => isActive = value ?? true),
+                ),
+              ],
+            ),
+          ),
         ),
         actions: [
           TextButton(
@@ -178,394 +223,284 @@ class _ManageDeliveryPartnersScreenState extends State<ManageDeliveryPartnersScr
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Implement generate new login code
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('New login code generated successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
-            child: const Text('Generate'),
+            onPressed: () => _addDeliveryPartner(
+              nameController.text,
+              phoneController.text,
+              emailController.text,
+              licenseController.text,
+              aadharController.text,
+              codeController.text,
+              isActive,
+            ),
+            child: const Text('Add'),
           ),
         ],
       ),
     );
   }
 
-  void _showPartnerDetails(DeliveryPartnerModel partner) {
+  void _showEditDeliveryPartnerDialog(String partnerId, Map<String, dynamic> data) {
+    final nameController = TextEditingController(text: data['name']);
+    final phoneController = TextEditingController(text: data['phoneNumber']?.replaceAll('+91', ''));
+    final emailController = TextEditingController(text: data['email']);
+    final licenseController = TextEditingController(text: data['licenseNumber']);
+    final aadharController = TextEditingController(text: data['aadharNumber']);
+    final codeController = TextEditingController(text: data['loginCode']);
+    bool isActive = data['isActive'] == true;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(partner.name),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildDetailRow('Phone', partner.phoneNumber),
-              _buildDetailRow('Email', partner.email),
-              _buildDetailRow('License', partner.licenseNumber),
-              _buildDetailRow('Status', partner.isActive ? 'Active' : 'Inactive'),
-              _buildDetailRow('Online', partner.isOnline ? 'Yes' : 'No'),
-              _buildDetailRow('Login Code', partner.registrationToken ?? 'N/A'),
-              _buildDetailRow('Rating', '${partner.rating}/5.0'),
-              _buildDetailRow('Total Deliveries', partner.totalDeliveries.toString()),
-              _buildDetailRow('Completed', partner.completedDeliveries.toString()),
-              _buildDetailRow('Cancelled', partner.cancelledDeliveries.toString()),
-              _buildDetailRow('Earnings', '₹${partner.earnings.toStringAsFixed(2)}'),
-              _buildDetailRow('Created', 
-                DateFormat('MMM dd, yyyy at hh:mm a').format(partner.createdAt.toDate())),
-              if (partner.createdBy != null)
-                _buildDetailRow('Created By', partner.createdBy!),
-            ],
+        title: const Text('Edit Delivery Partner'),
+        content: StatefulBuilder(
+          builder: (context, setState) => SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number *',
+                    hintText: '9876543210',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email Address *',
+                    hintText: 'example@email.com',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: licenseController,
+                  decoration: const InputDecoration(
+                    labelText: 'Driving License Number *',
+                    hintText: 'DL1234567890123',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: aadharController,
+                  decoration: const InputDecoration(
+                    labelText: 'Aadhar Number *',
+                    hintText: '123456789012',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 12,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: codeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Login Code *',
+                    hintText: '4-6 digits',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                ),
+                const SizedBox(height: 16),
+                CheckboxListTile(
+                  title: const Text('Active'),
+                  value: isActive,
+                  onChanged: (value) => setState(() => isActive = value ?? true),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => _updateDeliveryPartner(
+              partnerId,
+              nameController.text,
+              phoneController.text,
+              emailController.text,
+              licenseController.text,
+              aadharController.text,
+              codeController.text,
+              isActive,
+            ),
+            child: const Text('Update'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(child: Text(value)),
-        ],
-      ),
-    );
-  }
+  void _showResetCodeDialog(String partnerId, Map<String, dynamic> data) {
+    final codeController = TextEditingController();
 
-  Widget _buildStatsCard() {
-    return FutureBuilder<Map<String, int>>(
-      future: _deliveryService.getDeliveryPartnerStats(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
-        }
-
-        final stats = snapshot.data!;
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatItem('Total', stats['total']!, Colors.blue),
-                _buildStatItem('Online', stats['online']!, Colors.green),
-                _buildStatItem('Offline', stats['offline']!, Colors.orange),
-                _buildStatItem('Active', stats['active']!, Colors.purple),
-              ],
-            ),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Reset Code for ${data['name']}'),
+        content: TextField(
+          controller: codeController,
+          decoration: const InputDecoration(
+            labelText: 'New Login Code *',
+            hintText: '4-6 digits',
+            border: OutlineInputBorder(),
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildStatItem(String label, int value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value.toString(),
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+          keyboardType: TextInputType.number,
+          maxLength: 6,
         ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFilterChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          const SizedBox(width: 16),
-          ...[
-            'all',
-            'online',
-            'offline',
-            'active',
-            'inactive',
-          ].map((filter) {
-            final isSelected = _filterStatus == filter;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text(
-                  filter.toUpperCase(),
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black,
-                    fontSize: 12,
-                  ),
-                ),
-                selected: isSelected,
-                onSelected: (selected) {
-                  setState(() {
-                    _filterStatus = filter;
-                  });
-                },
-                backgroundColor: Colors.grey[200],
-                selectedColor: Colors.blue,
-              ),
-            );
-          }).toList(),
-          const SizedBox(width: 16),
+          ElevatedButton(
+            onPressed: () => _resetLoginCode(partnerId, codeController.text),
+            child: const Text('Reset'),
+          ),
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Delivery Partners'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const AddDeliveryPartnerScreen(),
-            ),
-          );
-        },
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.person_add, color: Colors.white),
-      ),
-      body: Column(
-        children: [
-          // Stats Cards
-          _buildStatsCard(),
-          
-          // Search Bar
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search by name, phone, email, or license...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                filled: true,
-                fillColor: Colors.grey[100],
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-            ),
+  void _showDeleteConfirmation(String partnerId, String name) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Delivery Partner'),
+        content: Text('Are you sure you want to delete $name?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
-          
-          // Filter Chips
-          _buildFilterChips(),
-          const SizedBox(height: 8),
-          
-          // Partners List
-          Expanded(
-            child: StreamBuilder<List<DeliveryPartnerModel>>(
-              stream: _deliveryService.getAllDeliveryPartners(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error, color: Colors.red, size: 64),
-                        const SizedBox(height: 16),
-                        Text('Error: ${snapshot.error}'),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () => setState(() {}),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final partners = snapshot.data ?? [];
-                final filteredPartners = _filterPartners(partners);
-
-                if (filteredPartners.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.person_off, color: Colors.grey, size: 64),
-                        const SizedBox(height: 16),
-                        Text(
-                          _searchQuery.isEmpty
-                              ? 'No delivery partners found'
-                              : 'No partners match your search',
-                          style: const TextStyle(fontSize: 18, color: Colors.grey),
-                        ),
-                        if (_searchQuery.isEmpty) ...[
-                          const SizedBox(height: 16),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const AddDeliveryPartnerScreen(),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.person_add),
-                            label: const Text('Add First Partner'),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: filteredPartners.length,
-                  itemBuilder: (context, index) {
-                    final partner = filteredPartners[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: Stack(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: partner.isActive ? Colors.blue : Colors.grey,
-                              child: Text(
-                                partner.name.substring(0, 1).toUpperCase(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            if (partner.isActive)
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: Container(
-                                  width: 12,
-                                  height: 12,
-                                  decoration: BoxDecoration(
-                                    color: partner.isOnline ? Colors.green : Colors.grey,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        title: Text(
-                          partner.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(partner.phoneNumber),
-                            Text(partner.email),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: partner.isActive ? Colors.green : Colors.red,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    partner.isActive ? 'Active' : 'Inactive',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                if (partner.isActive)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: partner.isOnline ? Colors.green : Colors.orange,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      partner.isOnline ? 'Online' : 'Offline',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Code: ${partner.registrationToken ?? 'N/A'}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.more_vert),
-                          onPressed: () => _showPartnerActions(partner),
-                        ),
-                        onTap: () => _showPartnerDetails(partner),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+          ElevatedButton(
+            onPressed: () => _deleteDeliveryPartner(partnerId),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _addDeliveryPartner(String name, String phone, String email, String license, String aadhar, String code, bool isActive) async {
+    if (name.trim().isEmpty || phone.trim().isEmpty || email.trim().isEmpty || 
+        license.trim().isEmpty || aadhar.trim().isEmpty || code.trim().isEmpty) {
+      _showSnackBar('Please fill all required fields');
+      return;
+    }
+
+    if (code.length < 4) {
+      _showSnackBar('Code must be at least 4 digits');
+      return;
+    }
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await _deliveryService.addDeliveryPartner(
+        name: name.trim(),
+        phoneNumber: phone.trim(),
+        email: email.trim(),
+        licenseNumber: license.trim(),
+        aadharNumber: aadhar.trim(),
+        loginCode: code.trim(),
+        isActive: isActive,
+        createdBy: authProvider.user?.uid ?? '',
+        createdByRole: authProvider.userRole?.toString() ?? 'admin',
+      );
+      
+      Navigator.pop(context);
+      _showSnackBar('Delivery partner added successfully');
+    } catch (e) {
+      _showSnackBar('Error adding delivery partner: ${e.toString()}');
+    }
+  }
+
+  Future<void> _updateDeliveryPartner(String partnerId, String name, String phone, String email, String license, String aadhar, String code, bool isActive) async {
+    if (name.trim().isEmpty || phone.trim().isEmpty || email.trim().isEmpty || 
+        license.trim().isEmpty || aadhar.trim().isEmpty || code.trim().isEmpty) {
+      _showSnackBar('Please fill all required fields');
+      return;
+    }
+
+    if (code.length < 4) {
+      _showSnackBar('Code must be at least 4 digits');
+      return;
+    }
+
+    try {
+      await _deliveryService.updateDeliveryPartner(
+        partnerId: partnerId,
+        name: name.trim(),
+        phoneNumber: phone.trim(),
+        email: email.trim(),
+        licenseNumber: license.trim(),
+        aadharNumber: aadhar.trim(),
+        loginCode: code.trim(),
+        isActive: isActive,
+      );
+      
+      Navigator.pop(context);
+      _showSnackBar('Delivery partner updated successfully');
+    } catch (e) {
+      _showSnackBar('Error updating delivery partner: ${e.toString()}');
+    }
+  }
+
+  Future<void> _togglePartnerStatus(String partnerId, bool currentStatus) async {
+    try {
+      await _deliveryService.togglePartnerStatus(partnerId, !currentStatus);
+      _showSnackBar('Partner status updated successfully');
+    } catch (e) {
+      _showSnackBar('Error updating status: ${e.toString()}');
+    }
+  }
+
+  Future<void> _resetLoginCode(String partnerId, String newCode) async {
+    if (newCode.trim().isEmpty || newCode.length < 4) {
+      _showSnackBar('Code must be at least 4 digits');
+      return;
+    }
+
+    try {
+      await _deliveryService.resetLoginCode(partnerId, newCode.trim());
+      Navigator.pop(context);
+      _showSnackBar('Login code reset successfully');
+    } catch (e) {
+      _showSnackBar('Error resetting code: ${e.toString()}');
+    }
+  }
+
+  Future<void> _deleteDeliveryPartner(String partnerId) async {
+    try {
+      await _deliveryService.deleteDeliveryPartner(partnerId);
+      Navigator.pop(context);
+      _showSnackBar('Delivery partner deleted successfully');
+    } catch (e) {
+      _showSnackBar('Error deleting delivery partner: ${e.toString()}');
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 }
