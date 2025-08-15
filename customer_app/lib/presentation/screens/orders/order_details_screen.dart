@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:customer_app/data/models/order_model.dart';
 import 'package:customer_app/services/order_notification_service.dart';
 import 'package:flutter/material.dart';
@@ -121,7 +122,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
+        backgroundColor: context.backgroundColor,
+        foregroundColor: context.onBackgroundColor,
         title: Text('Order #${widget.order.orderNumber ?? widget.order.id}'),
       ),
       body: _isCancelling
@@ -190,7 +194,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             Text(
               'Status: ${_formatStatus(widget.order.status)}',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
+            ),
             if (widget.order.status.toLowerCase() == 'cancelled')
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -239,8 +243,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             const Text(
               'Items',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -254,7 +258,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 final item = widget.order.items[index];
                 return ListTile(
                   title: Text(item['name']),
-                  subtitle: Text('${item['quantity']} x ₹${item['pricePerPiece']}'),
+                  subtitle:
+                      Text('${item['quantity']} x ₹${item['pricePerPiece']}'),
                   trailing: Text(
                     '₹${(item['quantity'] * item['pricePerPiece']).toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
@@ -319,8 +324,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             const Text(
               'Payment Details',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -328,7 +333,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             const SizedBox(height: 8),
             Text('Method: ${widget.order.paymentMethod}'),
             // Add more payment details as needed
-        ],
+          ],
         ),
       ),
     );

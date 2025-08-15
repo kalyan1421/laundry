@@ -1,6 +1,7 @@
 // lib/screens/profile/edit_profile_screen.dart
 import 'package:customer_app/core/theme/app_typography.dart';
 import 'package:customer_app/core/theme/app_colors.dart';
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -37,7 +38,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void _loadUserData() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.userModel;
-    
+
     if (user != null) {
       _nameController.text = user.name ?? '';
       _emailController.text = user.email ?? '';
@@ -53,7 +54,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Update user profile with only name and email
       final success = await authProvider.updateProfile(
         name: _nameController.text.trim(),
@@ -71,7 +72,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(authProvider.errorMessage ?? 'Failed to update profile'),
+            content:
+                Text(authProvider.errorMessage ?? 'Failed to update profile'),
             backgroundColor: Colors.red,
           ),
         );
@@ -108,7 +110,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         Text(
           label,
           style: AppTypography.bodyMedium.copyWith(
-            color: const Color(0xFF0F3057),
+            color: Theme.of(context).brightness == Brightness.light
+                ? context.primaryColor
+                : context.onBackgroundColor,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -124,10 +128,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             prefixIcon: Icon(
               prefixIcon,
-              color: const Color(0xFF0F3057),
+              color: Theme.of(context).brightness == Brightness.light
+                  ? context.primaryColor
+                  : context.onBackgroundColor,
             ),
             filled: true,
-            fillColor: const Color(0xFFF8F9FA),
+            fillColor: context.backgroundColor,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
@@ -155,20 +161,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
+        foregroundColor: context.onBackgroundColor,
         elevation: 0,
         title: Text(
           'Edit Profile',
           style: AppTypography.headlineSmall.copyWith(
-            color: const Color(0xFF0F3057),
+            // color: const Color(0xFF0F3057),
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3057)),
+          icon: const Icon(
+            Icons.arrow_back,
+            //  color: Color(0xFF0F3057)
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -184,7 +194,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 Text(
                   'Edit Your Information',
                   style: AppTypography.headlineMedium.copyWith(
-                    color: const Color(0xFF0F3057),
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? context.primaryColor
+                        : context.onBackgroundColor,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -223,7 +235,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your email';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                        .hasMatch(value)) {
                       return 'Please enter a valid email';
                     }
                     return null;
@@ -282,7 +295,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : Text(

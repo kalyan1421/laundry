@@ -1,4 +1,5 @@
 // screens/main/main_wrapper.dart
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:customer_app/presentation/providers/auth_provider.dart';
 import 'package:customer_app/presentation/screens/home/home_screen.dart';
 import 'package:customer_app/presentation/screens/orders/orders_screen.dart';
@@ -30,14 +31,13 @@ class _MainWrapperState extends State<MainWrapper> with AuthValidationMixin {
     const TrackOrderScreen(),
     const ProfileScreen(),
   ];
-  
+
   final List<String> _screenTitles = [
     'Home',
     'My Orders',
     'Track Order',
     'Profile',
   ];
-
 
   void _onTap(int index) {
     setState(() {
@@ -68,13 +68,16 @@ class _MainWrapperState extends State<MainWrapper> with AuthValidationMixin {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: context.backgroundColor, centerTitle: true,
         // AppBar theme is now handled by the theme system
         title: Text(
           'Cloud Ironing Factory',
-          style: theme.textTheme.headlineSmall,
+          style: theme.textTheme.headlineSmall?.copyWith(
+              color: theme.colorScheme.onSurface, fontWeight: FontWeight.w700),
         ),
         // All other AppBar properties are handled by theme
       ),

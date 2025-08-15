@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:customer_app/core/routes/app_routes.dart';
 import 'package:customer_app/core/theme/app_colors.dart';
 import 'package:customer_app/core/theme/app_text_theme.dart';
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:customer_app/core/utils/validators.dart';
 import 'package:customer_app/presentation/widgets/common/custom_button.dart';
 import 'package:customer_app/presentation/widgets/common/custom_text_field.dart';
@@ -25,11 +26,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _pageController = PageController();
   final _logger = Logger();
-  
+
   // Controllers for form fields
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  
+
   // Detailed address controllers
   final _doorNumberController = TextEditingController();
   final _floorNumberController = TextEditingController();
@@ -39,14 +40,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _cityController = TextEditingController();
   final _pincodeController = TextEditingController();
   final _stateController = TextEditingController();
-  
+
   File? _imageFile;
   Position? _currentPosition;
   String? _currentAddress;
   bool _isLoadingLocation = false;
   String? _locationError;
   int _currentStep = 0;
-  
+
   @override
   void initState() {
     super.initState();
@@ -79,7 +80,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       // Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        throw Exception('Location services are disabled. Please enable them in settings.');
+        throw Exception(
+            'Location services are disabled. Please enable them in settings.');
       }
 
       // Check location permission
@@ -87,12 +89,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          throw Exception('Location permission denied. Please grant permission in settings.');
+          throw Exception(
+              'Location permission denied. Please grant permission in settings.');
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        throw Exception('Location permission permanently denied. Please grant permission in settings.');
+        throw Exception(
+            'Location permission permanently denied. Please grant permission in settings.');
       }
 
       // Get current position with high accuracy
@@ -102,17 +106,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       );
 
       _logger.i('GPS Position obtained:');
-      _logger.i('Latitude: ${position.latitude} (Type: ${position.latitude.runtimeType})');
-      _logger.i('Longitude: ${position.longitude} (Type: ${position.longitude.runtimeType})');
+      _logger.i(
+          'Latitude: ${position.latitude} (Type: ${position.latitude.runtimeType})');
+      _logger.i(
+          'Longitude: ${position.longitude} (Type: ${position.longitude.runtimeType})');
       _logger.i('Accuracy: ${position.accuracy} meters');
       _logger.i('Timestamp: ${position.timestamp}');
-      
+
       // Perform reverse geocoding to get address details
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude, 
-        position.longitude
-      );
-      
+      List<Placemark> placemarks =
+          await placemarkFromCoordinates(position.latitude, position.longitude);
+
       if (placemarks.isNotEmpty) {
         Placemark place = placemarks[0];
         _logger.i('Address details obtained:');
@@ -121,26 +125,28 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         _logger.i('AdministrativeArea: ${place.administrativeArea}');
         _logger.i('PostalCode: ${place.postalCode}');
         _logger.i('Country: ${place.country}');
-        
+
         setState(() {
           _currentPosition = position;
           _isLoadingLocation = false;
-          
+
           _logger.i('Position set in state:');
           _logger.i('_currentPosition.latitude: ${_currentPosition?.latitude}');
-          _logger.i('_currentPosition.longitude: ${_currentPosition?.longitude}');
-          
+          _logger
+              .i('_currentPosition.longitude: ${_currentPosition?.longitude}');
+
           // Auto-fill address fields
           if (place.locality != null && place.locality!.isNotEmpty) {
             _cityController.text = place.locality!;
           }
-          if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) {
+          if (place.administrativeArea != null &&
+              place.administrativeArea!.isNotEmpty) {
             _stateController.text = place.administrativeArea!;
           }
           if (place.postalCode != null && place.postalCode!.isNotEmpty) {
             _pincodeController.text = place.postalCode!;
           }
-          
+
           // Create a readable address string
           List<String> addressParts = [];
           if (place.subLocality != null && place.subLocality!.isNotEmpty) {
@@ -149,22 +155,25 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           if (place.locality != null && place.locality!.isNotEmpty) {
             addressParts.add(place.locality!);
           }
-          if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) {
+          if (place.administrativeArea != null &&
+              place.administrativeArea!.isNotEmpty) {
             addressParts.add(place.administrativeArea!);
           }
-          
+
           _currentAddress = addressParts.join(', ');
         });
       } else {
         setState(() {
           _currentPosition = position;
           _isLoadingLocation = false;
-          
+
           _logger.i('Position set in state:');
           _logger.i('_currentPosition.latitude: ${_currentPosition?.latitude}');
-          _logger.i('_currentPosition.longitude: ${_currentPosition?.longitude}');
-          
-          _currentAddress = 'Location coordinates saved. Please manually fill your address details.';
+          _logger
+              .i('_currentPosition.longitude: ${_currentPosition?.longitude}');
+
+          _currentAddress =
+              'Location coordinates saved. Please manually fill your address details.';
         });
       }
     } catch (e) {
@@ -183,12 +192,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         _showSnackBar('Please enter your name', isError: true);
         return;
       }
-      if (_emailController.text.trim().isEmpty || !Validators.isValidEmail(_emailController.text.trim())) {
+      if (_emailController.text.trim().isEmpty ||
+          !Validators.isValidEmail(_emailController.text.trim())) {
         _showSnackBar('Please enter a valid email address', isError: true);
         return;
       }
     }
-    
+
     if (_currentStep < 1) {
       setState(() {
         _currentStep++;
@@ -226,40 +236,50 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Future<void> _submitProfile() async {
     // Validate all required fields manually to avoid form key issues
-    
+
     // Check basic info fields
     if (_nameController.text.trim().isEmpty) {
       _showSnackBar('Please enter your full name', isError: true);
       return;
     }
-    if (_emailController.text.trim().isEmpty || !Validators.isValidEmail(_emailController.text.trim())) {
+    if (_emailController.text.trim().isEmpty ||
+        !Validators.isValidEmail(_emailController.text.trim())) {
       _showSnackBar('Please enter a valid email address', isError: true);
       return;
     }
 
     // Check if location is available
     if (_currentPosition == null) {
-      _showSnackBar('Please enable location services to continue', isError: true);
+      _showSnackBar('Please enable location services to continue',
+          isError: true);
       return;
     }
 
     // Additional validation for coordinates
-    if (_currentPosition!.latitude == 0.0 && _currentPosition!.longitude == 0.0) {
-      _showSnackBar('Invalid location detected. Please try getting location again.', isError: true);
+    if (_currentPosition!.latitude == 0.0 &&
+        _currentPosition!.longitude == 0.0) {
+      _showSnackBar(
+          'Invalid location detected. Please try getting location again.',
+          isError: true);
       return;
     }
 
     // Validate coordinate ranges
     if (_currentPosition!.latitude < -90 || _currentPosition!.latitude > 90) {
-      _showSnackBar('Invalid latitude detected. Please try getting location again.', isError: true);
+      _showSnackBar(
+          'Invalid latitude detected. Please try getting location again.',
+          isError: true);
       return;
     }
 
-    if (_currentPosition!.longitude < -180 || _currentPosition!.longitude > 180) {
-      _showSnackBar('Invalid longitude detected. Please try getting location again.', isError: true);
+    if (_currentPosition!.longitude < -180 ||
+        _currentPosition!.longitude > 180) {
+      _showSnackBar(
+          'Invalid longitude detected. Please try getting location again.',
+          isError: true);
       return;
     }
-    
+
     // Validate required address fields
     if (_addressLine1Controller.text.trim().isEmpty) {
       _showSnackBar('Please enter address line 1', isError: true);
@@ -279,7 +299,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
+
     try {
       // Log coordinates before sending
       _logger.i('Profile Setup - Coordinates to save:');
@@ -287,10 +307,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _logger.i('Longitude: ${_currentPosition!.longitude}');
       _logger.i('Position accuracy: ${_currentPosition!.accuracy}');
       _logger.i('Position timestamp: ${_currentPosition!.timestamp}');
-      
+
       // Create detailed address string
       List<String> addressComponents = [];
-      
+
       if (_doorNumberController.text.trim().isNotEmpty) {
         addressComponents.add('Door: ${_doorNumberController.text.trim()}');
       }
@@ -300,7 +320,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (_apartmentNameController.text.trim().isNotEmpty) {
         addressComponents.add(_apartmentNameController.text.trim());
       }
-      
+
       String addressLine1 = _addressLine1Controller.text.trim();
       if (addressComponents.isNotEmpty) {
         addressLine1 = '${addressComponents.join(', ')}, $addressLine1';
@@ -308,7 +328,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
       _logger.i('Profile Setup - Address components:');
       _logger.i('Final Address Line 1: $addressLine1');
-      _logger.i('Address Line 2: ${_nearbyLandmarkController.text.trim().isEmpty ? 'None' : 'Near: ${_nearbyLandmarkController.text.trim()}'}');
+      _logger.i(
+          'Address Line 2: ${_nearbyLandmarkController.text.trim().isEmpty ? 'None' : 'Near: ${_nearbyLandmarkController.text.trim()}'}');
       _logger.i('City: ${_cityController.text.trim()}');
       _logger.i('State: ${_stateController.text.trim()}');
       _logger.i('Pincode: ${_pincodeController.text.trim()}');
@@ -318,11 +339,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         addressLine1: addressLine1,
-        addressLine2: _nearbyLandmarkController.text.trim().isEmpty ? null : 'Near: ${_nearbyLandmarkController.text.trim()}',
+        addressLine2: _nearbyLandmarkController.text.trim().isEmpty
+            ? null
+            : 'Near: ${_nearbyLandmarkController.text.trim()}',
         city: _cityController.text.trim(),
         state: _stateController.text.trim(),
         pincode: _pincodeController.text.trim(),
-        landmark: _nearbyLandmarkController.text.trim().isEmpty ? null : _nearbyLandmarkController.text.trim(),
+        landmark: _nearbyLandmarkController.text.trim().isEmpty
+            ? null
+            : _nearbyLandmarkController.text.trim(),
         latitude: _currentPosition!.latitude,
         longitude: _currentPosition!.longitude,
       );
@@ -334,7 +359,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         Navigator.of(context).pushReplacementNamed(AppRoutes.home);
       } else {
         _logger.e('Profile Setup - Failed to save profile/address');
-        _showSnackBar(authProvider.errorMessage ?? 'Failed to complete profile setup', isError: true);
+        _showSnackBar(
+            authProvider.errorMessage ?? 'Failed to complete profile setup',
+            isError: true);
       }
     } catch (e) {
       _logger.e('Profile Setup - Exception occurred: $e');
@@ -347,15 +374,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
         title: const Text('Setup Your Profile'),
-        backgroundColor: AppColors.primary,
-        leading: _currentStep > 0 
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: _previousStep,
-            )
-          : null,
+        backgroundColor: context.backgroundColor,
+        foregroundColor: context.onBackgroundColor,
+        leading: _currentStep > 0
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _previousStep,
+              )
+            : null,
       ),
       body: Column(
         children: [
@@ -370,7 +399,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       child: LinearProgressIndicator(
                         value: (_currentStep + 1) / 2,
                         backgroundColor: Colors.grey[300],
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(AppColors.primary),
                       ),
                     ),
                   ],
@@ -385,7 +415,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ],
             ),
           ),
-          
+
           // Page content
           Expanded(
             child: PageView(
@@ -397,7 +427,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ],
             ),
           ),
-          
+
           // Bottom navigation
           Container(
             padding: const EdgeInsets.all(16),
@@ -437,21 +467,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           children: [
             Text(
               'Tell us about yourself',
-              style: AppTextTheme.headlineMedium.copyWith(color: AppColors.textPrimary),
+              style: AppTextTheme.headlineMedium
+                  .copyWith(color: AppColors.textPrimary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               'Let\'s start with your basic information',
-              style: AppTextTheme.bodyLarge.copyWith(color: AppColors.textSecondary),
+              style: AppTextTheme.bodyLarge
+                  .copyWith(color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 40),
-            
+
             // Profile picture placeholder
-            
+
             const SizedBox(height: 40),
-            
+
             CustomTextField(
               controller: _nameController,
               labelText: 'Full Name',
@@ -483,25 +515,31 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         children: [
           Text(
             'Your delivery address',
-            style: AppTextTheme.headlineMedium.copyWith(color: AppColors.textPrimary),
+            style: AppTextTheme.headlineMedium
+                .copyWith(color: AppColors.textPrimary),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             'We\'ll use this for pickup and delivery',
-            style: AppTextTheme.bodyLarge.copyWith(color: AppColors.textSecondary),
+            style:
+                AppTextTheme.bodyLarge.copyWith(color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
-          
+
           // Current location card
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _currentPosition != null ? AppColors.success.withOpacity(0.1) : AppColors.error.withOpacity(0.1),
+              color: _currentPosition != null
+                  ? AppColors.success.withOpacity(0.1)
+                  : AppColors.error.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _currentPosition != null ? AppColors.success.withOpacity(0.3) : AppColors.error.withOpacity(0.3),
+                color: _currentPosition != null
+                    ? AppColors.success.withOpacity(0.3)
+                    : AppColors.error.withOpacity(0.3),
               ),
             ),
             child: Column(
@@ -509,8 +547,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 Row(
                   children: [
                     Icon(
-                      _currentPosition != null ? Icons.location_on : Icons.location_off,
-                      color: _currentPosition != null ? AppColors.success : AppColors.error,
+                      _currentPosition != null
+                          ? Icons.location_on
+                          : Icons.location_off,
+                      color: _currentPosition != null
+                          ? AppColors.success
+                          : AppColors.error,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -518,20 +560,26 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _currentPosition != null ? 'Current Location Detected' : 'Location Access Required',
+                            _currentPosition != null
+                                ? 'Current Location Detected'
+                                : 'Location Access Required',
                             style: AppTextTheme.titleSmall.copyWith(
-                              color: _currentPosition != null ? AppColors.success : AppColors.error,
+                              color: _currentPosition != null
+                                  ? AppColors.success
+                                  : AppColors.error,
                             ),
                           ),
                           if (_currentAddress != null)
                             Text(
                               _currentAddress!,
-                              style: AppTextTheme.bodySmall.copyWith(color: AppColors.textSecondary),
+                              style: AppTextTheme.bodySmall
+                                  .copyWith(color: AppColors.textSecondary),
                             ),
                           if (_locationError != null)
                             Text(
                               _locationError!,
-                              style: AppTextTheme.bodySmall.copyWith(color: AppColors.error),
+                              style: AppTextTheme.bodySmall
+                                  .copyWith(color: AppColors.error),
                             ),
                         ],
                       ),
@@ -556,11 +604,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Building/Apartment Details Section
           _buildSectionHeader('Building Details'),
           const SizedBox(height: 16),
-          
+
           Row(
             children: [
               Expanded(
@@ -583,7 +631,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           CustomTextField(
             controller: _apartmentNameController,
             labelText: 'Apartment/Building Name',
@@ -591,11 +639,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             prefixIcon: Icons.apartment_outlined,
           ),
           const SizedBox(height: 24),
-          
+
           // Address Details Section
           _buildSectionHeader('Address Details'),
           const SizedBox(height: 16),
-          
+
           CustomTextField(
             controller: _addressLine1Controller,
             labelText: 'Address Line 1 *',
@@ -609,7 +657,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           CustomTextField(
             controller: _nearbyLandmarkController,
             labelText: 'Nearby Landmark',
@@ -617,7 +665,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             prefixIcon: Icons.place_outlined,
           ),
           const SizedBox(height: 16),
-          
+
           Row(
             children: [
               Expanded(
@@ -656,7 +704,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           CustomTextField(
             controller: _stateController,
             labelText: 'State *',
@@ -670,7 +718,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             },
           ),
           const SizedBox(height: 24),
-          
+
           // Info card
           Container(
             padding: const EdgeInsets.all(12),

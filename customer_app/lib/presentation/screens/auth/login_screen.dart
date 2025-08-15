@@ -6,6 +6,7 @@ import 'package:customer_app/core/constants/font_constants.dart';
 import 'package:customer_app/core/utils/text_utils.dart';
 import 'package:flutter/material.dart' hide TextButton;
 import 'package:flutter/material.dart' as material show TextButton;
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:sms_autofill/sms_autofill.dart';
@@ -27,12 +28,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final FocusNode _phoneFocusNode = FocusNode();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  
+
   // Rate limiting countdown
   Timer? _countdownTimer;
   int _remainingSeconds = 0;
   bool _isRateLimited = false;
-  
+
   // Loading animation state
   bool _showLoadingAnimation = false;
   Timer? _animationTimer;
@@ -50,12 +51,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Reset OTP state when coming to login screen
       authProvider.resetOTPState();
-      
+
       // Initialize phone number autofill
       _initializePhoneAutofill();
     });
   }
-  
+
   Future<void> _initializePhoneAutofill() async {
     try {
       // Request phone permission
@@ -66,7 +67,10 @@ class _LoginScreenState extends State<LoginScreen> {
         if (phoneNumber != null && phoneNumber.isNotEmpty) {
           setState(() {
             // Remove +91 if present and format the number
-            String formattedNumber = phoneNumber.replaceAll('+91', '').replaceAll(' ', '').replaceAll('-', '');
+            String formattedNumber = phoneNumber
+                .replaceAll('+91', '')
+                .replaceAll(' ', '')
+                .replaceAll('-', '');
             if (formattedNumber.length == 10) {
               _phoneController.text = formattedNumber;
             }
@@ -93,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _isRateLimited = true;
       _remainingSeconds = seconds;
     });
-    
+
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
@@ -105,7 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     });
   }
-  
+
   void _extractCountdownFromError(String errorMessage) {
     // Extract seconds from rate limit message
     final regex = RegExp(r'(\d+) seconds');
@@ -165,10 +169,10 @@ class _LoginScreenState extends State<LoginScreen> {
           _showLoadingAnimation = false;
         });
       }
-      
+
       // Error handling is managed by the provider
       print('Error sending OTP: $e');
-      
+
       // Check if it's a rate limit error and start countdown
       final errorMessage = authProvider.errorMessage ?? '';
       if (errorMessage.contains('wait') && errorMessage.contains('seconds')) {
@@ -180,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (errorMessage.contains('blocked')) {
         _startCountdown(2 * 60 * 60); // 2 hours for account blocked
       }
-      
+
       // Show snackbar for additional feedback
       if (mounted) {
         // ScaffoldMessenger.of(context).showSnackBar(
@@ -202,15 +206,17 @@ class _LoginScreenState extends State<LoginScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final theme = Theme.of(context);
+        final colors = theme.colorScheme;
         return AlertDialog(
           title: Row(
             children: [
-              const Icon(Icons.error_outline, color: Colors.red),
+              Icon(Icons.error_outline, color: colors.error),
               const SizedBox(width: 8),
               Text(
                 'Error',
                 style: AppTypography.headlineSmall.copyWith(
-                  color: const Color(0xFF2D3748),
+                  color: colors.onSurface,
                 ),
               ),
             ],
@@ -218,7 +224,7 @@ class _LoginScreenState extends State<LoginScreen> {
           content: Text(
             message,
             style: AppTypography.bodyMedium.copyWith(
-              color: const Color(0xFF4A5568),
+              color: colors.onSurfaceVariant,
             ),
           ),
           actions: [
@@ -227,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Text(
                 'OK',
                 style: AppTypography.labelLarge.copyWith(
-                  color: const Color(0xFF4299E1),
+                  color: colors.primary,
                   fontWeight: FontConstants.semibold,
                 ),
               ),
@@ -241,7 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
@@ -250,14 +256,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Listen for OTP status changes for navigation (but only if not showing animation)
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (!_showLoadingAnimation &&
-                      authProvider.otpStatus == OTPStatus.sent && 
+                      authProvider.otpStatus == OTPStatus.sent &&
                       _phoneController.text.isNotEmpty) {
-                    final fullPhoneNumber = '+91${_phoneController.text.trim()}';
+                    final fullPhoneNumber =
+                        '+91${_phoneController.text.trim()}';
                     AppRoutes.navigateToOTP(context, fullPhoneNumber);
                   }
-                  
+
                   // Show error dialog if there's an error (but avoid during navigation)
-                  if (authProvider.errorMessage != null && 
+                  if (authProvider.errorMessage != null &&
                       authProvider.errorMessage!.isNotEmpty &&
                       authProvider.otpStatus != OTPStatus.sent &&
                       !_showLoadingAnimation) {
@@ -270,8 +277,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.all(24),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      minHeight: MediaQuery.of(context).size.height - 
-                               MediaQuery.of(context).padding.top - 48,
+                      minHeight: MediaQuery.of(context).size.height -
+                          MediaQuery.of(context).padding.top -
+                          48,
                     ),
                     child: IntrinsicHeight(
                       child: Form(
@@ -302,7 +310,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                             // Already have account
                             _buildFooter(),
-                            
+
                             const SizedBox(height: 16),
                           ],
                         ),
@@ -312,7 +320,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 );
               },
             ),
-        
+
             // Loading animation overlay
             if (_showLoadingAnimation)
               Container(
@@ -361,14 +369,14 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Iron icon - Reduced size
-        Image.asset("assets/icons/icon.png", width: 200, height: 200),
+        // Themed logo (SVG) based on current theme
+        _buildThemeLogo(size: 200),
 
         const SizedBox(height: 8),
 
         // App title with SF Pro Display
-        AppText.appTitle('Welcome to'),
-        AppText.appTitle('Cloud Ironing Factory pvt ltd'),
+        AppText.appTitle( 'Welcome to'),
+        AppText.appTitle( 'Cloud Ironing Factory pvt ltd'),
         const SizedBox(height: 6),
 
         // Subtitle with SF Pro Display
@@ -377,19 +385,30 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget _buildThemeLogo({double size = 160}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final asset = isDark ? 'assets/icons/logo_dark.svg' : 'assets/icons/logo_light.svg';
+    return SvgPicture.asset(
+      asset,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+    );
+  }
+
   Widget _buildPhoneInput(AuthProvider authProvider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color:
-                  _phoneFocusNode.hasFocus
-                      ? const Color(0xFF4299E1)
-                      : Colors.grey[300]!,
+              color: _phoneFocusNode.hasFocus
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.outline,
               width: _phoneFocusNode.hasFocus ? 2 : 1,
             ),
           ),
@@ -402,7 +421,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   vertical: 16,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(8),
                     bottomLeft: Radius.circular(8),
@@ -412,7 +431,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   '+91',
                   style: AppTypography.bodyLarge.copyWith(
                     fontWeight: FontConstants.medium,
-                    color: const Color(0xFF2D3748),
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -429,15 +448,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                   style: AppTypography.bodyLarge.copyWith(
                     fontWeight: FontConstants.medium,
-                    color: const Color(0xFF2D3748),
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                   decoration: InputDecoration(
+                    fillColor: Theme.of(context).colorScheme.surface,
+                    // filled: true,
                     hintText: '9876 543210',
                     hintStyle: AppTypography.bodyLarge.copyWith(
                       color: const Color(0xFFA0AEC0),
                       fontWeight: FontConstants.regular,
                     ),
-                    border: InputBorder.none,
+                    border: const OutlineInputBorder(borderSide: BorderSide.none,borderRadius: BorderRadius.all(Radius.circular(0))),
                     errorBorder: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -499,10 +520,9 @@ class _LoginScreenState extends State<LoginScreen> {
       child: ElevatedButton(
         onPressed: isValid && !isLoading && !_isRateLimited ? _sendOTP : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              isValid && !isLoading && !_isRateLimited
-                  ? const Color(0xFF0F3057)
-                  : const Color(0xFF0F3057).withOpacity(0.6),
+          backgroundColor: isValid && !isLoading && !_isRateLimited
+              ? const Color(0xFF0F3057)
+              : const Color(0xFF0F3057).withOpacity(0.6),
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -562,7 +582,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             child: Center(
               child: Text(
-                'G',
+                'G Sign In with Google',
                 style: AppTypography.headlineSmall.copyWith(
                   fontWeight: FontConstants.bold,
                   color: const Color(0xFF4285F4),
@@ -576,37 +596,40 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildFooter() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'Already have account? ',
-          style: AppTypography.bodyMedium.copyWith(
-            color: const Color(0xFF718096),
-          ),
-        ),
-        GestureDetector(
-          onTap: () {
-            // Handle existing user login
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Just enter your phone number to login!',
-                  style: AppTypography.bodyMedium.copyWith(color: Colors.white),
-                ),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          },
-          child: Text(
-            'Login',
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Already have account? ',
             style: AppTypography.bodyMedium.copyWith(
-              color: const Color(0xFF4299E1),
-              fontWeight: FontConstants.medium,
+              color: const Color(0xFF718096),
             ),
           ),
-        ),
-      ],
+          GestureDetector(
+            onTap: () {
+              // Handle existing user login
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Just enter your phone number to login!',
+                    style: AppTypography.bodyMedium.copyWith(color: Colors.white),
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: Text(
+              'Login',
+              style: AppTypography.bodyMedium.copyWith(
+                color: const Color(0xFF4299E1),
+                fontWeight: FontConstants.medium,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

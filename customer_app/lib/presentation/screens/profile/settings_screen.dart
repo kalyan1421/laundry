@@ -60,12 +60,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: colors.background,
       appBar: AppBar(
-        title: const Text('Settings'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        title: Text('Settings', style: theme.textTheme.titleLarge),
+        backgroundColor: colors.surface,
+        foregroundColor: colors.onSurface,
         elevation: 0,
         centerTitle: true,
       ),
@@ -263,8 +265,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSection(String title, List<Widget> children) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return Container(
-      color: Colors.white,
+      color: colors.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -272,11 +276,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Text(
               title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F3057),
-              ),
+              style: theme.textTheme.titleLarge?.copyWith(color: colors.onSurface),
             ),
           ),
           ...children,
@@ -292,14 +292,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool value,
     Function(bool) onChanged,
   ) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return ListTile(
-      leading: Icon(icon, color: Colors.grey[700]),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      subtitle: Text(subtitle, style: TextStyle(color: Colors.grey[600])),
+      leading: Icon(icon, color: colors.onSurfaceVariant),
+      title: Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500, color: colors.onSurface)),
+      subtitle: Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF0F3057),
+        activeColor: colors.primary,
       ),
     );
   }
@@ -312,17 +314,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     List<String> options,
     Function(String?) onChanged,
   ) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return ListTile(
-      leading: Icon(icon, color: Colors.grey[700]),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      subtitle: Text(subtitle, style: TextStyle(color: Colors.grey[600])),
+      leading: Icon(icon, color: colors.onSurfaceVariant),
+      title: Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500, color: colors.onSurface)),
+      subtitle: Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
       trailing: DropdownButton<String>(
         value: value,
         underline: Container(),
         items: options.map((String option) {
           return DropdownMenuItem<String>(
             value: option,
-            child: Text(option),
+            child: Text(option, style: theme.textTheme.bodyMedium?.copyWith(color: colors.onSurface)),
           );
         }).toList(),
         onChanged: onChanged,
@@ -337,23 +341,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     VoidCallback onTap, {
     bool isDestructive = false,
   }) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final destructiveColor = Colors.red[600];
     return ListTile(
       leading: Icon(
         icon,
-        color: isDestructive ? Colors.red[600] : Colors.grey[700],
+        color: isDestructive ? destructiveColor : colors.onSurfaceVariant,
       ),
       title: Text(
         title,
-        style: TextStyle(
+        style: theme.textTheme.titleSmall?.copyWith(
           fontWeight: FontWeight.w500,
-          color: isDestructive ? Colors.red[600] : null,
+          color: isDestructive ? destructiveColor : colors.onSurface,
         ),
       ),
-      subtitle: Text(subtitle, style: TextStyle(color: Colors.grey[600])),
+      subtitle: Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
       trailing: Icon(
         Icons.arrow_forward_ios,
         size: 16,
-        color: Colors.grey[400],
+        color: colors.outlineVariant,
       ),
       onTap: onTap,
     );
@@ -364,13 +371,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String value,
     IconData icon,
   ) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return ListTile(
-      leading: Icon(icon, color: Colors.grey[700]),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+      leading: Icon(icon, color: colors.onSurfaceVariant),
+      title: Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500, color: colors.onSurface)),
       trailing: Text(
         value,
-        style: TextStyle(
-          color: Colors.grey[600],
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: colors.onSurfaceVariant,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -380,26 +389,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildThemeSelectionTile() {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
+        final theme = Theme.of(context);
+        final colors = theme.colorScheme;
         return ListTile(
           leading: Icon(
             themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
-            color: Colors.grey[700],
+            color: colors.onSurfaceVariant,
           ),
-          title: const Text(
+          title: Text(
             'Theme',
-            style: TextStyle(fontWeight: FontWeight.w500),
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500, color: colors.onSurface),
           ),
           subtitle: Text(
             themeProvider.getThemeModeDescription(),
-            style: TextStyle(color: Colors.grey[600]),
+            style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
           ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 themeProvider.getThemeModeDisplayName(),
-                style: TextStyle(
-                  color: Colors.grey[600],
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -407,7 +418,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey[400],
+                color: colors.outlineVariant,
               ),
             ],
           ),

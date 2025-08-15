@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'dart:async';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -24,11 +25,11 @@ class _SplashScreenState extends State<SplashScreen> {
             Container(
               width: 120,
               height: 120,
-              // decoration: BoxDecoration(
-              //   color: Colors.grey[100],
-              //   borderRadius: BorderRadius.circular(20),
-              // ),
-              child: Image.asset("assets/icons/icon.png", fit: BoxFit.cover),
+              decoration: BoxDecoration(
+                shape: BoxShape.rectangle,
+                // border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: _buildThemeLogo(),
             ),
             const SizedBox(height: 30),
             // App title
@@ -57,6 +58,15 @@ class _SplashScreenState extends State<SplashScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildThemeLogo() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final asset = isDark ? 'assets/icons/logo_dark.svg' : 'assets/icons/logo_light.svg';
+    return SvgPicture.asset(
+      asset,
+      fit: BoxFit.contain,
     );
   }
 

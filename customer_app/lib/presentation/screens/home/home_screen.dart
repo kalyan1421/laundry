@@ -11,7 +11,8 @@ import 'package:customer_app/presentation/screens/home/allied_services_screen.da
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
-import 'package:customer_app/data/models/order_model.dart' as customer_order_model;
+import 'package:customer_app/data/models/order_model.dart'
+    as customer_order_model;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
@@ -30,10 +31,12 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
   final Logger _logger = Logger();
   Map<String, int> itemQuantities = {};
   final ScrollController _scrollController = ScrollController();
-  
+
   // Contact numbers for place order
-  static const String phoneNumber = '+916382654316'; // Replace with actual phone number
-  static const String whatsappNumber = '+916382654316'; // Replace with actual WhatsApp number
+  static const String phoneNumber =
+      '+916382654316'; // Replace with actual phone number
+  static const String whatsappNumber =
+      '+916382654316'; // Replace with actual WhatsApp number
 
   @override
   void initState() {
@@ -45,30 +48,33 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
 
   void _fetchInitialData() async {
     _logger.d('Fetching initial data for HomeScreen');
-    
+
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Validate authentication state before fetching data
-      if (authProvider.userModel == null && authProvider.authStatus == AuthStatus.authenticated) {
-        _logger.w('UserModel is null but auth status is authenticated - validating auth state');
+      if (authProvider.userModel == null &&
+          authProvider.authStatus == AuthStatus.authenticated) {
+        _logger.w(
+            'UserModel is null but auth status is authenticated - validating auth state');
         await handleAuthError();
         return;
       }
-      
+
       if (authProvider.userModel != null) {
         Provider.of<HomeProvider>(context, listen: false)
             .fetchLastActiveOrder(authProvider.userModel!.uid);
       }
-      
+
       Provider.of<BannerProvider>(context, listen: false).fetchBanners();
-      Provider.of<SpecialOfferProvider>(context, listen: false).fetchSpecialOffers();
+      Provider.of<SpecialOfferProvider>(context, listen: false)
+          .fetchSpecialOffers();
       Provider.of<ItemProvider>(context, listen: false).loadAllItemData();
-      
     } catch (e) {
       _logger.e('Error fetching initial data: $e');
       // Handle auth-related errors
-      if (e.toString().contains('permission') || e.toString().contains('unauthenticated')) {
+      if (e.toString().contains('permission') ||
+          e.toString().contains('unauthenticated')) {
         await handleAuthError();
       }
     }
@@ -101,7 +107,8 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
     });
   }
 
-  int get totalItems => itemQuantities.values.fold(0, (sum, quantity) => sum + quantity);
+  int get totalItems =>
+      itemQuantities.values.fold(0, (sum, quantity) => sum + quantity);
 
   void _scrollToItemsSection() {
     // Scroll to items section (approximate position)
@@ -139,16 +146,17 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              
+
               // Title
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: Text(
                   'Place Your Order',
                   style: context.heading2,
                 ),
               ),
-              
+
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
@@ -157,12 +165,13 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                   textAlign: TextAlign.center,
                 ),
               ),
-              
+
               const SizedBox(height: 20),
-              
+
               // Phone Call Option
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: InkWell(
                   onTap: () {
                     Navigator.pop(context);
@@ -172,36 +181,35 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.blue.shade200),
+                      border: Border.all(color: context.outlineVariant),
                       borderRadius: BorderRadius.circular(12),
-                      color: Colors.blue.shade50,
+                      color: context.surfaceVariant,
                     ),
                     child: Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade100,
+                            color: context.primaryColor.withOpacity(0.12),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             Icons.phone,
-                            color: Colors.blue.shade700,
+                            color: context.primaryColor,
                             size: 24,
                           ),
                         ),
                         const SizedBox(width: 16),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'Call Us',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(color: context.onSurfaceColor),
                               ),
                               SizedBox(height: 4),
                               Text(
@@ -217,17 +225,18 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                         Icon(
                           Icons.arrow_forward_ios,
                           size: 16,
-                          color: Colors.blue.shade400,
+                          color: context.outlineVariant,
                         ),
                       ],
                     ),
                   ),
                 ),
               ),
-              
+
               // WhatsApp Option
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: InkWell(
                   onTap: () {
                     Navigator.pop(context);
@@ -237,44 +246,43 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.green.shade200),
+                      border: Border.all(color: context.outlineVariant),
                       borderRadius: BorderRadius.circular(12),
-                      color: Colors.green.shade50,
+                      color: context.surfaceVariant,
                     ),
                     child: Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.green.shade100,
+                            color: context.primaryColor.withOpacity(0.12),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             Icons.chat,
-                            color: Colors.green.shade700,
+                            color: context.primaryColor,
                             size: 24,
                           ),
                         ),
                         const SizedBox(width: 16),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'WhatsApp',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(color: context.onSurfaceColor),
                               ),
                               SizedBox(height: 4),
                               Text(
                                 'Chat with us on WhatsApp',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: context.onSurfaceVariant),
                               ),
                             ],
                           ),
@@ -282,14 +290,14 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                         Icon(
                           Icons.arrow_forward_ios,
                           size: 16,
-                          color: Colors.green.shade400,
+                          color: context.outlineVariant,
                         ),
                       ],
                     ),
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 30),
             ],
           ),
@@ -315,9 +323,11 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
 
   // Open WhatsApp
   Future<void> _openWhatsApp() async {
-    final String message = Uri.encodeComponent('Hello! I would like to place an order for laundry service.');
-    final Uri whatsappUri = Uri.parse('https://wa.me/$whatsappNumber?text=$message');
-    
+    final String message = Uri.encodeComponent(
+        'Hello! I would like to place an order for laundry service.');
+    final Uri whatsappUri =
+        Uri.parse('https://wa.me/$whatsappNumber?text=$message');
+
     try {
       if (await canLaunchUrl(whatsappUri)) {
         await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
@@ -346,9 +356,8 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
   void _navigateToSchedulePickup() {
     final itemProvider = Provider.of<ItemProvider>(context, listen: false);
 
-    final selectedItems = Map.fromEntries(itemQuantities.entries
-        .where((entry) => entry.value > 0)
-        .map((entry) {
+    final selectedItems = Map.fromEntries(
+        itemQuantities.entries.where((entry) => entry.value > 0).map((entry) {
       final item = itemProvider.items.firstWhere((i) => i.id == entry.key);
       return MapEntry(item, entry.value);
     }));
@@ -381,28 +390,26 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.backgroundColor,
-    //   appBar: _buildAppBar(),
+      // appBar: _buildAppBar(),
       body: _buildBody(),
       bottomSheet: totalItems > 0 ? _buildBottomSheet() : null,
-    //   bottomNavigationBar: _buildBottomNavigationBar(),
+      //   bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: context.backgroundColor,
       elevation: 0,
-      
-      title: const Text(
+      title: Text(
         'Cloud Ironing',
         style: TextStyle(
-          color: Colors.black,
+          color: context.onBackgroundColor,
           fontWeight: FontWeight.w600,
           fontSize: 18,
         ),
       ),
       centerTitle: true,
-     
     );
   }
 
@@ -435,16 +442,20 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: context.surfaceVariant,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.outlineVariant),
       ),
       child: Row(
         children: [
-          Icon(Icons.search, color: Colors.grey[600]),
+          Icon(Icons.search, color: context.onSurfaceVariant),
           const SizedBox(width: 12),
           Text(
             'Search for services...',
-            style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: context.onSurfaceVariant),
           ),
         ],
       ),
@@ -486,7 +497,6 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
             ),
             items: bannerProvider.banners.map((banner) {
               return Container(
-
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   image: DecorationImage(
@@ -502,7 +512,7 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        Colors.black.withOpacity(0.3),
+                        Theme.of(context).colorScheme.scrim.withOpacity(0.3),
                         Colors.transparent,
                       ],
                     ),
@@ -513,11 +523,11 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                     children: [
                       Text(
                         banner.title ?? 'Professional Ironing',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: Theme.of(context).colorScheme.onPrimary,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       const SizedBox(height: 4),
                       // Text(
@@ -580,50 +590,63 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.blue.shade50,
-                          Colors.white,
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.shade200),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withOpacity(0.1),
-                          spreadRadius: 1,
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
+                        gradient:
+                            Theme.of(context).brightness == Brightness.light
+                                ? LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Colors.lightBlue.shade50,
+                                      Colors.white,
+                                    ],
+                                  )
+                                : null,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? context.surfaceVariant
+                            : null,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                                  ? Colors.lightBlue.shade200
+                                  : context.outlineVariant,
                         ),
-                      ],
-                    ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.lightBlue.withOpacity(0.1),
+                            spreadRadius: 1,
+                            blurRadius: 3,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]),
                     child: Column(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
+                            color: Colors.lightBlue.shade100,
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.iron, color: Colors.blue[600], size: 28),
+                          child: Icon(Icons.iron,
+                              color: Colors.lightBlue, size: 28),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           'Placing Order',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: context.onSurfaceColor),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Select items for ironing',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: context.onSurfaceVariant),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -658,7 +681,7 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
               //       ),
               //       child: Column(
               //         children: [
-                        
+
               //           const SizedBox(height: 5),
               //           const Text(
               //             'Place Order',
@@ -714,50 +737,63 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.green.shade50,
-                          Colors.white,
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.shade200),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.green.withOpacity(0.1),
-                          spreadRadius: 1,
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
+                        gradient:
+                            Theme.of(context).brightness == Brightness.light
+                                ? LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Colors.green.shade50,
+                                      Colors.white,
+                                    ],
+                                  )
+                                : null,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? context.surfaceVariant
+                            : null,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                                  ? Colors.green.shade200
+                                  : context.outlineVariant,
                         ),
-                      ],
-                    ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withOpacity(0.1),
+                            spreadRadius: 1,
+                            blurRadius: 3,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]),
                     child: Column(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
+                            color: Colors.green.shade100,
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.home_repair_service, color: Colors.green[600], size: 28),
+                          child: Icon(Icons.home_repair_service,
+                              color: Colors.green, size: 28),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           'Allied Services',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: context.onSurfaceColor),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Bed sheets, stain removal',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: context.onSurfaceVariant),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -780,16 +816,25 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.orange.shade50,
-                Colors.white,
-              ],
-            ),
+            gradient: Theme.of(context).brightness == Brightness.light
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.orange.shade50,
+                      Colors.white,
+                    ],
+                  )
+                : null,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? context.surfaceVariant
+                : null,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.orange.shade200, width: 1),
+            border: Border.all(
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Colors.orange.shade200
+                  : context.outlineVariant,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.orange.withOpacity(0.1),
@@ -815,29 +860,20 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                 ),
               ),
               const SizedBox(width: 16),
-              const Expanded(
+              Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Call / Chat To Place Order',
-                      style: TextStyle(
-                        letterSpacing: 0.5,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.black87,
-                      ),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            letterSpacing: 0.5,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: context.onSurfaceColor,
+                          ),
                     ),
-                    
-                    // Text(
-                    //   'Call or WhatsApp us to place your order',
-                    //   style: TextStyle(
-                    //     color: Colors.grey,
-                    //     fontSize: 14,
-                    //     fontWeight: FontWeight.w500,
-                    //   ),
-                    // ),
                   ],
                 ),
               ),
@@ -864,8 +900,9 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
   }
 
   Widget _buildRevenueTracking() {
-    final firebase_auth.User? currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
-    
+    final firebase_auth.User? currentUser =
+        firebase_auth.FirebaseAuth.instance.currentUser;
+
     if (currentUser == null) {
       return const SizedBox.shrink();
     }
@@ -875,13 +912,11 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
         FirebaseFirestore.instance
             .collection('orders')
             .where('customerId', isEqualTo: currentUser.uid)
-            .where('status', whereIn: ['completed', 'delivered'])
-            .get(),
+            .where('status', whereIn: ['completed', 'delivered']).get(),
         FirebaseFirestore.instance
             .collection('orders')
             .where('userId', isEqualTo: currentUser.uid)
-            .where('status', whereIn: ['completed', 'delivered'])
-            .get(),
+            .where('status', whereIn: ['completed', 'delivered']).get(),
       ]),
       builder: (context, snapshot) {
         double totalRevenue = 0.0;
@@ -907,7 +942,8 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Card(
             elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -1054,9 +1090,11 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                           Expanded(
                             child: Container(
                               decoration: BoxDecoration(
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                                borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(12)),
                                 image: DecorationImage(
-                                  image: CachedNetworkImageProvider(offer.imageUrl ?? ''),
+                                  image: CachedNetworkImageProvider(
+                                      offer.imageUrl ?? ''),
                                   fit: BoxFit.cover,
                                 ),
                               ),
@@ -1067,7 +1105,8 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                                     top: 8,
                                     left: 8,
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
                                         color: Colors.green,
                                         borderRadius: BorderRadius.circular(12),
@@ -1169,14 +1208,14 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
               itemBuilder: (context, index) {
                 final item = itemProvider.items[index];
                 final quantity = itemQuantities[item.id] ?? 0;
-                
+
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: context.surfaceColor,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
+                    border: Border.all(color: context.outlineVariant),
                   ),
                   child: Row(
                     children: [
@@ -1184,21 +1223,24 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.grey[100],
+                          color: context.surfaceVariant,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: item.imageUrl != null && item.imageUrl!.isNotEmpty
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: CachedNetworkImage(
-                                  imageUrl: item.imageUrl!,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) {
-                                    return Icon(_getItemIcon(item.name), color: Colors.grey[400]);
-                                  },
-                                ),
-                              )
-                            : Icon(_getItemIcon(item.name), color: Colors.grey[400]),
+                        child:
+                            item.imageUrl != null && item.imageUrl!.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: CachedNetworkImage(
+                                      imageUrl: item.imageUrl!,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (context, url, error) {
+                                        return Icon(_getItemIcon(item.name),
+                                            color: context.onSurfaceVariant);
+                                      },
+                                    ),
+                                  )
+                                : Icon(_getItemIcon(item.name),
+                                    color: context.onSurfaceVariant),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -1216,25 +1258,33 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                             Row(
                               children: [
                                 // Original Price (strikethrough) - Show first if there's an offer
-                                if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
+                                if (item.originalPrice != null &&
+                                    item.originalPrice! >
+                                        (item.offerPrice ?? item.pricePerPiece))
                                   Text(
                                     '₹${item.originalPrice!.toInt()}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       decoration: TextDecoration.lineThrough,
-                                      color: Colors.grey,
+                                      color: context.onSurfaceVariant,
                                       fontSize: 12,
                                     ),
                                   ),
                                 // Add spacing between original and offer price
-                                if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
+                                if (item.originalPrice != null &&
+                                    item.originalPrice! >
+                                        (item.offerPrice ?? item.pricePerPiece))
                                   const SizedBox(width: 8),
                                 // Current/Offer Price
                                 Text(
                                   '₹${(item.offerPrice ?? item.pricePerPiece).toInt()} per piece',
                                   style: TextStyle(
-                                    color: item.offerPrice != null ? Colors.green[700] : Colors.grey[600],
+                                    color: item.offerPrice != null
+                                        ? Theme.of(context).colorScheme.tertiary
+                                        : context.onSurfaceVariant,
                                     fontSize: 14,
-                                    fontWeight: item.offerPrice != null ? FontWeight.w600 : FontWeight.normal,
+                                    fontWeight: item.offerPrice != null
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
                                   ),
                                 ),
                                 // Offer badge
@@ -1272,14 +1322,19 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                       Row(
                         children: [
                           IconButton(
-                            onPressed: quantity > 0 ? () => _decrementQuantity(item.id) : null,
+                            onPressed: quantity > 0
+                                ? () => _decrementQuantity(item.id)
+                                : null,
                             icon: Icon(
                               Icons.remove,
-                              color: quantity > 0 ? Colors.grey[600] : Colors.grey[300],
+                              color: quantity > 0
+                                  ? context.onSurfaceVariant
+                                  : context.outlineVariant,
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
                             child: Text(
                               '$quantity',
                               style: const TextStyle(
@@ -1292,13 +1347,13 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                             onPressed: () => _incrementQuantity(item.id),
                             icon: Container(
                               padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.blue,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.add,
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onPrimary,
                                 size: 16,
                               ),
                             ),
@@ -1385,33 +1440,41 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: context.surfaceColor,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
+                    border: Border.all(color: context.outlineVariant),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Mar 15, 2025',
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: context.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
                       ),
                       const SizedBox(height: 4),
                       const Text(
                         '₹250',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.green[100],
+                          color:
+                              Theme.of(context).colorScheme.tertiaryContainer,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           'Delivered',
                           style: TextStyle(
-                            color: Colors.green[700],
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onTertiaryContainer,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1434,21 +1497,25 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: context.surfaceColor,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
+                    border: Border.all(color: context.outlineVariant),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Mar 10, 2025',
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: context.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
                       ),
                       const SizedBox(height: 4),
                       const Text(
                         '₹180',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                       const SizedBox(height: 32), // Space for delivered status
                       const SizedBox(height: 8),
@@ -1474,13 +1541,13 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 20), // 20px from bottom
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black12,
+            color: Theme.of(context).colorScheme.shadow.withOpacity(0.12),
             blurRadius: 8,
-            offset: Offset(0, -2),
+            offset: const Offset(0, -2),
           ),
         ],
       ),
@@ -1501,11 +1568,10 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                   ),
                   Text(
                     'Total Amount: ₹${totalAmount.toInt()}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: Colors.blue,
-                    ),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                   ),
                 ],
               ),
@@ -1516,12 +1582,17 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
               child: ElevatedButton(
                 onPressed: _navigateToSchedulePickup,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F3057),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
-                child: const Text(
+                child: Text(
                   'Continue',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
               ),
             ),
@@ -1534,8 +1605,8 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
   Widget _buildBottomNavigationBar() {
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
-      selectedItemColor: Colors.blue,
-      unselectedItemColor: Colors.grey,
+      selectedItemColor: Theme.of(context).colorScheme.primary,
+      unselectedItemColor: context.onSurfaceVariant,
       items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.home),
@@ -1560,10 +1631,12 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
   IconData _getItemIcon(String itemName) {
     final name = itemName.toLowerCase();
     if (name.contains('shirt')) return Icons.checkroom;
-    if (name.contains('pant') || name.contains('trouser')) return Icons.checkroom;
+    if (name.contains('pant') || name.contains('trouser'))
+      return Icons.checkroom;
     if (name.contains('churidar')) return Icons.checkroom;
     if (name.contains('saree') || name.contains('sare')) return Icons.checkroom;
-    if (name.contains('blouse') || name.contains('blows')) return Icons.checkroom;
+    if (name.contains('blouse') || name.contains('blows'))
+      return Icons.checkroom;
     if (name.contains('special')) return Icons.star;
     return Icons.checkroom;
   }
