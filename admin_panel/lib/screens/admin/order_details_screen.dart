@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -22,17 +24,17 @@ class OrderDetailsScreen extends StatefulWidget {
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
+
   OrderModel? _order;
   List<DocumentSnapshot> _deliveryPersons = [];
   Map<String, dynamic>? _customerDetails;
   bool _isLoading = true;
   bool _isUpdating = false;
   StreamSubscription<DocumentSnapshot>? _orderSubscription;
-  
+
   final List<String> _orderStatuses = [
     'pending',
-    'confirmed', 
+    'confirmed',
     'assigned',
     'picked_up',
     'processing',
@@ -60,46 +62,51 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         .collection('orders')
         .doc(widget.orderId)
         .snapshots()
-        .listen((orderDoc) async {
-      if (orderDoc.exists) {
-        setState(() {
-          _order = OrderModel.fromFirestore(orderDoc as DocumentSnapshot<Map<String, dynamic>>);
-        });
-        
-        // Load customer details after order is loaded
-        await _loadCustomerDetails();
-        
-        setState(() {
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }, onError: (e) {
-      print('Error listening to order updates: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    });
+        .listen(
+          (orderDoc) async {
+            if (orderDoc.exists) {
+              setState(() {
+                _order = OrderModel.fromFirestore(
+                  orderDoc as DocumentSnapshot<Map<String, dynamic>>,
+                );
+              });
+
+              // Load customer details after order is loaded
+              await _loadCustomerDetails();
+
+              setState(() {
+                _isLoading = false;
+              });
+            } else {
+              setState(() {
+                _isLoading = false;
+              });
+            }
+          },
+          onError: (e) {
+            print('Error listening to order updates: $e');
+            setState(() {
+              _isLoading = false;
+            });
+          },
+        );
   }
 
   Future<void> _loadOrderDetails() async {
     try {
-      DocumentSnapshot orderDoc = await _firestore
-          .collection('orders')
-          .doc(widget.orderId)
-          .get();
-      
+      DocumentSnapshot orderDoc =
+          await _firestore.collection('orders').doc(widget.orderId).get();
+
       if (orderDoc.exists) {
         setState(() {
-          _order = OrderModel.fromFirestore(orderDoc as DocumentSnapshot<Map<String, dynamic>>);
+          _order = OrderModel.fromFirestore(
+            orderDoc as DocumentSnapshot<Map<String, dynamic>>,
+          );
         });
-        
+
         // Load customer details after order is loaded
         await _loadCustomerDetails();
-        
+
         setState(() {
           _isLoading = false;
         });
@@ -118,49 +125,56 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Future<void> _loadCustomerDetails() async {
     if (_order == null) return;
-    
+
     try {
       String? customerId = _order!.customerId ?? _order!.userId;
       if (customerId == null) return;
-      
+
       // Try to get customer from customer collection
       try {
-        DocumentSnapshot customerDoc = await _firestore
-            .collection('customer')  // Changed from 'customers' to 'customer'
-            .doc(customerId)
-            .get();
-        
+        DocumentSnapshot customerDoc =
+            await _firestore
+                .collection(
+                  'customer',
+                ) // Changed from 'customers' to 'customer'
+                .doc(customerId)
+                .get();
+
         if (customerDoc.exists) {
-          Map<String, dynamic> customerData = customerDoc.data() as Map<String, dynamic>;
+          Map<String, dynamic> customerData =
+              customerDoc.data() as Map<String, dynamic>;
           setState(() {
             _customerDetails = customerData;
           });
-          print('Customer details loaded from customer collection: ${customerData['name']}');
+          print(
+            'Customer details loaded from customer collection: ${customerData['name']}',
+          );
           return;
         }
       } catch (e) {
         print('Error loading from customer collection: $e');
       }
-      
+
       // If not found in customer collection, try legacy users collection
       try {
-        DocumentSnapshot userDoc = await _firestore
-            .collection('users')
-            .doc(customerId)
-            .get();
-        
+        DocumentSnapshot userDoc =
+            await _firestore.collection('users').doc(customerId).get();
+
         if (userDoc.exists) {
-          Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+          Map<String, dynamic> userData =
+              userDoc.data() as Map<String, dynamic>;
           setState(() {
             _customerDetails = userData;
           });
-          print('Customer details loaded from users collection: ${userData['name']}');
+          print(
+            'Customer details loaded from users collection: ${userData['name']}',
+          );
           return;
         }
       } catch (e) {
         print('Error loading from users collection: $e');
       }
-      
+
       // Fallback: Try to extract customer info from the order data itself
       // Check if customer details are embedded in the order
       if (_order!.customer != null) {
@@ -174,10 +188,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         print('Customer details loaded from order customer object');
         return;
       }
-      
+
       // Check if customer info is in order properties
       Map<String, dynamic> fallbackCustomerData = {};
-      
+
       // Create a basic placeholder with customer ID
       String fallbackCustomerId = _order!.customerId ?? _order!.userId;
       fallbackCustomerData = {
@@ -186,13 +200,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         'email': 'N/A (Details not loaded)',
         'isPlaceholder': true,
       };
-      
+
       setState(() {
         _customerDetails = fallbackCustomerData;
       });
       print('Using basic customer placeholder with ID: $fallbackCustomerId');
       return;
-      
     } catch (e) {
       print('Error loading customer details: $e');
     }
@@ -200,11 +213,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Future<void> _loadDeliveryPersons() async {
     try {
-      QuerySnapshot snapshot = await _firestore
-          .collection('delivery')
-          .where('isActive', isEqualTo: true)
-          .get();
-      
+      QuerySnapshot snapshot =
+          await _firestore
+              .collection('delivery')
+              .where('isActive', isEqualTo: true)
+              .get();
+
       setState(() {
         _deliveryPersons = snapshot.docs;
       });
@@ -233,15 +247,16 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           backgroundColor: Colors.blue[700],
           foregroundColor: Colors.white,
         ),
-        body: const Center(
-          child: Text('Order not found'),
-        ),
+        body: const Center(child: Text('Order not found')),
       );
     }
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text('Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)}'),
+        title: Text(
+          'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)}',
+        ),
         backgroundColor: Colors.blue[700],
         foregroundColor: Colors.white,
         actions: [
@@ -251,24 +266,101 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 600) {
+            // Mobile layout
+            return _buildMobileLayout();
+          } else {
+            // Web / Desktop layout
+            return _buildWebLayout();
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildOrderHeader(),
+          const SizedBox(height: 16),
+          _buildOrderStatus(),
+          const SizedBox(height: 16),
+          _buildCustomerInfo(),
+          const SizedBox(height: 16),
+          _buildItemsList(),
+          const SizedBox(height: 16),
+          _buildAddressInfo(),
+          const SizedBox(height: 16),
+          _buildDeliveryAssignment(),
+          const SizedBox(height: 24),
+          _buildActionButtons(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebLayout() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildOrderHeader(),
-            const SizedBox(height: 16),
-            _buildOrderStatus(),
-            const SizedBox(height: 16),
-            _buildCustomerInfo(),
-            const SizedBox(height: 16),
-            _buildItemsList(),
-            const SizedBox(height: 16),
-            _buildAddressInfo(),
-            const SizedBox(height: 16),
-            _buildDeliveryAssignment(),
-            const SizedBox(height: 24),
-            _buildActionButtons(),
+            // Left Column
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildOrderHeader(),
+                  ),
+                  // const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildOrderStatus(),
+                  ),
+                  // const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildCustomerInfo(),
+                  ),
+                ],
+              ),
+            ),
+            // const SizedBox(width: 8),
+
+            // Right Column
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildItemsList(),
+                  ),
+                  // const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildAddressInfo(),
+                  ),
+                  // const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildDeliveryAssignment(),
+                  ),
+                  // const SizedBox(height: 16),
+                  _buildActionButtons(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -277,6 +369,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Widget _buildOrderHeader() {
     return Card(
+      semanticContainer: true,
+      elevation: 8,
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -293,7 +388,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: _getStatusColor(_order!.status),
                     borderRadius: BorderRadius.circular(16),
@@ -319,7 +417,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               children: [
                 Icon(Icons.currency_rupee, size: 20, color: Colors.green[600]),
                 Text(
-                  '₹${_order!.totalAmount.toStringAsFixed(2)}',
+                  '${_order!.totalAmount.toStringAsFixed(2)}',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -336,6 +434,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Widget _buildOrderStatus() {
     return Card(
+      semanticContainer: true,
+      elevation: 8,
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -343,10 +444,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           children: [
             const Text(
               'Order Status',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             Row(
@@ -358,12 +456,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       labelText: 'Current Status',
                       border: OutlineInputBorder(),
                     ),
-                    items: _orderStatuses.map((status) {
-                      return DropdownMenuItem(
-                        value: status,
-                        child: Text(status.replaceAll('_', ' ').toUpperCase()),
-                      );
-                    }).toList(),
+                    items:
+                        _orderStatuses.map((status) {
+                          return DropdownMenuItem(
+                            value: status,
+                            child: Text(
+                              status.replaceAll('_', ' ').toUpperCase(),
+                            ),
+                          );
+                        }).toList(),
                     onChanged: (newStatus) {
                       if (newStatus != null && newStatus != _order!.status) {
                         _updateOrderStatus(newStatus);
@@ -373,6 +474,42 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ),
               ],
             ),
+            SizedBox(
+              width: double.maxFinite,
+              // height: 300,
+              child: StatusStepper(statusHistory: _order!.statusHistory),
+
+              // _order!.statusHistory.isEmpty
+              //     ? const Center(child: Text('No status history available'))
+              //     : ListView.builder(
+              //       shrinkWrap: true, // ✅ takes height based on content
+              //       physics:
+              //           const NeverScrollableScrollPhysics(), // ✅ prevents nested scroll conflict
+              //       itemCount: _order!.statusHistory.length,
+              //       itemBuilder: (context, index) {
+              //         final history = _order!.statusHistory[index];
+              //         return ListTile(
+              //           leading: Icon(
+              //             Icons.circle,
+              //             color: _getStatusColor(history['status'] ?? ''),
+              //             size: 12,
+              //           ),
+              //           title: Text(
+              //             (history['status'] ?? 'Unknown').toUpperCase(),
+              //           ),
+              //           subtitle:
+              //               history['timestamp'] != null
+              //                   ? Text(
+              //                     DateFormat('MMM d, yyyy • h:mm a').format(
+              //                       (history['timestamp'] as Timestamp)
+              //                           .toDate(),
+              //                     ),
+              //                   )
+              //                   : null,
+              //         );
+              //       },
+              //     ),
+            ),
           ],
         ),
       ),
@@ -381,6 +518,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Widget _buildCustomerInfo() {
     return Card(
+      semanticContainer: true,
+      elevation: 8,
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -390,17 +530,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               children: [
                 Icon(Icons.person, color: Colors.blue[600], size: 20),
                 const SizedBox(width: 8),
-            const Text(
-              'Customer Information',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+                const Text(
+                  'Customer Information',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // Customer Name
             Row(
               children: [
@@ -415,54 +552,72 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   ),
                 ),
                 Expanded(
-                  child: _customerDetails == null
-                      ? Row(
-                          children: [
-                            SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Loading customer details...',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            if (_customerDetails!['hasError'] == true)
-                              Icon(Icons.error_outline, size: 16, color: Colors.red[600])
-                            else if (_customerDetails!['isPlaceholder'] == true)
-                              Icon(Icons.info_outline, size: 16, color: Colors.orange[600])
-                            else
-                              Icon(Icons.person, size: 16, color: Colors.blue[600]),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                _customerDetails!['name'] ?? 'N/A',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                  color: _customerDetails!['hasError'] == true 
-                                      ? Colors.red[600]
-                                      : _customerDetails!['isPlaceholder'] == true
-                                          ? Colors.orange[600]
-                                          : Colors.black87,
+                  child:
+                      _customerDetails == null
+                          ? Row(
+                            children: [
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Loading customer details...',
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          )
+                          : Row(
+                            children: [
+                              if (_customerDetails!['hasError'] == true)
+                                Icon(
+                                  Icons.error_outline,
+                                  size: 16,
+                                  color: Colors.red[600],
+                                )
+                              else if (_customerDetails!['isPlaceholder'] ==
+                                  true)
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 16,
+                                  color: Colors.orange[600],
+                                )
+                              else
+                                Icon(
+                                  Icons.person,
+                                  size: 16,
+                                  color: Colors.blue[600],
+                                ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  _customerDetails!['name'] ?? 'N/A',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                    color:
+                                        _customerDetails!['hasError'] == true
+                                            ? Colors.red[600]
+                                            : _customerDetails!['isPlaceholder'] ==
+                                                true
+                                            ? Colors.orange[600]
+                                            : Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            
+
             // Phone Number
             Row(
               children: [
@@ -477,59 +632,68 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   ),
                 ),
                 Expanded(
-                  child: _customerDetails == null
-                      ? Row(
-                          children: [
-                            SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Loading...',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Icon(
-                              _customerDetails!['hasError'] == true || _customerDetails!['isPlaceholder'] == true
-                                  ? Icons.phone_disabled
-                                  : Icons.phone, 
-                              size: 16, 
-                              color: _customerDetails!['hasError'] == true 
-                                  ? Colors.red[600]
-                                  : _customerDetails!['isPlaceholder'] == true
-                                      ? Colors.orange[600]
-                                      : Colors.green[600]
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                _customerDetails!['phoneNumber'] ?? 'N/A',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                  color: _customerDetails!['hasError'] == true 
-                                      ? Colors.red[600]
-                                      : _customerDetails!['isPlaceholder'] == true
-                                          ? Colors.orange[600]
-                                          : Colors.green[600],
+                  child:
+                      _customerDetails == null
+                          ? Row(
+                            children: [
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Loading...',
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          )
+                          : Row(
+                            children: [
+                              Icon(
+                                _customerDetails!['hasError'] == true ||
+                                        _customerDetails!['isPlaceholder'] ==
+                                            true
+                                    ? Icons.phone_disabled
+                                    : Icons.phone,
+                                size: 16,
+                                color:
+                                    _customerDetails!['hasError'] == true
+                                        ? Colors.red[600]
+                                        : _customerDetails!['isPlaceholder'] ==
+                                            true
+                                        ? Colors.orange[600]
+                                        : Colors.green[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  _customerDetails!['phoneNumber'] ?? 'N/A',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                    color:
+                                        _customerDetails!['hasError'] == true
+                                            ? Colors.red[600]
+                                            : _customerDetails!['isPlaceholder'] ==
+                                                true
+                                            ? Colors.orange[600]
+                                            : Colors.green[600],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            
+
             // Email
             Row(
               children: [
@@ -544,59 +708,68 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   ),
                 ),
                 Expanded(
-                  child: _customerDetails == null
-                      ? Row(
-                          children: [
-                            SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Loading...',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Icon(
-                              _customerDetails!['hasError'] == true || _customerDetails!['isPlaceholder'] == true
-                                  ? Icons.email_outlined
-                                  : Icons.email, 
-                              size: 16, 
-                              color: _customerDetails!['hasError'] == true 
-                                  ? Colors.red[600]
-                                  : _customerDetails!['isPlaceholder'] == true
-                                      ? Colors.orange[600]
-                                      : Colors.blue[600]
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                _customerDetails!['email'] ?? 'N/A',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                  color: _customerDetails!['hasError'] == true 
-                                      ? Colors.red[600]
-                                      : _customerDetails!['isPlaceholder'] == true
-                                          ? Colors.orange[600]
-                                          : Colors.black87,
+                  child:
+                      _customerDetails == null
+                          ? Row(
+                            children: [
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Loading...',
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          )
+                          : Row(
+                            children: [
+                              Icon(
+                                _customerDetails!['hasError'] == true ||
+                                        _customerDetails!['isPlaceholder'] ==
+                                            true
+                                    ? Icons.email_outlined
+                                    : Icons.email,
+                                size: 16,
+                                color:
+                                    _customerDetails!['hasError'] == true
+                                        ? Colors.red[600]
+                                        : _customerDetails!['isPlaceholder'] ==
+                                            true
+                                        ? Colors.orange[600]
+                                        : Colors.blue[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  _customerDetails!['email'] ?? 'N/A',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                    color:
+                                        _customerDetails!['hasError'] == true
+                                            ? Colors.red[600]
+                                            : _customerDetails!['isPlaceholder'] ==
+                                                true
+                                            ? Colors.orange[600]
+                                            : Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            
+
             // Permission notice if applicable
             if (_customerDetails?['isPlaceholder'] == true) ...[
               Container(
@@ -608,7 +781,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.orange[600]),
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Colors.orange[600],
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -624,7 +801,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ),
               const SizedBox(height: 12),
             ],
-            
+
             // Client ID (Phone Number)
             Row(
               children: [
@@ -640,7 +817,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ),
                 Expanded(
                   child: Text(
-                    PhoneFormatter.getClientId(_customerDetails?['phoneNumber']),
+                    PhoneFormatter.getClientId(
+                      _customerDetails?['phoneNumber'],
+                    ),
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
@@ -650,8 +829,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ),
               ],
             ),
-            
-            if (_order!.specialInstructions != null && _order!.specialInstructions!.isNotEmpty) ...[
+
+            if (_order!.specialInstructions != null &&
+                _order!.specialInstructions!.isNotEmpty) ...[
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -665,30 +845,31 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info_outline, size: 16, color: Colors.blue[600]),
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Colors.blue[600],
+                        ),
                         const SizedBox(width: 4),
-              Text(
+                        Text(
                           'Special Instructions:',
-                style: TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w600,
-                  color: Colors.blue[700],
-                ),
-              ),
-            ],
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
                       _order!.specialInstructions!,
-                      style: TextStyle(
-                        color: Colors.blue[700],
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.blue[700], fontSize: 14),
                     ),
                   ],
                 ),
               ),
             ],
-            
+
             const SizedBox(height: 16),
             Row(
               children: [
@@ -704,7 +885,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ),
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.green[50],
                       borderRadius: BorderRadius.circular(8),
@@ -730,6 +914,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Widget _buildItemsList() {
     return Card(
+      semanticContainer: true,
+      elevation: 8,
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -738,20 +925,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             // Header with edit button
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Items (${_order!.items.length})',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              children: [
+                Text(
+                  'Items (${_order!.items.length})',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 ElevatedButton.icon(
                   onPressed: () async {
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AdminEditOrderScreen(order: _order!),
+                        builder:
+                            (context) => AdminEditOrderScreen(order: _order!),
                       ),
                     );
                     if (result == true) {
@@ -764,14 +952,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue[700],
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     textStyle: const TextStyle(fontSize: 12),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            
+
             // Items list
             ..._order!.items.map((item) {
               return Container(
@@ -790,14 +981,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                        '${item['name'] ?? 'Unknown Item'}',
+                            '${item['name'] ?? 'Unknown Item'}',
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 15,
-                      ),
-                    ),
+                            ),
+                          ),
                           if (item['category'] != null)
-                    Text(
+                            Text(
                               'Category: ${item['category']}',
                               style: TextStyle(
                                 color: Colors.grey[600],
@@ -819,11 +1010,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         ),
                         Text(
                           '₹${(item['pricePerPiece'] ?? 0).toString()}',
-                      style: TextStyle(
-                        color: Colors.green[600],
-                        fontWeight: FontWeight.bold,
+                          style: TextStyle(
+                            color: Colors.green[600],
+                            fontWeight: FontWeight.bold,
                             fontSize: 14,
-                      ),
+                          ),
                         ),
                       ],
                     ),
@@ -831,7 +1022,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ),
               );
             }).toList(),
-            
+
             // Total amount display
             Container(
               margin: const EdgeInsets.only(top: 8),
@@ -846,10 +1037,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 children: [
                   const Text(
                     'Total Amount',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   Text(
                     '₹${_order!.totalAmount.toStringAsFixed(0)}',
@@ -870,6 +1058,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Widget _buildAddressInfo() {
     return Card(
+      semanticContainer: true,
+      elevation: 8,
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -878,13 +1069,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             // Header with address management button
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Address Information',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              children: [
+                const Text(
+                  'Address Information',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 ElevatedButton.icon(
                   onPressed: () async {
@@ -892,10 +1080,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ManageCustomerAddressScreen(
-                            customerId: _order!.customerId!,
-                            customerName: _customerDetails?['name'] ?? 'Customer',
-                          ),
+                          builder:
+                              (context) => ManageCustomerAddressScreen(
+                                customerId: _order!.customerId!,
+                                customerName:
+                                    _customerDetails?['name'] ?? 'Customer',
+                              ),
                         ),
                       );
                     } else {
@@ -912,14 +1102,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green[700],
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     textStyle: const TextStyle(fontSize: 12),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            
+
             // Pickup Address
             Container(
               padding: const EdgeInsets.all(12),
@@ -929,32 +1122,32 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 border: Border.all(color: Colors.blue[200]!),
               ),
               child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.location_on, color: Colors.blue[600]),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Pickup Address:',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatAddress(_order!.pickupAddress),
-                        style: const TextStyle(height: 1.4),
-                ),
-              ],
-            ),
-                ),
-              ],
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.location_on, color: Colors.blue[600]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Pickup Address:',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatAddress(_order!.pickupAddress)!,
+                          style: const TextStyle(height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Delivery Address
             Container(
               padding: const EdgeInsets.all(12),
@@ -964,32 +1157,32 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 border: Border.all(color: Colors.green[200]!),
               ),
               child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.location_on, color: Colors.green[600]),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Delivery Address:',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatAddress(_order!.deliveryAddress),
-                        style: const TextStyle(height: 1.4),
-                ),
-              ],
-            ),
-                ),
-              ],
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.location_on, color: Colors.green[600]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Delivery Address:',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatAddress(_order!.deliveryAddress)!,
+                          style: const TextStyle(height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Schedule Information
             Row(
               children: [
@@ -997,7 +1190,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                  'Pickup: ${_order!.pickupDate != null ? DateFormat('MMM d, yyyy').format(_order!.pickupDate!.toDate()) : 'TBD'} (${_order!.pickupTimeSlot ?? 'TBD'})',
+                    'Pickup: ${_order!.pickupDate != null ? DateFormat('MMM d, yyyy').format(_order!.pickupDate!.toDate()) : 'TBD'} (${_order!.pickupTimeSlot ?? 'TBD'})',
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 ),
@@ -1011,7 +1204,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                    'Delivery: ${DateFormat('MMM d, yyyy').format(_order!.deliveryDate!.toDate())} (${_order!.deliveryTimeSlot ?? 'TBD'})',
+                      'Delivery: ${DateFormat('MMM d, yyyy').format(_order!.deliveryDate!.toDate())} (${_order!.deliveryTimeSlot ?? 'TBD'})',
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                   ),
@@ -1026,8 +1219,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Widget _buildDeliveryAssignment() {
     bool isAssigned = _order!.assignedDeliveryPerson != null;
-    
+
     return Card(
+      semanticContainer: true,
+      elevation: 8,
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1035,10 +1231,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           children: [
             const Text(
               'Delivery Assignment',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             if (isAssigned) ...[
@@ -1072,21 +1265,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     Row(
                       children: [
                         Icon(
-                          _order!.isAcceptedByDeliveryPerson 
-                              ? Icons.check_circle 
+                          _order!.isAcceptedByDeliveryPerson
+                              ? Icons.check_circle
                               : Icons.schedule,
-                          color: _order!.isAcceptedByDeliveryPerson 
-                              ? Colors.green[600] 
-                              : Colors.orange[600],
+                          color:
+                              _order!.isAcceptedByDeliveryPerson
+                                  ? Colors.green[600]
+                                  : Colors.orange[600],
                         ),
                         const SizedBox(width: 8),
                         // Text(
-                        //   _order!.isAcceptedByDeliveryPerson 
+                        //   _order!.isAcceptedByDeliveryPerson
                         //       ? 'Accepted by delivery person'
                         //       : 'Waiting for acceptance',
                         //   style: TextStyle(
-                        //     color: _order!.isAcceptedByDeliveryPerson 
-                        //         ? Colors.green[600] 
+                        //     color: _order!.isAcceptedByDeliveryPerson
+                        //         ? Colors.green[600]
                         //         : Colors.orange[600],
                         //     fontWeight: FontWeight.w500,
                         //   ),
@@ -1145,22 +1339,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Widget _buildActionButtons() {
     return Column(
       children: [
-        Row(
-      children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () => _showStatusHistoryDialog(),
-            icon: const Icon(Icons.history),
-            label: const Text('View History'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.purple[700],
-              foregroundColor: Colors.white,
-            ),
-          ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
+        // Row(
+        //   children: [
+        //     Expanded(
+        //       child: ElevatedButton.icon(
+        //         onPressed: () => _showStatusHistoryDialog(),
+        //         icon: const Icon(Icons.history),
+        //         label: const Text('View History'),
+        //         style: ElevatedButton.styleFrom(
+        //           backgroundColor: Colors.purple[700],
+        //           foregroundColor: Colors.white,
+        //         ),
+        //       ),
+        //     ),
+        //   ],
+        // ),
+        // const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
@@ -1214,10 +1408,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Future<void> _updateOrderStatus(String newStatus) async {
     setState(() => _isUpdating = true);
-    
+
     try {
       final String oldStatus = _order!.status;
-      
+
       await _firestore.collection('orders').doc(widget.orderId).update({
         'status': newStatus,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -1227,29 +1421,32 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             'timestamp': Timestamp.now(),
             'updatedBy': 'admin',
             'title': 'Status Updated',
-            'description': 'Order status updated to ${newStatus.replaceAll('_', ' ')}',
-          }
+            'description':
+                'Order status updated to ${newStatus.replaceAll('_', ' ')}',
+          },
         ]),
       });
-      
+
       // Send FCM notification to customer about status change
       try {
         // Get customer's FCM token
-        final customerDoc = await _firestore
-            .collection('customer')
-            .doc(_order!.customerId)
-            .get();
-        
+        final customerDoc =
+            await _firestore
+                .collection('customer')
+                .doc(_order!.customerId)
+                .get();
+
         if (customerDoc.exists) {
           final customerData = customerDoc.data() as Map<String, dynamic>;
           final customerFcmToken = customerData['fcmToken'] as String? ?? '';
-          
+
           if (customerFcmToken.isNotEmpty) {
             // Send FCM notification to customer
             await _firestore.collection('fcm_notifications').add({
               'token': customerFcmToken,
               'title': 'Order Status Updated',
-              'body': 'Order #${_order!.orderNumber} status: ${_formatStatus(newStatus)}',
+              'body':
+                  'Order #${_order!.orderNumber} status: ${_formatStatus(newStatus)}',
               'data': {
                 'type': 'status_change',
                 'orderId': widget.orderId,
@@ -1264,38 +1461,39 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               'type': 'direct_token',
               'priority': 'high',
             });
-            
+
             print('✅ FCM notification queued for customer');
           }
         }
       } catch (e) {
         print('❌ Error sending FCM notification to customer: $e');
       }
-      
+
       // Save notification to order's subcollection for customer
       await _firestore
           .collection('orders')
           .doc(widget.orderId)
           .collection('notifications')
           .add({
-        'type': 'status_change',
-        'title': 'Order Status Updated',
-        'body': 'Your order #${_order!.orderNumber} status: ${_formatStatus(newStatus)}',
-        'data': {
-          'orderId': widget.orderId,
-          'orderNumber': _order!.orderNumber,
-          'customerId': _order!.customerId,
-          'oldStatus': oldStatus,
-          'newStatus': newStatus,
-        },
-        'createdAt': FieldValue.serverTimestamp(),
-        'status': 'sent',
-        'forAdmin': false,
-        'read': false,
-      });
-      
+            'type': 'status_change',
+            'title': 'Order Status Updated',
+            'body':
+                'Your order #${_order!.orderNumber} status: ${_formatStatus(newStatus)}',
+            'data': {
+              'orderId': widget.orderId,
+              'orderNumber': _order!.orderNumber,
+              'customerId': _order!.customerId,
+              'oldStatus': oldStatus,
+              'newStatus': newStatus,
+            },
+            'createdAt': FieldValue.serverTimestamp(),
+            'status': 'sent',
+            'forAdmin': false,
+            'read': false,
+          });
+
       // No need to reload - real-time listener will handle the update
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1321,495 +1519,603 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   void _showAssignDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Assign Delivery Person'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: _deliveryPersons.isEmpty
-              ? const Text('No delivery persons available')
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _deliveryPersons.length,
-                  itemBuilder: (context, index) {
-                    final person = _deliveryPersons[index].data() as Map<String, dynamic>;
-                    return ListTile(
-                      leading: CircleAvatar(
-                        child: Text(
-                          (person['name'] ?? 'U').substring(0, 1).toUpperCase(),
-                        ),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Assign Delivery Person'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child:
+                  _deliveryPersons.isEmpty
+                      ? const Text('No delivery persons available')
+                      : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _deliveryPersons.length,
+                        itemBuilder: (context, index) {
+                          final person =
+                              _deliveryPersons[index].data()
+                                  as Map<String, dynamic>;
+                          return ListTile(
+                            leading: CircleAvatar(
+                              child: Text(
+                                (person['name'] ?? 'U')
+                                    .substring(0, 1)
+                                    .toUpperCase(),
+                              ),
+                            ),
+                            title: Text(person['name'] ?? 'Unknown'),
+                            subtitle: Text(person['phoneNumber'] ?? 'No phone'),
+                            onTap:
+                                () => _assignDeliveryPerson(
+                                  _deliveryPersons[index],
+                                ),
+                          );
+                        },
                       ),
-                      title: Text(person['name'] ?? 'Unknown'),
-                      subtitle: Text(person['phoneNumber'] ?? 'No phone'),
-                      onTap: () => _assignDeliveryPerson(_deliveryPersons[index]),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   void _showReassignDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reassign Delivery Person'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: _deliveryPersons.isEmpty
-              ? const Text('No delivery persons available')
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _deliveryPersons.length,
-                  itemBuilder: (context, index) {
-                    final person = _deliveryPersons[index].data() as Map<String, dynamic>;
-                    final isCurrentlyAssigned = _deliveryPersons[index].id == _order!.assignedDeliveryPerson;
-                    final isOnline = person['isOnline'] ?? false;
-                    final isActive = person['isActive'] ?? true;
-                    
-                    return ListTile(
-                      leading: Stack(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: isCurrentlyAssigned ? Colors.green : 
-                                             isActive ? Colors.blue : Colors.grey,
-                            child: Text(
-                              (person['name'] ?? 'U').substring(0, 1).toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          if (isActive)
-                            Positioned(
-                              right: 0,
-                              bottom: 0,
-                              child: Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  color: isOnline ? Colors.green : Colors.grey,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Reassign Delivery Person'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child:
+                  _deliveryPersons.isEmpty
+                      ? const Text('No delivery persons available')
+                      : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _deliveryPersons.length,
+                        itemBuilder: (context, index) {
+                          final person =
+                              _deliveryPersons[index].data()
+                                  as Map<String, dynamic>;
+                          final isCurrentlyAssigned =
+                              _deliveryPersons[index].id ==
+                              _order!.assignedDeliveryPerson;
+                          final isOnline = person['isOnline'] ?? false;
+                          final isActive = person['isActive'] ?? true;
+
+                          return ListTile(
+                            leading: Stack(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor:
+                                      isCurrentlyAssigned
+                                          ? Colors.green
+                                          : isActive
+                                          ? Colors.blue
+                                          : Colors.grey,
+                                  child: Text(
+                                    (person['name'] ?? 'U')
+                                        .substring(0, 1)
+                                        .toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                if (isActive)
+                                  Positioned(
+                                    right: 0,
+                                    bottom: 0,
+                                    child: Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isOnline
+                                                ? Colors.green
+                                                : Colors.grey,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
-                        ],
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    person['name'] ?? 'Unknown',
+                                    style: TextStyle(
+                                      fontWeight:
+                                          isCurrentlyAssigned
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                                if (!isActive)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'INACTIVE',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                if (isActive && isOnline)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'ONLINE',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                if (isActive && !isOnline)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'OFFLINE',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(person['phoneNumber'] ?? ''),
+                                if (isCurrentlyAssigned)
+                                  const Text(
+                                    'Currently assigned to this order',
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing:
+                                isCurrentlyAssigned
+                                    ? const Icon(
+                                      Icons.check_circle,
+                                      color: Colors.green,
+                                    )
+                                    : isActive
+                                    ? (isOnline
+                                        ? const Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 16,
+                                        )
+                                        : const Icon(
+                                          Icons.schedule,
+                                          color: Colors.orange,
+                                          size: 16,
+                                        ))
+                                    : const Icon(
+                                      Icons.block,
+                                      color: Colors.red,
+                                      size: 16,
+                                    ),
+                            onTap:
+                                isCurrentlyAssigned || !isActive
+                                    ? null
+                                    : () => _assignDeliveryPerson(
+                                      _deliveryPersons[index],
+                                    ),
+                            enabled: !isCurrentlyAssigned && isActive,
+                          );
+                        },
                       ),
-                      title: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              person['name'] ?? 'Unknown',
-                              style: TextStyle(
-                                fontWeight: isCurrentlyAssigned ? FontWeight.bold : FontWeight.normal,
-                              ),
-                            ),
-                          ),
-                          if (!isActive)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'INACTIVE',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          if (isActive && isOnline)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.green,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'ONLINE',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          if (isActive && !isOnline)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.orange,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'OFFLINE',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(person['phoneNumber'] ?? ''),
-                          if (isCurrentlyAssigned)
-                            const Text(
-                              'Currently assigned to this order',
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                        ],
-                      ),
-                      trailing: isCurrentlyAssigned 
-                          ? const Icon(Icons.check_circle, color: Colors.green)
-                          : isActive 
-                              ? (isOnline 
-                                  ? const Icon(Icons.arrow_forward_ios, size: 16)
-                                  : const Icon(Icons.schedule, color: Colors.orange, size: 16))
-                              : const Icon(Icons.block, color: Colors.red, size: 16),
-                      onTap: isCurrentlyAssigned || !isActive
-                          ? null 
-                          : () => _assignDeliveryPerson(_deliveryPersons[index]),
-                      enabled: !isCurrentlyAssigned && isActive,
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-// Fixed order reassignment in OrderDetailsScreen
-Future<void> _assignDeliveryPerson(DocumentSnapshot deliveryPersonDoc) async {
-  Navigator.pop(context); // Close dialog
-  setState(() => _isUpdating = true);
-  
-  try {
-    final person = deliveryPersonDoc.data() as Map<String, dynamic>;
-    final String newDeliveryPartnerId = deliveryPersonDoc.id;
-    final String previousDeliveryPartner = _order!.assignedDeliveryPerson ?? 'none';
-    
-    print('🚚 📋 Reassigning order ${widget.orderId}');
-    print('🚚 📋 From: $previousDeliveryPartner');
-    print('🚚 📋 To: $newDeliveryPartnerId (${person['name']})');
-    
-    // Prepare the update data - Using assignedDeliveryPerson as primary field
-    Map<String, dynamic> updateData = {
-      'assignedDeliveryPerson': newDeliveryPartnerId, // Primary field for delivery partner assignment
-      'assignedDeliveryPersonName': person['name'] ?? 'Unknown',
-      'assignedBy': _auth.currentUser?.uid,
-      'assignedAt': FieldValue.serverTimestamp(),
-      'isAcceptedByDeliveryPerson': false, // Reset acceptance status
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-    
-    // Update status based on current state
-    String newStatus = 'assigned';
-    String actionDescription = '';
-    
-    if (previousDeliveryPartner == 'none' || previousDeliveryPartner.isEmpty) {
-      // First time assignment
-      actionDescription = 'Order assigned to delivery partner: ${person['name'] ?? 'Unknown'}';
-      newStatus = 'assigned';
-    } else {
-      // Reassignment
-      actionDescription = 'Order reassigned from previous delivery partner to: ${person['name'] ?? 'Unknown'}';
-      newStatus = 'assigned'; // Reset to assigned status for new partner
-    }
-    
-    updateData['status'] = newStatus;
-    
-    // Add to status history
-    Map<String, dynamic> statusHistoryEntry = {
-      'status': newStatus,
-      'timestamp': Timestamp.now(),
-      'updatedBy': 'admin',
-      'updatedByUserId': _auth.currentUser?.uid,
-      'title': previousDeliveryPartner == 'none' ? 'Order Assigned' : 'Order Reassigned',
-      'description': actionDescription,
-      'assignedTo': newDeliveryPartnerId,
-      'assignedToName': person['name'] ?? 'Unknown',
-    };
-    
-    if (previousDeliveryPartner != 'none' && previousDeliveryPartner.isNotEmpty) {
-      statusHistoryEntry['previouslyAssignedTo'] = previousDeliveryPartner;
-      statusHistoryEntry['previouslyAssignedToName'] = _order!.assignedDeliveryPersonName;
-    }
-    
-    updateData['statusHistory'] = FieldValue.arrayUnion([statusHistoryEntry]);
-    
-    // Perform the update
-    await _firestore.collection('orders').doc(widget.orderId).update(updateData);
-    
-    print('🚚 ✅ Order reassignment completed successfully');
-    
-    // Send notification to NEW delivery person
-    await _sendNotificationToDeliveryPerson(
-      newDeliveryPartnerId, 
-      person['name'] ?? 'Unknown',
-      isReassignment: previousDeliveryPartner != 'none'
-    );
-    
-    // If this is a reassignment, notify the previous delivery partner
-    if (previousDeliveryPartner != 'none' && previousDeliveryPartner.isNotEmpty) {
-      await _sendReassignmentNotificationToPreviousPartner(
-        previousDeliveryPartner,
-        _order!.assignedDeliveryPersonName ?? 'Unknown'
-      );
-    }
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  previousDeliveryPartner == 'none' 
-                      ? 'Order assigned to ${person['name']}'
-                      : 'Order reassigned to ${person['name']}',
-                ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
               ),
             ],
           ),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 3),
-        ),
+    );
+  }
+
+  // Fixed order reassignment in OrderDetailsScreen
+  Future<void> _assignDeliveryPerson(DocumentSnapshot deliveryPersonDoc) async {
+    Navigator.pop(context); // Close dialog
+    setState(() => _isUpdating = true);
+
+    try {
+      final person = deliveryPersonDoc.data() as Map<String, dynamic>;
+      final String newDeliveryPartnerId = deliveryPersonDoc.id;
+      final String previousDeliveryPartner =
+          _order!.assignedDeliveryPerson ?? 'none';
+
+      print('🚚 📋 Reassigning order ${widget.orderId}');
+      print('🚚 📋 From: $previousDeliveryPartner');
+      print('🚚 📋 To: $newDeliveryPartnerId (${person['name']})');
+
+      // Prepare the update data - Using assignedDeliveryPerson as primary field
+      Map<String, dynamic> updateData = {
+        'assignedDeliveryPerson':
+            newDeliveryPartnerId, // Primary field for delivery partner assignment
+        'assignedDeliveryPersonName': person['name'] ?? 'Unknown',
+        'assignedBy': _auth.currentUser?.uid,
+        'assignedAt': FieldValue.serverTimestamp(),
+        'isAcceptedByDeliveryPerson': false, // Reset acceptance status
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      // Update status based on current state
+      String newStatus = 'assigned';
+      String actionDescription = '';
+
+      if (previousDeliveryPartner == 'none' ||
+          previousDeliveryPartner.isEmpty) {
+        // First time assignment
+        actionDescription =
+            'Order assigned to delivery partner: ${person['name'] ?? 'Unknown'}';
+        newStatus = 'assigned';
+      } else {
+        // Reassignment
+        actionDescription =
+            'Order reassigned from previous delivery partner to: ${person['name'] ?? 'Unknown'}';
+        newStatus = 'assigned'; // Reset to assigned status for new partner
+      }
+
+      updateData['status'] = newStatus;
+
+      // Add to status history
+      Map<String, dynamic> statusHistoryEntry = {
+        'status': newStatus,
+        'timestamp': Timestamp.now(),
+        'updatedBy': 'admin',
+        'updatedByUserId': _auth.currentUser?.uid,
+        'title':
+            previousDeliveryPartner == 'none'
+                ? 'Order Assigned'
+                : 'Order Reassigned',
+        'description': actionDescription,
+        'assignedTo': newDeliveryPartnerId,
+        'assignedToName': person['name'] ?? 'Unknown',
+      };
+
+      if (previousDeliveryPartner != 'none' &&
+          previousDeliveryPartner.isNotEmpty) {
+        statusHistoryEntry['previouslyAssignedTo'] = previousDeliveryPartner;
+        statusHistoryEntry['previouslyAssignedToName'] =
+            _order!.assignedDeliveryPersonName;
+      }
+
+      updateData['statusHistory'] = FieldValue.arrayUnion([statusHistoryEntry]);
+
+      // Perform the update
+      await _firestore
+          .collection('orders')
+          .doc(widget.orderId)
+          .update(updateData);
+
+      print('🚚 ✅ Order reassignment completed successfully');
+
+      // Send notification to NEW delivery person
+      await _sendNotificationToDeliveryPerson(
+        newDeliveryPartnerId,
+        person['name'] ?? 'Unknown',
+        isReassignment: previousDeliveryPartner != 'none',
       );
-    }
-  } catch (e) {
-    print('🚚 ❌ Error during order reassignment: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white),
-              const SizedBox(width: 8),
-              Expanded(child: Text('Error reassigning order: $e')),
-            ],
+
+      // If this is a reassignment, notify the previous delivery partner
+      if (previousDeliveryPartner != 'none' &&
+          previousDeliveryPartner.isNotEmpty) {
+        await _sendReassignmentNotificationToPreviousPartner(
+          previousDeliveryPartner,
+          _order!.assignedDeliveryPersonName ?? 'Unknown',
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    previousDeliveryPartner == 'none'
+                        ? 'Order assigned to ${person['name']}'
+                        : 'Order reassigned to ${person['name']}',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
           ),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
+        );
+      }
+    } catch (e) {
+      print('🚚 ❌ Error during order reassignment: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Error reassigning order: $e')),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isUpdating = false);
+    }
+  }
+
+  // Enhanced notification method for assignments/reassignments
+  Future<void> _sendNotificationToDeliveryPerson(
+    String deliveryPartnerId,
+    String deliveryPartnerName, {
+    bool isReassignment = false,
+  }) async {
+    try {
+      print(
+        '🚚 📱 Sending ${isReassignment ? 'reassignment' : 'assignment'} notification to: $deliveryPartnerName',
+      );
+
+      // Get delivery partner's FCM token
+      DocumentSnapshot deliveryDoc =
+          await _firestore.collection('delivery').doc(deliveryPartnerId).get();
+
+      if (!deliveryDoc.exists) {
+        print('🚚 ⚠️ Delivery partner document not found: $deliveryPartnerId');
+        return;
+      }
+
+      final deliveryData = deliveryDoc.data() as Map<String, dynamic>;
+      final fcmToken = deliveryData['fcmToken'] as String? ?? '';
+
+      if (fcmToken.isEmpty) {
+        print(
+          '🚚 ⚠️ No FCM token found for delivery partner: $deliveryPartnerName',
+        );
+      } else {
+        // Send FCM notification
+        await _firestore.collection('fcm_notifications').add({
+          'token': fcmToken,
+          'title':
+              isReassignment
+                  ? 'Order Reassigned to You'
+                  : 'New Order Assignment',
+          'body':
+              'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)} has been ${isReassignment ? 'reassigned to' : 'assigned to'} you',
+          'data': {
+            'type': 'order_assignment',
+            'orderId': widget.orderId,
+            'orderNumber': _order!.orderNumber ?? _order!.id.substring(0, 8),
+            'customerName':
+                _order!.customer?.name ??
+                _customerDetails?['name'] ??
+                'Unknown',
+            'customerPhone':
+                _order!.customer?.phoneNumber ??
+                _customerDetails?['phoneNumber'] ??
+                '',
+            'deliveryAddress': _order!.displayDeliveryAddress,
+            'totalAmount': _order!.totalAmount.toString(),
+            'itemCount': _order!.items.length.toString(),
+            'specialInstructions': _order!.specialInstructions ?? '',
+            'assignedBy': 'admin',
+            'assignedAt': DateTime.now().toIso8601String(),
+            'isReassignment': isReassignment.toString(),
+          },
+          'timestamp': FieldValue.serverTimestamp(),
+          'status': 'pending',
+          'type': 'direct_token',
+          'priority': 'high',
+        });
+      }
+
+      // Save notification to delivery partner's subcollection
+      await _firestore
+          .collection('delivery')
+          .doc(deliveryPartnerId)
+          .collection('notifications')
+          .add({
+            'type': 'order_assignment',
+            'title':
+                isReassignment
+                    ? 'Order Reassigned to You'
+                    : 'New Order Assignment',
+            'body':
+                'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)} has been ${isReassignment ? 'reassigned to' : 'assigned to'} you',
+            'data': {
+              'orderId': widget.orderId,
+              'orderNumber': _order!.orderNumber ?? _order!.id.substring(0, 8),
+              'customerName':
+                  _order!.customer?.name ??
+                  _customerDetails?['name'] ??
+                  'Unknown',
+              'isReassignment': isReassignment,
+            },
+            'createdAt': FieldValue.serverTimestamp(),
+            'read': false,
+            'forAdmin': false,
+          });
+
+      print(
+        '🚚 ✅ ${isReassignment ? 'Reassignment' : 'Assignment'} notification sent to: $deliveryPartnerName',
+      );
+    } catch (e) {
+      print('🚚 ❌ Error sending notification to delivery person: $e');
+    }
+  }
+
+  // Notify previous delivery partner about reassignment
+  Future<void> _sendReassignmentNotificationToPreviousPartner(
+    String previousDeliveryPartnerId,
+    String previousDeliveryPartnerName,
+  ) async {
+    try {
+      print(
+        '🚚 📱 Notifying previous delivery partner about reassignment: $previousDeliveryPartnerName',
+      );
+
+      // Get previous delivery partner's FCM token
+      DocumentSnapshot deliveryDoc =
+          await _firestore
+              .collection('delivery')
+              .doc(previousDeliveryPartnerId)
+              .get();
+
+      if (!deliveryDoc.exists) {
+        print(
+          '🚚 ⚠️ Previous delivery partner document not found: $previousDeliveryPartnerId',
+        );
+        return;
+      }
+
+      final deliveryData = deliveryDoc.data() as Map<String, dynamic>;
+      final fcmToken = deliveryData['fcmToken'] as String? ?? '';
+
+      if (fcmToken.isNotEmpty) {
+        // Send FCM notification
+        await _firestore.collection('fcm_notifications').add({
+          'token': fcmToken,
+          'title': 'Order Reassigned',
+          'body':
+              'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)} has been reassigned to another delivery partner',
+          'data': {
+            'type': 'order_reassignment',
+            'orderId': widget.orderId,
+            'orderNumber': _order!.orderNumber ?? _order!.id.substring(0, 8),
+            'action': 'removed_from_assignment',
+          },
+          'timestamp': FieldValue.serverTimestamp(),
+          'status': 'pending',
+          'type': 'direct_token',
+          'priority': 'normal',
+        });
+      }
+
+      // Save notification to previous delivery partner's subcollection
+      await _firestore
+          .collection('delivery')
+          .doc(previousDeliveryPartnerId)
+          .collection('notifications')
+          .add({
+            'type': 'order_reassignment',
+            'title': 'Order Reassigned',
+            'body':
+                'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)} has been reassigned to another delivery partner',
+            'data': {
+              'orderId': widget.orderId,
+              'orderNumber': _order!.orderNumber ?? _order!.id.substring(0, 8),
+              'action': 'removed_from_assignment',
+            },
+            'createdAt': FieldValue.serverTimestamp(),
+            'read': false,
+            'forAdmin': false,
+          });
+
+      print(
+        '🚚 ✅ Reassignment notification sent to previous delivery partner: $previousDeliveryPartnerName',
+      );
+    } catch (e) {
+      print(
+        '🚚 ❌ Error sending reassignment notification to previous partner: $e',
       );
     }
-  } finally {
-    setState(() => _isUpdating = false);
   }
-}
-
-// Enhanced notification method for assignments/reassignments
-Future<void> _sendNotificationToDeliveryPerson(
-  String deliveryPartnerId, 
-  String deliveryPartnerName, {
-  bool isReassignment = false
-}) async {
-  try {
-    print('🚚 📱 Sending ${isReassignment ? 'reassignment' : 'assignment'} notification to: $deliveryPartnerName');
-    
-    // Get delivery partner's FCM token
-    DocumentSnapshot deliveryDoc = await _firestore
-        .collection('delivery')
-        .doc(deliveryPartnerId)
-        .get();
-    
-    if (!deliveryDoc.exists) {
-      print('🚚 ⚠️ Delivery partner document not found: $deliveryPartnerId');
-      return;
-    }
-    
-    final deliveryData = deliveryDoc.data() as Map<String, dynamic>;
-    final fcmToken = deliveryData['fcmToken'] as String? ?? '';
-    
-    if (fcmToken.isEmpty) {
-      print('🚚 ⚠️ No FCM token found for delivery partner: $deliveryPartnerName');
-    } else {
-      // Send FCM notification
-      await _firestore.collection('fcm_notifications').add({
-        'token': fcmToken,
-        'title': isReassignment ? 'Order Reassigned to You' : 'New Order Assignment',
-        'body': 'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)} has been ${isReassignment ? 'reassigned to' : 'assigned to'} you',
-        'data': {
-          'type': 'order_assignment',
-          'orderId': widget.orderId,
-          'orderNumber': _order!.orderNumber ?? _order!.id.substring(0, 8),
-          'customerName': _order!.customer?.name ?? _customerDetails?['name'] ?? 'Unknown',
-          'customerPhone': _order!.customer?.phoneNumber ?? _customerDetails?['phoneNumber'] ?? '',
-          'deliveryAddress': _order!.displayDeliveryAddress,
-          'totalAmount': _order!.totalAmount.toString(),
-          'itemCount': _order!.items.length.toString(),
-          'specialInstructions': _order!.specialInstructions ?? '',
-          'assignedBy': 'admin',
-          'assignedAt': DateTime.now().toIso8601String(),
-          'isReassignment': isReassignment.toString(),
-        },
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': 'pending',
-        'type': 'direct_token',
-        'priority': 'high',
-      });
-    }
-    
-    // Save notification to delivery partner's subcollection
-    await _firestore
-        .collection('delivery')
-        .doc(deliveryPartnerId)
-        .collection('notifications')
-        .add({
-      'type': 'order_assignment',
-      'title': isReassignment ? 'Order Reassigned to You' : 'New Order Assignment',
-      'body': 'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)} has been ${isReassignment ? 'reassigned to' : 'assigned to'} you',
-      'data': {
-        'orderId': widget.orderId,
-        'orderNumber': _order!.orderNumber ?? _order!.id.substring(0, 8),
-        'customerName': _order!.customer?.name ?? _customerDetails?['name'] ?? 'Unknown',
-        'isReassignment': isReassignment,
-      },
-      'createdAt': FieldValue.serverTimestamp(),
-      'read': false,
-      'forAdmin': false,
-    });
-    
-    print('🚚 ✅ ${isReassignment ? 'Reassignment' : 'Assignment'} notification sent to: $deliveryPartnerName');
-    
-  } catch (e) {
-    print('🚚 ❌ Error sending notification to delivery person: $e');
-  }
-}
-
-// Notify previous delivery partner about reassignment
-Future<void> _sendReassignmentNotificationToPreviousPartner(
-  String previousDeliveryPartnerId, 
-  String previousDeliveryPartnerName
-) async {
-  try {
-    print('🚚 📱 Notifying previous delivery partner about reassignment: $previousDeliveryPartnerName');
-    
-    // Get previous delivery partner's FCM token
-    DocumentSnapshot deliveryDoc = await _firestore
-        .collection('delivery')
-        .doc(previousDeliveryPartnerId)
-        .get();
-    
-    if (!deliveryDoc.exists) {
-      print('🚚 ⚠️ Previous delivery partner document not found: $previousDeliveryPartnerId');
-      return;
-    }
-    
-    final deliveryData = deliveryDoc.data() as Map<String, dynamic>;
-    final fcmToken = deliveryData['fcmToken'] as String? ?? '';
-    
-    if (fcmToken.isNotEmpty) {
-      // Send FCM notification
-      await _firestore.collection('fcm_notifications').add({
-        'token': fcmToken,
-        'title': 'Order Reassigned',
-        'body': 'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)} has been reassigned to another delivery partner',
-        'data': {
-          'type': 'order_reassignment',
-          'orderId': widget.orderId,
-          'orderNumber': _order!.orderNumber ?? _order!.id.substring(0, 8),
-          'action': 'removed_from_assignment',
-        },
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': 'pending',
-        'type': 'direct_token',
-        'priority': 'normal',
-      });
-    }
-    
-    // Save notification to previous delivery partner's subcollection
-    await _firestore
-        .collection('delivery')
-        .doc(previousDeliveryPartnerId)
-        .collection('notifications')
-        .add({
-      'type': 'order_reassignment',
-      'title': 'Order Reassigned',
-      'body': 'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)} has been reassigned to another delivery partner',
-      'data': {
-        'orderId': widget.orderId,
-        'orderNumber': _order!.orderNumber ?? _order!.id.substring(0, 8),
-        'action': 'removed_from_assignment',
-      },
-      'createdAt': FieldValue.serverTimestamp(),
-      'read': false,
-      'forAdmin': false,
-    });
-    
-    print('🚚 ✅ Reassignment notification sent to previous delivery partner: $previousDeliveryPartnerName');
-    
-  } catch (e) {
-    print('🚚 ❌ Error sending reassignment notification to previous partner: $e');
-  }
-}
 
   void _showStatusHistoryDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Order History'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: _order!.statusHistory.isEmpty
-              ? const Center(child: Text('No status history available'))
-              : ListView.builder(
-                  itemCount: _order!.statusHistory.length,
-                  itemBuilder: (context, index) {
-                    final history = _order!.statusHistory[index];
-                    return ListTile(
-                      leading: Icon(
-                        Icons.circle,
-                        color: _getStatusColor(history['status'] ?? ''),
-                        size: 12,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Order History'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 300,
+              child:
+                  _order!.statusHistory.isEmpty
+                      ? const Center(child: Text('No status history available'))
+                      : ListView.builder(
+                        itemCount: _order!.statusHistory.length,
+                        itemBuilder: (context, index) {
+                          final history = _order!.statusHistory[index];
+                          return ListTile(
+                            leading: Icon(
+                              Icons.circle,
+                              color: _getStatusColor(history['status'] ?? ''),
+                              size: 12,
+                            ),
+                            title: Text(
+                              (history['status'] ?? 'Unknown').toUpperCase(),
+                            ),
+                            subtitle:
+                                history['timestamp'] != null
+                                    ? Text(
+                                      DateFormat('MMM d, yyyy • h:mm a').format(
+                                        (history['timestamp'] as Timestamp)
+                                            .toDate(),
+                                      ),
+                                    )
+                                    : null,
+                          );
+                        },
                       ),
-                      title: Text((history['status'] ?? 'Unknown').toUpperCase()),
-                      subtitle: history['timestamp'] != null
-                          ? Text(DateFormat('MMM d, yyyy • h:mm a').format(
-                              (history['timestamp'] as Timestamp).toDate(),
-                            ))
-                          : null,
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
-
-
 
   Widget _buildInfoRow(String label, String? value) {
     return Padding(
@@ -1841,68 +2147,76 @@ Future<void> _sendReassignmentNotificationToPreviousPartner(
   void _showDeleteOrderDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning, color: Colors.red[700]),
-            const SizedBox(width: 8),
-            const Text('Delete Order'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Are you sure you want to delete this order?',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.warning, color: Colors.red[700]),
+                const SizedBox(width: 8),
+                const Text('Delete Order'),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)}',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.red[700], size: 20),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'This action cannot be undone.',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Are you sure you want to delete this order?',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)}',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red[200]!),
                   ),
-                ],
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.red[700],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'This action cannot be undone.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _deleteOrder();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteOrder();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red[700],
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1911,7 +2225,7 @@ Future<void> _sendReassignmentNotificationToPreviousPartner(
 
     try {
       await DatabaseService().deleteOrder(_order!.id);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1919,13 +2233,15 @@ Future<void> _sendReassignmentNotificationToPreviousPartner(
               children: [
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 8),
-                Text('Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)} deleted successfully'),
+                Text(
+                  'Order #${_order!.orderNumber ?? _order!.id.substring(0, 8)} deleted successfully',
+                ),
               ],
             ),
             backgroundColor: Colors.green[700],
           ),
         );
-        
+
         // Navigate back to orders list
         Navigator.pop(context);
       }
@@ -1951,57 +2267,116 @@ Future<void> _sendReassignmentNotificationToPreviousPartner(
     }
   }
 
-  String _formatAddress(String? address) {
+  String? _formatAddress(String? address) {
     if (address == null || address.isEmpty) {
       return 'Address not provided';
     }
 
-    // Try to parse address if it's in JSON format
     try {
-      // If address contains structured data, format it nicely
-      if (address.contains('"doorNumber"') || address.contains('"floorNumber"')) {
-        // This would be a JSON string, parse it
-        final Map<String, dynamic> addressData = {};
-        
-        // Extract key-value pairs using regex or simple parsing
-        final doorMatch = RegExp(r'"doorNumber"\s*:\s*"([^"]*)"').firstMatch(address);
-        final floorMatch = RegExp(r'"floorNumber"\s*:\s*"([^"]*)"').firstMatch(address);
-        final landmarkMatch = RegExp(r'"landmark"\s*:\s*"([^"]*)"').firstMatch(address);
-        final streetMatch = RegExp(r'"street"\s*:\s*"([^"]*)"').firstMatch(address);
-        final areaMatch = RegExp(r'"area"\s*:\s*"([^"]*)"').firstMatch(address);
-        final cityMatch = RegExp(r'"city"\s*:\s*"([^"]*)"').firstMatch(address);
-        final pincodeMatch = RegExp(r'"pincode"\s*:\s*"([^"]*)"').firstMatch(address);
+      // Clean { } if present
+      address = address.replaceAll(RegExp(r'[\{\}]'), '');
 
-        List<String> addressParts = [];
-        
-        if (doorMatch != null && doorMatch.group(1)!.isNotEmpty) {
-          addressParts.add('Door: ${doorMatch.group(1)}');
-        }
-        if (floorMatch != null && floorMatch.group(1)!.isNotEmpty) {
-          addressParts.add('Floor: ${floorMatch.group(1)}');
-        }
-        if (streetMatch != null && streetMatch.group(1)!.isNotEmpty) {
-          addressParts.add(streetMatch.group(1)!);
-        }
-        if (landmarkMatch != null && landmarkMatch.group(1)!.isNotEmpty) {
-          addressParts.add('Near ${landmarkMatch.group(1)}');
-        }
-        if (areaMatch != null && areaMatch.group(1)!.isNotEmpty) {
-          addressParts.add(areaMatch.group(1)!);
-        }
-        if (cityMatch != null && cityMatch.group(1)!.isNotEmpty) {
-          addressParts.add(cityMatch.group(1)!);
-        }
-        if (pincodeMatch != null && pincodeMatch.group(1)!.isNotEmpty) {
-          addressParts.add('PIN: ${pincodeMatch.group(1)}');
-        }
+      // Split into key-value pairs
+      final parts = address.split(',');
 
-        return addressParts.isNotEmpty ? addressParts.join('\n') : address;
+      String? doorNumber;
+      String? floorNumber;
+      String? formattedTime;
+      List<String> otherParts = [];
+
+      for (var part in parts) {
+        final keyValue = part.split(':');
+        if (keyValue.length == 2) {
+          final key = keyValue[0].trim().toLowerCase();
+          final value = keyValue[1].trim();
+
+          if (key == 'doornumber') {
+            doorNumber = value;
+          } else if (key == 'floornumber') {
+            floorNumber = value;
+          } else if (key.contains('timestamp')) {
+            try {
+              // Try parsing timestamp
+              DateTime dt = DateTime.parse(value);
+              formattedTime = DateFormat("dd MMM yyyy, hh:mm a").format(dt);
+            } catch (_) {
+              formattedTime = value; // fallback
+            }
+          } else {
+            otherParts.add(value);
+          }
+        }
       }
-    } catch (e) {
-      // If parsing fails, return the original address
-    }
 
-    return address;
+      // Build formatted address
+      String formatted = '';
+      if (doorNumber != null) formatted += 'Door No: $doorNumber\n';
+      if (floorNumber != null) formatted += 'Floor: $floorNumber\n';
+      if (otherParts.isNotEmpty) formatted += otherParts.join(', ');
+
+      if (formattedTime != null) {
+        formatted += '\nTime: $formattedTime';
+      }
+
+      return formatted.trim();
+    } catch (e) {
+      return address; // fallback
+    }
   }
-} 
+}
+
+class StatusStepper extends StatelessWidget {
+  final List<Map<String, dynamic>> statusHistory;
+
+  const StatusStepper({Key? key, required this.statusHistory})
+    : super(key: key);
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return Colors.orange;
+      case "processing":
+        return Colors.blue;
+      case "completed":
+        return Colors.green;
+      case "cancelled":
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stepper(
+      physics: const NeverScrollableScrollPhysics(),
+      currentStep: statusHistory.length - 1, // highlight latest step
+      controlsBuilder:
+          (context, details) =>
+              const SizedBox.shrink(), // hide next/back buttons
+      steps:
+          statusHistory.map((history) {
+            String status = (history['status'] ?? 'Unknown').toString();
+            Timestamp? ts = history['timestamp'] as Timestamp?;
+            String formattedTime =
+                ts != null
+                    ? DateFormat('MMM d, yyyy • h:mm a').format(ts.toDate())
+                    : "No timestamp";
+
+            return Step(
+              isActive: true,
+              state: StepState.complete,
+              title: Text(
+                status.toUpperCase(),
+                style: TextStyle(
+                  color: _getStatusColor(status),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              subtitle: Text(formattedTime),
+              content: const SizedBox.shrink(), // we don’t need extra content
+            );
+          }).toList(),
+    );
+  }
+}

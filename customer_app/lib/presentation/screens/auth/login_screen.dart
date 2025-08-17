@@ -1,4 +1,5 @@
 // lib/screens/auth/login_screen.dart
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:customer_app/core/utils/validators.dart';
 import 'package:customer_app/core/routes/app_routes.dart';
 import 'package:customer_app/core/theme/app_typography.dart';
@@ -330,7 +331,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 200,
                     height: 200,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: context.backgroundColor,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
@@ -370,13 +371,13 @@ class _LoginScreenState extends State<LoginScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         // Themed logo (SVG) based on current theme
-        _buildThemeLogo(size: 200),
+        _buildThemeLogo(size: 100),
 
         const SizedBox(height: 8),
 
         // App title with SF Pro Display
-        AppText.appTitle( 'Welcome to'),
-        AppText.appTitle( 'Cloud Ironing Factory pvt ltd'),
+        AppText.appTitle('Welcome to'),
+        AppText.appTitle('Cloud Ironing Factory pvt ltd'),
         const SizedBox(height: 6),
 
         // Subtitle with SF Pro Display
@@ -387,7 +388,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildThemeLogo({double size = 160}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = isDark ? 'assets/icons/logo_dark.svg' : 'assets/icons/logo_light.svg';
+    final asset =
+        isDark ? 'assets/icons/logo_dark.svg' : 'assets/icons/logo_light.svg';
     return SvgPicture.asset(
       asset,
       width: size,
@@ -458,7 +460,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: const Color(0xFFA0AEC0),
                       fontWeight: FontConstants.regular,
                     ),
-                    border: const OutlineInputBorder(borderSide: BorderSide.none,borderRadius: BorderRadius.all(Radius.circular(0))),
+                    border: const OutlineInputBorder(
+                        borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.all(Radius.circular(0))),
                     errorBorder: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -614,7 +618,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 SnackBar(
                   content: Text(
                     'Just enter your phone number to login!',
-                    style: AppTypography.bodyMedium.copyWith(color: Colors.white),
+                    style:
+                        AppTypography.bodyMedium.copyWith(color: Colors.white),
                   ),
                   behavior: SnackBarBehavior.floating,
                 ),
