@@ -7,7 +7,6 @@ import '../../providers/order_provider.dart';
 import '../../models/order_model.dart';
 import 'order_details_screen.dart';
 
-
 class AllOrders extends StatefulWidget {
   const AllOrders({super.key});
 
@@ -21,13 +20,14 @@ class _AllOrdersState extends State<AllOrders> {
   String _searchQuery = '';
   int _orderLimit = 20; // Start with very small limit for faster loading
   bool _isSearchingCustomers = false; // Track if we're doing a customer search
-  List<String> _customerSearchResults = []; // Store customer IDs from customer search
-  
+  List<String> _customerSearchResults =
+      []; // Store customer IDs from customer search
+
   // Date filtering
   DateTime? _selectedDate;
   DateTime? _startDate;
   DateTime? _endDate;
-  
+
   final Map<String, String> _filterOptions = {
     'all': '📋 All Orders',
     'pending': '🟡 Pending Orders',
@@ -37,7 +37,6 @@ class _AllOrdersState extends State<AllOrders> {
     'processing': '🔄 In Processing',
     'out_for_delivery': '🚚 Out for Delivery',
     'delivered': '✅ Delivered',
-    
   };
 
   @override
@@ -49,34 +48,38 @@ class _AllOrdersState extends State<AllOrders> {
   // Search customers collection for name, phone, or email matches
   Future<List<String>> _searchCustomerIds(String query) async {
     if (query.length < 3) return []; // Require at least 3 characters
-    
+
     try {
       List<String> customerIds = [];
-      
+
       // Search by name
-      final nameQuery = await FirebaseFirestore.instance
-          .collection('customer')  // Changed from 'customers' to 'customer'
-          .where('name', isGreaterThanOrEqualTo: query)
-          .where('name', isLessThan: query + '\uf8ff')
-          .limit(20)
-          .get();
-      
+      final nameQuery =
+          await FirebaseFirestore.instance
+              .collection('customer') // Changed from 'customers' to 'customer'
+              .where('name', isGreaterThanOrEqualTo: query)
+              .where('name', isLessThan: query + '\uf8ff')
+              .limit(20)
+              .get();
+
       for (var doc in nameQuery.docs) {
         if (!customerIds.contains(doc.id)) {
           customerIds.add(doc.id);
         }
       }
-      
+
       // Search by phone (if query looks like a phone number)
       if (RegExp(r'^[\d\+\-\s\(\)]*$').hasMatch(query)) {
         try {
-          final phoneQuery = await FirebaseFirestore.instance
-              .collection('customer')  // Changed from 'customers' to 'customer'
-              .where('phoneNumber', isGreaterThanOrEqualTo: query)
-              .where('phoneNumber', isLessThan: query + '\uf8ff')
-              .limit(20)
-              .get();
-          
+          final phoneQuery =
+              await FirebaseFirestore.instance
+                  .collection(
+                    'customer',
+                  ) // Changed from 'customers' to 'customer'
+                  .where('phoneNumber', isGreaterThanOrEqualTo: query)
+                  .where('phoneNumber', isLessThan: query + '\uf8ff')
+                  .limit(20)
+                  .get();
+
           for (var doc in phoneQuery.docs) {
             if (!customerIds.contains(doc.id)) {
               customerIds.add(doc.id);
@@ -86,17 +89,20 @@ class _AllOrdersState extends State<AllOrders> {
           print('Phone search error: $e');
         }
       }
-      
+
       // Search by email (if query looks like an email)
       if (query.contains('@') || query.contains('.')) {
         try {
-          final emailQuery = await FirebaseFirestore.instance
-              .collection('customer')  // Changed from 'customers' to 'customer'
-              .where('email', isGreaterThanOrEqualTo: query)
-              .where('email', isLessThan: query + '\uf8ff')
-              .limit(20)
-              .get();
-          
+          final emailQuery =
+              await FirebaseFirestore.instance
+                  .collection(
+                    'customer',
+                  ) // Changed from 'customers' to 'customer'
+                  .where('email', isGreaterThanOrEqualTo: query)
+                  .where('email', isLessThan: query + '\uf8ff')
+                  .limit(20)
+                  .get();
+
           for (var doc in emailQuery.docs) {
             if (!customerIds.contains(doc.id)) {
               customerIds.add(doc.id);
@@ -106,7 +112,7 @@ class _AllOrdersState extends State<AllOrders> {
           print('Email search error: $e');
         }
       }
-      
+
       return customerIds;
     } catch (e) {
       print('Customer search error: $e');
@@ -118,16 +124,20 @@ class _AllOrdersState extends State<AllOrders> {
   List<OrderModel> _filterOrdersByDate(List<OrderModel> orders) {
     if (_selectedDate != null) {
       return orders.where((order) {
-        final orderDate = order.createdAt?.toDate() ?? order.orderTimestamp.toDate();
+        final orderDate =
+            order.createdAt?.toDate() ?? order.orderTimestamp.toDate();
         return orderDate.year == _selectedDate!.year &&
-               orderDate.month == _selectedDate!.month &&
-               orderDate.day == _selectedDate!.day;
+            orderDate.month == _selectedDate!.month &&
+            orderDate.day == _selectedDate!.day;
       }).toList();
     } else if (_startDate != null && _endDate != null) {
       return orders.where((order) {
-        final orderDate = order.createdAt?.toDate() ?? order.orderTimestamp.toDate();
-        return orderDate.isAfter(_startDate!.subtract(const Duration(days: 1))) &&
-               orderDate.isBefore(_endDate!.add(const Duration(days: 1)));
+        final orderDate =
+            order.createdAt?.toDate() ?? order.orderTimestamp.toDate();
+        return orderDate.isAfter(
+              _startDate!.subtract(const Duration(days: 1)),
+            ) &&
+            orderDate.isBefore(_endDate!.add(const Duration(days: 1)));
       }).toList();
     }
     return orders;
@@ -162,9 +172,10 @@ class _AllOrdersState extends State<AllOrders> {
       context: context,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
-      initialDateRange: _startDate != null && _endDate != null
-          ? DateTimeRange(start: _startDate!, end: _endDate!)
-          : null,
+      initialDateRange:
+          _startDate != null && _endDate != null
+              ? DateTimeRange(start: _startDate!, end: _endDate!)
+              : null,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -224,35 +235,42 @@ class _AllOrdersState extends State<AllOrders> {
 
     // Search query filtering
     if (_searchQuery.isNotEmpty) {
-      filteredOrders = filteredOrders.where((order) {
-        final query = _searchQuery.toLowerCase();
-        
-        // Basic order information
-        final orderId = order.id.toLowerCase();
-        final orderNumber = (order.orderNumber ?? '').toLowerCase();
-        final customerId = (order.customerId ?? order.userId).toLowerCase();
-        
-        // Check for matches in order ID, order number, or customer ID
-        bool basicMatch = orderId.contains(query) ||
-                         orderNumber.contains(query) ||
-                         customerId.contains(query);
-        
-        // If we did a customer search, check if this order's customer is in the results
-        bool customerSearchMatch = _isSearchingCustomers && 
-                                 _customerSearchResults.contains(order.customerId ?? order.userId);
-        
-        // Customer information from order.customer object (if available)
-        final customerName = (order.customer?.name ?? '').toLowerCase();
-        final customerPhone = (order.customer?.phoneNumber ?? '').toLowerCase();
-        final customerEmail = (order.customer?.email ?? '').toLowerCase();
-        
-        // Check for matches in customer details (if available)
-        bool customerDetailMatch = customerName.contains(query) ||
-                                 customerPhone.contains(query) ||
-                                 customerEmail.contains(query);
-        
-        return basicMatch || customerSearchMatch || customerDetailMatch;
-      }).toList();
+      filteredOrders =
+          filteredOrders.where((order) {
+            final query = _searchQuery.toLowerCase();
+
+            // Basic order information
+            final orderId = order.id.toLowerCase();
+            final orderNumber = (order.orderNumber ?? '').toLowerCase();
+            final customerId = (order.customerId ?? order.userId).toLowerCase();
+
+            // Check for matches in order ID, order number, or customer ID
+            bool basicMatch =
+                orderId.contains(query) ||
+                orderNumber.contains(query) ||
+                customerId.contains(query);
+
+            // If we did a customer search, check if this order's customer is in the results
+            bool customerSearchMatch =
+                _isSearchingCustomers &&
+                _customerSearchResults.contains(
+                  order.customerId ?? order.userId,
+                );
+
+            // Customer information from order.customer object (if available)
+            final customerName = (order.customer?.name ?? '').toLowerCase();
+            final customerPhone =
+                (order.customer?.phoneNumber ?? '').toLowerCase();
+            final customerEmail = (order.customer?.email ?? '').toLowerCase();
+
+            // Check for matches in customer details (if available)
+            bool customerDetailMatch =
+                customerName.contains(query) ||
+                customerPhone.contains(query) ||
+                customerEmail.contains(query);
+
+            return basicMatch || customerSearchMatch || customerDetailMatch;
+          }).toList();
     }
 
     return filteredOrders;
@@ -264,16 +282,16 @@ class _AllOrdersState extends State<AllOrders> {
       _isSearchingCustomers = false;
       _customerSearchResults = [];
     });
-    
+
     // If query might be a customer search (contains letters or email-like characters)
     if (value.length >= 3 && (RegExp(r'[a-zA-Z@.]').hasMatch(value))) {
       setState(() {
         _isSearchingCustomers = true;
       });
-      
+
       // Search customer collection
       final customerIds = await _searchCustomerIds(value);
-      
+
       setState(() {
         _customerSearchResults = customerIds;
         _isSearchingCustomers = false;
@@ -283,15 +301,19 @@ class _AllOrdersState extends State<AllOrders> {
 
   void _loadMoreOrders() {
     setState(() {
-      _orderLimit += 15; // Load 15 more orders (smaller batches for better performance)
+      _orderLimit +=
+          15; // Load 15 more orders (smaller batches for better performance)
     });
   }
 
   String _getTimeDisplay(OrderModel order) {
-    DateTime orderTime = order.createdAt?.toDate() ?? order.orderTimestamp.toDate();
+    DateTime orderTime =
+        order.createdAt?.toDate() ?? order.orderTimestamp.toDate();
     DateTime now = DateTime.now();
-    
-    if (orderTime.year == now.year && orderTime.month == now.month && orderTime.day == now.day) {
+
+    if (orderTime.year == now.year &&
+        orderTime.month == now.month &&
+        orderTime.day == now.day) {
       return DateFormat('h:mm a').format(orderTime);
     } else {
       return DateFormat('MMM d, h:mm a').format(orderTime);
@@ -334,33 +356,47 @@ class _AllOrdersState extends State<AllOrders> {
                         child: TextField(
                           controller: _searchController,
                           decoration: InputDecoration(
-                            hintText: 'Search by order ID, customer name, phone, email...',
+                            hintText:
+                                'Search by order ID, customer name, phone, email...',
                             hintStyle: TextStyle(color: Colors.grey[600]),
-                            prefixIcon: _isSearchingCustomers 
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: Padding(
-                                      padding: EdgeInsets.all(12.0),
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                            prefixIcon:
+                                _isSearchingCustomers
+                                    ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: Padding(
+                                        padding: EdgeInsets.all(12.0),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    )
+                                    : Icon(
+                                      Icons.search,
+                                      color: Colors.grey[600],
                                     ),
-                                  )
-                                : Icon(Icons.search, color: Colors.grey[600]),
-                            suffixIcon: _searchQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: Icon(Icons.clear, color: Colors.grey[600]),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() {
-                                        _searchQuery = '';
-                                        _isSearchingCustomers = false;
-                                        _customerSearchResults = [];
-                                      });
-                                    },
-                                  )
-                                : null,
+                            suffixIcon:
+                                _searchQuery.isNotEmpty
+                                    ? IconButton(
+                                      icon: Icon(
+                                        Icons.clear,
+                                        color: Colors.grey[600],
+                                      ),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() {
+                                          _searchQuery = '';
+                                          _isSearchingCustomers = false;
+                                          _customerSearchResults = [];
+                                        });
+                                      },
+                                    )
+                                    : null,
                             border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                           ),
                           onChanged: _onSearchChanged,
                         ),
@@ -389,7 +425,10 @@ class _AllOrdersState extends State<AllOrders> {
                             _orderLimit = 20;
                           });
                           // Trigger a rebuild which will refresh the stream
-                          Provider.of<OrderProvider>(context, listen: false).refreshOrders();
+                          Provider.of<OrderProvider>(
+                            context,
+                            listen: false,
+                          ).refreshOrders();
                         },
                         tooltip: 'Refresh Orders',
                       ),
@@ -397,136 +436,173 @@ class _AllOrdersState extends State<AllOrders> {
                   ],
                 ),
                 const SizedBox(height: 16),
+
                 // Filter Options
-                
               ],
             ),
           ),
           SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-FilterChip(
-                        label: const Text('Today'),
-                        selected: _selectedDate?.day == DateTime.now().day,
-                        onSelected: (bool selected) {
-                          if (selected) {
-                            _setToday();
-                          } else {
-                            _clearDateFilter();
-                          }
-                        },
-                        backgroundColor: Colors.white,
-                        selectedColor: Colors.green[100],
-                        checkmarkColor: Colors.green[700],
-                      ),
-                      const SizedBox(width: 8),
-                      FilterChip(
-                        label: const Text('Yesterday'),
-                        selected: _selectedDate?.day == DateTime.now().subtract(const Duration(days: 1)).day,
-                        onSelected: (bool selected) {
-                          if (selected) {
-                            _setYesterday();
-                          } else {
-                            _clearDateFilter();
-                          }
-                        },
-                        backgroundColor: Colors.white,
-                        selectedColor: Colors.orange[100],
-                        checkmarkColor: Colors.orange[700],
-                      ),
-                      const SizedBox(width: 8),
-                      ActionChip(
-                        label: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.calendar_today, size: 16),
-                            const SizedBox(width: 4),
-                            Text(_selectedDate != null
-                                ? DateFormat('MMM d, y').format(_selectedDate!)
-                                : _startDate != null && _endDate != null
-                                    ? '${DateFormat('MMM d').format(_startDate!)} - ${DateFormat('MMM d').format(_endDate!)}'
-                                    : 'Select Date'),
-                          ],
-                        ),
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (BuildContext context) {
-                              return AlertDialog(
-                                title: const Text('Select Date Filter'),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ListTile(
-                                      leading: const Icon(Icons.calendar_today),
-                                      title: const Text('Single Date'),
-                                      onTap: () {
-                                        Navigator.pop(context);
-                                        _showDatePicker();
-                                      },
-                                    ),
-                                    ListTile(
-                                      leading: const Icon(Icons.date_range),
-                                      title: const Text('Date Range'),
-                                      onTap: () {
-                                        Navigator.pop(context);
-                                        _showDateRangePicker();
-                                      },
-                                    ),
-                                    if (_selectedDate != null || (_startDate != null && _endDate != null))
-                                      ListTile(
-                                        leading: const Icon(Icons.clear),
-                                        title: const Text('Clear Filter'),
-                                        onTap: () {
-                                          Navigator.pop(context);
-                                          _clearDateFilter();
-                                        },
-                                      ),
-                                  ],
-                                ),
-                              );
-                            },
-                          );
-                        },)
-                    ])),
-SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      // Status Filter Chips
-                      ..._filterOptions.entries.map((entry) => Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: FilterChip(
-                          label: Text(entry.value),
-                          selected: _selectedFilter == entry.key,
-                          onSelected: (bool selected) {
-                            setState(() {
-                              _selectedFilter = selected ? entry.key : 'all';
-                              _orderLimit = 20;
-                            });
-                          },
-                          backgroundColor: Colors.white,
-                          selectedColor: Colors.blue[100],
-                          checkmarkColor: Colors.blue[700],
-                        ),
-                      )),
-                      // Vertical Divider
-                      Container(
-                        height: 32,
-                        width: 1,
-                        color: Colors.grey[300],
-                        margin: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      // Date Filter Options
-                      
-                        // backgroundColor: (_selectedDate != null || (_startDate != null && _endDate != null))
-                        //     ? Colors.blue[100]
-                        //     : Colors.white,
-                      
-                    ],
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.9,
+              child: Row(
+                children: [
+                  FilterChip(
+                    label: const Text('Today'),
+                    selected: _selectedDate?.day == DateTime.now().day,
+                    onSelected: (bool selected) {
+                      if (selected) {
+                        _setToday();
+                      } else {
+                        _clearDateFilter();
+                      }
+                    },
+                    backgroundColor: Colors.white,
+                    selectedColor: Colors.green[100],
+                    checkmarkColor: Colors.green[700],
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  FilterChip(
+                    label: const Text('Yesterday'),
+                    selected:
+                        _selectedDate?.day ==
+                        DateTime.now().subtract(const Duration(days: 1)).day,
+                    onSelected: (bool selected) {
+                      if (selected) {
+                        _setYesterday();
+                      } else {
+                        _clearDateFilter();
+                      }
+                    },
+                    backgroundColor: Colors.white,
+                    selectedColor: Colors.orange[100],
+                    checkmarkColor: Colors.orange[700],
+                  ),
+                  const SizedBox(width: 8),
+                  ActionChip(
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.calendar_today, size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          _selectedDate != null
+                              ? DateFormat('MMM d, y').format(_selectedDate!)
+                              : _startDate != null && _endDate != null
+                              ? '${DateFormat('MMM d').format(_startDate!)} - ${DateFormat('MMM d').format(_endDate!)}'
+                              : 'Select Date',
+                        ),
+                      ],
+                    ),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: const Text('Select Date Filter'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ListTile(
+                                  leading: const Icon(Icons.calendar_today),
+                                  title: const Text('Single Date'),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _showDatePicker();
+                                  },
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.date_range),
+                                  title: const Text('Date Range'),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _showDateRangePicker();
+                                  },
+                                ),
+                                if (_selectedDate != null ||
+                                    (_startDate != null && _endDate != null))
+                                  ListTile(
+                                    leading: const Icon(Icons.clear),
+                                    title: const Text('Clear Filter'),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _clearDateFilter();
+                                    },
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                  Spacer(),
+                  DropdownButton<String>(
+                    value: _selectedFilter,
+                    items:
+                        _filterOptions.entries.map((entry) {
+                          return DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          );
+                        }).toList(),
+                    onChanged: (String? newValue) {
+                      if (newValue != null) {
+                        setState(() {
+                          _selectedFilter = newValue;
+                          _orderLimit = 20;
+                        });
+                      }
+                    },
+                    underline: const SizedBox(),
+                    style: const TextStyle(fontSize: 14, color: Colors.black),
+                    dropdownColor: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    icon: const Icon(Icons.arrow_drop_down, color: Colors.blue),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // SingleChildScrollView(
+          //   scrollDirection: Axis.horizontal,
+          //   child: Row(
+          //     children: [
+          //       // Status Filter Chips
+          //       ..._filterOptions.entries.map(
+          //         (entry) => Padding(
+          //           padding: const EdgeInsets.only(right: 8.0),
+          //           child: FilterChip(
+          //             label: Text(entry.value),
+          //             selected: _selectedFilter == entry.key,
+          //             onSelected: (bool selected) {
+          //               setState(() {
+          //                 _selectedFilter = selected ? entry.key : 'all';
+          //                 _orderLimit = 20;
+          //               });
+          //             },
+          //             backgroundColor: Colors.white,
+          //             selectedColor: Colors.blue[100],
+          //             checkmarkColor: Colors.blue[700],
+          //           ),
+          //         ),
+          //       ),
+          //       // Vertical Divider
+          //       Container(
+          //         height: 32,
+          //         width: 1,
+          //         color: Colors.grey[300],
+          //         margin: const EdgeInsets.symmetric(horizontal: 8),
+          //       ),
+
+          //       // Date Filter Options
+
+          //       // backgroundColor: (_selectedDate != null || (_startDate != null && _endDate != null))
+          //       //     ? Colors.blue[100]
+          //       //     : Colors.white,
+          //     ],
+          //   ),
+          // ),
           // Orders List
           Expanded(
             child: StreamBuilder<List<OrderModel>>(
@@ -598,7 +674,8 @@ SingleChildScrollView(
                             color: Colors.grey[600],
                           ),
                         ),
-                        if (_selectedDate != null || (_startDate != null && _endDate != null))
+                        if (_selectedDate != null ||
+                            (_startDate != null && _endDate != null))
                           TextButton(
                             onPressed: _clearDateFilter,
                             child: const Text('Clear Date Filter'),
@@ -610,46 +687,71 @@ SingleChildScrollView(
 
                 // Apply date filtering
                 var filteredOrders = _filterOrdersByDate(snapshot.data!);
-                
+
                 // Apply search filtering
                 if (_searchQuery.isNotEmpty) {
-                  filteredOrders = filteredOrders.where((order) {
-                    final query = _searchQuery.toLowerCase();
-                    
-                    // Basic order information (always available in fast mode)
-                    final orderId = order.id.toLowerCase();
-                    final orderNumber = (order.orderNumber ?? '').toLowerCase();
-                    final customerId = (order.customerId ?? order.userId ?? '').toLowerCase();
-                    final status = order.status.toLowerCase();
-                    
-                    // Check for matches in basic order data
-                    bool basicMatch = orderId.contains(query) ||
-                                   orderNumber.contains(query) ||
-                                   customerId.contains(query) ||
-                                   status.contains(query);
-                    
-                    // Check total amount
-                    bool amountMatch = order.totalAmount.toString().contains(query);
-                    
-                    // Check delivery address if available
-                    bool addressMatch = false;
-                    if (order.deliveryAddressDetails != null) {
-                      final address = order.deliveryAddressDetails!;
-                      addressMatch = (address.addressLine1?.toLowerCase().contains(query) ?? false) ||
-                                   (address.addressLine2?.toLowerCase().contains(query) ?? false) ||
-                                   (address.city?.toLowerCase().contains(query) ?? false) ||
-                                   (address.pincode?.toLowerCase().contains(query) ?? false);
-                    }
-                    
-                    // Check items if available
-                    bool itemMatch = false;
-                    if (order.items != null && order.items!.isNotEmpty) {
-                      itemMatch = order.items!.any((item) =>
-                        (item['name']?.toString().toLowerCase().contains(query) ?? false));
-                    }
-                    
-                    return basicMatch || amountMatch || addressMatch || itemMatch;
-                  }).toList();
+                  filteredOrders =
+                      filteredOrders.where((order) {
+                        final query = _searchQuery.toLowerCase();
+
+                        // Basic order information (always available in fast mode)
+                        final orderId = order.id.toLowerCase();
+                        final orderNumber =
+                            (order.orderNumber ?? '').toLowerCase();
+                        final customerId =
+                            (order.customerId ?? order.userId ?? '')
+                                .toLowerCase();
+                        final status = order.status.toLowerCase();
+
+                        // Check for matches in basic order data
+                        bool basicMatch =
+                            orderId.contains(query) ||
+                            orderNumber.contains(query) ||
+                            customerId.contains(query) ||
+                            status.contains(query);
+
+                        // Check total amount
+                        bool amountMatch = order.totalAmount
+                            .toString()
+                            .contains(query);
+
+                        // Check delivery address if available
+                        bool addressMatch = false;
+                        if (order.deliveryAddressDetails != null) {
+                          final address = order.deliveryAddressDetails!;
+                          addressMatch =
+                              (address.addressLine1?.toLowerCase().contains(
+                                    query,
+                                  ) ??
+                                  false) ||
+                              (address.addressLine2?.toLowerCase().contains(
+                                    query,
+                                  ) ??
+                                  false) ||
+                              (address.city?.toLowerCase().contains(query) ??
+                                  false) ||
+                              (address.pincode?.toLowerCase().contains(query) ??
+                                  false);
+                        }
+
+                        // Check items if available
+                        bool itemMatch = false;
+                        if (order.items != null && order.items!.isNotEmpty) {
+                          itemMatch = order.items!.any(
+                            (item) =>
+                                (item['name']
+                                        ?.toString()
+                                        .toLowerCase()
+                                        .contains(query) ??
+                                    false),
+                          );
+                        }
+
+                        return basicMatch ||
+                            amountMatch ||
+                            addressMatch ||
+                            itemMatch;
+                      }).toList();
                 }
 
                 return Column(
@@ -662,7 +764,7 @@ SingleChildScrollView(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                                                    'Showing ${filteredOrders.length} orders (Fast Mode)${_selectedFilter != 'all' ? ' • Filter: ${_filterOptions[_selectedFilter]}' : ''}${_searchQuery.isNotEmpty ? ' • Search: "$_searchQuery"' : ''}',
+                            'Showing ${filteredOrders.length} orders (Fast Mode)${_selectedFilter != 'all' ? ' • Filter: ${_filterOptions[_selectedFilter]}' : ''}${_searchQuery.isNotEmpty ? ' • Search: "$_searchQuery"' : ''}',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.blue[700],
@@ -681,7 +783,7 @@ SingleChildScrollView(
                         ],
                       ),
                     ),
-                    
+
                     // Orders list
                     Expanded(
                       child: ListView.builder(
@@ -700,203 +802,224 @@ SingleChildScrollView(
           ),
         ],
       ),
-      floatingActionButton: _selectedFilter != 'pending' 
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                setState(() {
-                  _selectedFilter = 'pending';
-                  _orderLimit = 20;
-                });
-              },
-              icon: const Icon(Icons.pending_actions),
-              label: const Text('Pending'),
-              backgroundColor: Colors.orange,
-            )
-          : null,
+      floatingActionButton:
+          _selectedFilter != 'pending'
+              ? FloatingActionButton.extended(
+                onPressed: () {
+                  setState(() {
+                    _selectedFilter = 'pending';
+                    _orderLimit = 20;
+                  });
+                },
+                icon: const Icon(Icons.pending_actions),
+                label: const Text('Pending'),
+                backgroundColor: Colors.orange,
+              )
+              : null,
     );
   }
 
   Widget _buildOrderCard(OrderModel order) {
-  final timeDisplay = _getTimeDisplay(order);
-  
-  return Container(
-    margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          spreadRadius: 1,
-          blurRadius: 4,
-          offset: const Offset(0, 2),
-        ),
-      ],
-      border: Border.all(color: Colors.grey[200]!),
-    ),
-    child: InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => OrderDetailsScreen(orderId: order.id),
+    final timeDisplay = _getTimeDisplay(order);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
-        );
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Top row with order info, status, and edit buttons
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Order icon
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(order.status).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+        ],
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OrderDetailsScreen(orderId: order.id),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Top row with order info, status, and edit buttons
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Order icon
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(order.status).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.receipt_long,
+                      color: _getStatusColor(order.status),
+                      size: 20,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.receipt_long,
-                    color: _getStatusColor(order.status),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                
-                // Order details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Order number and status badge row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Order #${order.orderNumber ?? order.id.substring(0, 8)}',
+                  const SizedBox(width: 12),
+
+                  // Order details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Order number and status badge row
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Order #${order.orderNumber ?? order.id.substring(0, 8)}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                            // Status badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(order.status),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                _getStatusDisplayName(order.status),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+
+                        // Time and date below order ID
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 16,
+                              color: Colors.grey[600],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              timeDisplay,
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 13,
+                              ),
+                            ),
+                            const Spacer(),
+                            // Amount on the right
+                            Text(
+                              '₹${order.totalAmount.toStringAsFixed(0)}',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.black87,
+                                color: Colors.green,
                               ),
                             ),
-                          ),
-                          // Status badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(order.status),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              _getStatusDisplayName(order.status),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      
-                      // Time and date below order ID
-                      Row(
-                        children: [
-                          Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
-                          Text(
-                            timeDisplay,
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 13,
-                            ),
-                          ),
-                          const Spacer(),
-                          // Amount on the right
-                          Text(
-                            '₹${order.totalAmount.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Edit buttons and arrow
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
-                  onSelected: (value) {
-                    switch (value) {
-                      case 'edit_order':
-                        _showEditOrderDialog(order);
-                        break;
-                      case 'edit_address':
-                        _showEditAddressDialog(order);
-                        break;
-                      case 'view_details':
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => OrderDetailsScreen(orderId: order.id),
-                          ),
-                        );
-                        break;
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit_order',
-                  child: Row(
-                    children: [
-                          Icon(Icons.edit, size: 16, color: Colors.blue),
-                          SizedBox(width: 8),
-                          Text('Edit Order'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'edit_address',
-                      child: Row(
-                        children: [
-                          Icon(Icons.location_on, size: 16, color: Colors.green),
-                          SizedBox(width: 8),
-                          Text('Edit Address'),
-                    ],
-                  ),
-                ),
-                    const PopupMenuItem(
-                      value: 'view_details',
-                  child: Row(
-                    children: [
-                          Icon(Icons.visibility, size: 16, color: Colors.orange),
-                          SizedBox(width: 8),
-                          Text('View Details'),
-                        ],
+                          ],
                         ),
-                      ),
-                    ],
-                ),
-              ],
-            ),
-            
+                      ],
+                    ),
+                  ),
 
-          ],
+                  // Edit buttons and arrow
+                  PopupMenuButton<String>(
+                    icon: Icon(
+                      Icons.more_vert,
+                      color: Colors.grey[600],
+                      size: 20,
+                    ),
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'edit_order':
+                          _showEditOrderDialog(order);
+                          break;
+                        case 'edit_address':
+                          _showEditAddressDialog(order);
+                          break;
+                        case 'view_details':
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) =>
+                                      OrderDetailsScreen(orderId: order.id),
+                            ),
+                          );
+                          break;
+                      }
+                    },
+                    itemBuilder:
+                        (context) => [
+                          const PopupMenuItem(
+                            value: 'edit_order',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit, size: 16, color: Colors.blue),
+                                SizedBox(width: 8),
+                                Text('Edit Order'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'edit_address',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Colors.green,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Edit Address'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'view_details',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.visibility,
+                                  size: 16,
+                                  color: Colors.orange,
+                                ),
+                                SizedBox(width: 8),
+                                Text('View Details'),
+                              ],
+                            ),
+                          ),
+                        ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   String _getStatusDisplayName(String status) {
     switch (status.toLowerCase()) {
@@ -950,12 +1073,13 @@ SingleChildScrollView(
   void _showEditOrderDialog(OrderModel order) {
     showDialog(
       context: context,
-      builder: (context) => EditOrderDialog(
-        order: order,
-        onOrderUpdated: () {
-          setState(() {});
-        },
-      ),
+      builder:
+          (context) => EditOrderDialog(
+            order: order,
+            onOrderUpdated: () {
+              setState(() {});
+            },
+          ),
     );
   }
 
@@ -963,12 +1087,13 @@ SingleChildScrollView(
   void _showEditAddressDialog(OrderModel order) {
     showDialog(
       context: context,
-      builder: (context) => EditOrderAddressDialog(
-        order: order,
-        onAddressUpdated: () {
-          setState(() {});
-        },
-      ),
+      builder:
+          (context) => EditOrderAddressDialog(
+            order: order,
+            onAddressUpdated: () {
+              setState(() {});
+            },
+          ),
     );
   }
 }
@@ -1011,8 +1136,12 @@ class _EditOrderDialogState extends State<EditOrderDialog> {
   void initState() {
     super.initState();
     _statusController = TextEditingController(text: widget.order.status);
-    _notesController = TextEditingController(text: widget.order.specialInstructions ?? '');
-    _totalAmountController = TextEditingController(text: widget.order.totalAmount.toString());
+    _notesController = TextEditingController(
+      text: widget.order.specialInstructions ?? '',
+    );
+    _totalAmountController = TextEditingController(
+      text: widget.order.totalAmount.toString(),
+    );
   }
 
   @override
@@ -1025,17 +1154,19 @@ class _EditOrderDialogState extends State<EditOrderDialog> {
 
   Future<void> _updateOrder() async {
     setState(() => _isUpdating = true);
-    
+
     try {
       await FirebaseFirestore.instance
           .collection('orders')
           .doc(widget.order.id)
           .update({
-        'status': _statusController.text,
-        'specialInstructions': _notesController.text.trim(),
-        'totalAmount': double.tryParse(_totalAmountController.text) ?? widget.order.totalAmount,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+            'status': _statusController.text,
+            'specialInstructions': _notesController.text.trim(),
+            'totalAmount':
+                double.tryParse(_totalAmountController.text) ??
+                widget.order.totalAmount,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
 
       if (mounted) {
         Navigator.pop(context);
@@ -1066,7 +1197,9 @@ class _EditOrderDialogState extends State<EditOrderDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Edit Order #${widget.order.orderNumber ?? widget.order.id.substring(0, 8)}'),
+      title: Text(
+        'Edit Order #${widget.order.orderNumber ?? widget.order.id.substring(0, 8)}',
+      ),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -1080,12 +1213,13 @@ class _EditOrderDialogState extends State<EditOrderDialog> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.assignment),
               ),
-              items: _statusOptions.map((status) {
-                return DropdownMenuItem(
-                  value: status,
-                  child: Text(status.replaceAll('_', ' ').toUpperCase()),
-                );
-              }).toList(),
+              items:
+                  _statusOptions.map((status) {
+                    return DropdownMenuItem(
+                      value: status,
+                      child: Text(status.replaceAll('_', ' ').toUpperCase()),
+                    );
+                  }).toList(),
               onChanged: (value) {
                 if (value != null) {
                   _statusController.text = value;
@@ -1093,7 +1227,7 @@ class _EditOrderDialogState extends State<EditOrderDialog> {
               },
             ),
             const SizedBox(height: 16),
-            
+
             // Total Amount
             TextFormField(
               controller: _totalAmountController,
@@ -1105,7 +1239,7 @@ class _EditOrderDialogState extends State<EditOrderDialog> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 16),
-            
+
             // Special Instructions
             TextFormField(
               controller: _notesController,
@@ -1130,16 +1264,17 @@ class _EditOrderDialogState extends State<EditOrderDialog> {
             backgroundColor: Colors.blue,
             foregroundColor: Colors.white,
           ),
-          child: _isUpdating
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-              : const Text('Update'),
+          child:
+              _isUpdating
+                  ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                  : const Text('Update'),
         ),
       ],
     );
@@ -1174,8 +1309,12 @@ class _EditOrderAddressDialogState extends State<EditOrderAddressDialog> {
   void initState() {
     super.initState();
     final address = widget.order.deliveryAddressDetails;
-    _addressLine1Controller = TextEditingController(text: address?.addressLine1 ?? '');
-    _addressLine2Controller = TextEditingController(text: address?.addressLine2 ?? '');
+    _addressLine1Controller = TextEditingController(
+      text: address?.addressLine1 ?? '',
+    );
+    _addressLine2Controller = TextEditingController(
+      text: address?.addressLine2 ?? '',
+    );
     _cityController = TextEditingController(text: address?.city ?? '');
     _stateController = TextEditingController(text: address?.state ?? '');
     _pincodeController = TextEditingController(text: address?.pincode ?? '');
@@ -1195,7 +1334,7 @@ class _EditOrderAddressDialogState extends State<EditOrderAddressDialog> {
 
   Future<void> _updateAddress() async {
     setState(() => _isUpdating = true);
-    
+
     try {
       Map<String, dynamic> updatedAddress = {
         'addressLine1': _addressLine1Controller.text.trim(),
@@ -1210,9 +1349,9 @@ class _EditOrderAddressDialogState extends State<EditOrderAddressDialog> {
           .collection('orders')
           .doc(widget.order.id)
           .update({
-        'deliveryAddress.details': updatedAddress,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+            'deliveryAddress.details': updatedAddress,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
 
       if (mounted) {
         Navigator.pop(context);
@@ -1243,7 +1382,9 @@ class _EditOrderAddressDialogState extends State<EditOrderAddressDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Edit Delivery Address - Order #${widget.order.orderNumber ?? widget.order.id.substring(0, 8)}'),
+      title: Text(
+        'Edit Delivery Address - Order #${widget.order.orderNumber ?? widget.order.id.substring(0, 8)}',
+      ),
       content: SizedBox(
         width: 500,
         child: SingleChildScrollView(
@@ -1259,7 +1400,7 @@ class _EditOrderAddressDialogState extends State<EditOrderAddressDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-              
+
               TextFormField(
                 controller: _addressLine2Controller,
                 decoration: const InputDecoration(
@@ -1269,7 +1410,7 @@ class _EditOrderAddressDialogState extends State<EditOrderAddressDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-              
+
               Row(
                 children: [
                   Expanded(
@@ -1297,7 +1438,7 @@ class _EditOrderAddressDialogState extends State<EditOrderAddressDialog> {
                 ],
               ),
               const SizedBox(height: 12),
-              
+
               TextFormField(
                 controller: _stateController,
                 decoration: const InputDecoration(
@@ -1307,7 +1448,7 @@ class _EditOrderAddressDialogState extends State<EditOrderAddressDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-              
+
               TextFormField(
                 controller: _landmarkController,
                 decoration: const InputDecoration(
@@ -1331,16 +1472,17 @@ class _EditOrderAddressDialogState extends State<EditOrderAddressDialog> {
             backgroundColor: Colors.green,
             foregroundColor: Colors.white,
           ),
-          child: _isUpdating
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-              : const Text('Update Address'),
+          child:
+              _isUpdating
+                  ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                  : const Text('Update Address'),
         ),
       ],
     );

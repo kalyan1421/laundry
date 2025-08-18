@@ -1,6 +1,7 @@
 // lib/screens/auth/otp_verification_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:pinput/pinput.dart';
 import 'package:sms_autofill/sms_autofill.dart';
@@ -9,7 +10,7 @@ import '../../providers/auth_provider.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final String phoneNumber;
-  
+
   const OTPVerificationScreen({
     Key? key,
     required this.phoneNumber,
@@ -19,10 +20,11 @@ class OTPVerificationScreen extends StatefulWidget {
   State<OTPVerificationScreen> createState() => _OTPVerificationScreenState();
 }
 
-class _OTPVerificationScreenState extends State<OTPVerificationScreen> with CodeAutoFill {
+class _OTPVerificationScreenState extends State<OTPVerificationScreen>
+    with CodeAutoFill {
   final TextEditingController _pinController = TextEditingController();
   final FocusNode _pinFocusNode = FocusNode();
-  
+
   int _resendCooldown = 30;
   Timer? _timer;
   bool _isAutoVerifying = false;
@@ -31,6 +33,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
   bool _showLoading = true;
   String _currentOTP = '';
   String? _appSignature;
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -39,13 +42,14 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
     _initializeOTPScreen();
     _initializeSMSAutofill();
   }
-  
+
   Future<void> _initializeOTPScreen() async {
     // Show loading animation for 2 seconds
     Timer(const Duration(seconds: 2), () {
       if (mounted && !_isDisposed) {
         setState(() {
           _showLoading = false;
+          isLoading = false;
         });
       }
     });
@@ -56,10 +60,10 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
       // Get app signature for SMS autofill
       _appSignature = await SmsAutoFill().getAppSignature;
       print('App signature for SMS autofill: $_appSignature');
-      
+
       // Start listening for SMS
       await SmsAutoFill().listenForCode();
-      
+
       // Listen for code changes
       SmsAutoFill().code.listen((code) {
         if (code != null && code.length == 6 && !_isDisposed && mounted) {
@@ -67,7 +71,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
           _pinController.text = code;
           _currentOTP = code;
           setState(() {});
-          
+
           // Auto-verify the detected OTP
           Future.delayed(const Duration(milliseconds: 500), () {
             if (!_isDisposed && mounted && !_isAutoVerifying) {
@@ -89,7 +93,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
       _pinController.text = code!;
       _currentOTP = code!;
       setState(() {});
-      
+
       // Auto-verify the detected OTP
       Future.delayed(const Duration(milliseconds: 300), () {
         if (!_isDisposed && mounted && !_isAutoVerifying) {
@@ -98,12 +102,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
       });
     }
   }
-  
-
-  
-
-  
-
 
   @override
   void dispose() {
@@ -120,13 +118,13 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
   void _startResendTimer() {
     _timer?.cancel();
     _resendCooldown = 30;
-    
+
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_isDisposed) {
         timer.cancel();
         return;
       }
-      
+
       if (mounted) {
         setState(() {
           if (_resendCooldown > 0) {
@@ -143,31 +141,31 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
 
   Future<void> _verifyOTP(String otp) async {
     if (_isDisposed || !mounted || otp.length != 6) return;
-    
+
     // Prevent multiple simultaneous verifications
     if (_isAutoVerifying) return;
-    
+
     setState(() {
       _isAutoVerifying = true;
     });
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Remove focus from any active field
       FocusScope.of(context).unfocus();
-      
+
       bool success = await authProvider.verifyOTP(otp);
-      
+
       if (_isDisposed || !mounted) return;
-      
+
       if (success) {
         _handleSuccessfulVerification(authProvider);
       } else {
         setState(() {
           _isAutoVerifying = false;
         });
-        
+
         if (authProvider.errorMessage != null) {
           _showMessage(authProvider.errorMessage!, isError: true);
         }
@@ -175,11 +173,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
       }
     } catch (e) {
       if (_isDisposed || !mounted) return;
-      
+
       setState(() {
         _isAutoVerifying = false;
       });
-      
+
       print('Error in _verifyOTP: $e');
       _showMessage('Verification failed. Please try again.', isError: true);
       _clearOTPField();
@@ -188,15 +186,15 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
 
   void _handleSuccessfulVerification(AuthProvider authProvider) {
     if (_isDisposed || !mounted || _hasNavigated) return;
-    
+
     _hasNavigated = true;
-    
+
     _showMessage('Verification successful!', isError: false);
-    
+
     // Navigate based on user status
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isDisposed || !mounted) return;
-      
+
       try {
         if (authProvider.isNewUser || !authProvider.isProfileComplete) {
           Navigator.pushReplacementNamed(context, '/profile-setup');
@@ -211,7 +209,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
 
   void _clearOTPField() {
     if (_isDisposed || !mounted) return;
-    
+
     try {
       _pinController.clear();
       _currentOTP = '';
@@ -223,22 +221,20 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
 
   Future<void> _resendOTP() async {
     if (_resendCooldown > 0 || _isDisposed || !mounted) return;
-    
+
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       String phoneNumber = widget.phoneNumber.replaceFirst('+91', '');
-      
+
       await authProvider.sendOTP(phoneNumber);
-      
+
       if (_isDisposed || !mounted) return;
-      
+
       if (authProvider.otpStatus == OTPStatus.sent) {
         _startResendTimer();
         _showMessage('OTP sent successfully', isError: false);
         _clearOTPField();
-        
-
       } else if (authProvider.errorMessage != null) {
         _showMessage(authProvider.errorMessage!, isError: true);
       }
@@ -250,7 +246,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
 
   void _changeNumber() {
     if (_isDisposed || !mounted) return;
-    
+
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       authProvider.resetOTPState();
@@ -262,7 +258,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
 
   void _showMessage(String message, {required bool isError}) {
     if (_isDisposed || !mounted) return;
-    
+
     try {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -292,7 +288,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
           backgroundColor: isError ? Colors.red[600] : Colors.green[600],
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: isError ? 4 : 2),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: EdgeInsets.all(16),
           elevation: 4,
         ),
@@ -305,12 +302,12 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor ,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon:  Icon(
+          icon: Icon(
             Icons.arrow_back_ios,
             color: Theme.of(context).colorScheme.onSurface,
             size: 20,
@@ -321,7 +318,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
             }
           },
         ),
-        title:  Text(
+        title: Text(
           'Verify Your Number',
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurface,
@@ -331,129 +328,141 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
         ),
         centerTitle: true,
       ),
-      body: Consumer<AuthProvider>(
-        builder: (context, authProvider, child) {
-          // Listen for auth state changes
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_isDisposed || !mounted || _hasNavigated) return;
-            
-            if (authProvider.authStatus == AuthStatus.authenticated && 
-                authProvider.otpStatus == OTPStatus.verified) {
-              _handleSuccessfulVerification(authProvider);
-            }
-          });
+      body: isLoading
+          ? Center(
+              child: LottieBuilder.asset(
+                  fit: BoxFit.contain,
+                  height: 200,
+                  'assets/Ironing People Animation (1).json'),
+            )
+          : Consumer<AuthProvider>(
+              builder: (context, authProvider, child) {
+                // Listen for auth state changes
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_isDisposed || !mounted || _hasNavigated) return;
 
-          // Show loading animation
-          if (_showLoading) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    padding: EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Color(0xFF4299E1).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(40),
-                    ),
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4299E1)),
-                      strokeWidth: 3,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Setting up verification...',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Color(0xFF2D3748),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  // const SizedBox(height: 8),
-                  // Text(
-                  //   'Preparing SMS auto-detection',
-                  //   style: TextStyle(
-                  //     fontSize: 14,
-                  //     color: Colors.grey[500],
-                  //   ),
-                  // ),
-                ],
-              ),
-            );
-          }
+                  if (authProvider.authStatus == AuthStatus.authenticated &&
+                      authProvider.otpStatus == OTPStatus.verified) {
+                    _handleSuccessfulVerification(authProvider);
+                  }
+                });
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                const SizedBox(height: 40),
-                
-                // Instructions with auto-fill status
-                _buildInstructions(),
-                
-                const SizedBox(height: 50),
-                
-                // OTP Input Field using OTPTextField
-                _buildOTPField(authProvider),
-                
-                const SizedBox(height: 40),
-                
-                // Verify button
-                _buildVerifyButton(authProvider),
-                
-                const SizedBox(height: 30),
-                
-                // Resend section
-                _buildResendSection(authProvider),
-                
-                const SizedBox(height: 20),
-                
-                // Change number
-                _buildChangeNumberButton(),
-                
-                const SizedBox(height: 20),
-                
-                // Show verification status
-                if (authProvider.otpStatus == OTPStatus.verifying || _isAutoVerifying)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Color(0xFF4299E1).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Color(0xFF4299E1).withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                // Show loading animation
+                if (_showLoading) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
+                        Container(
+                          width: 80,
+                          height: 80,
+                          padding: EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Color(0xFF4299E1).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(40),
+                          ),
                           child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4299E1)),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF4299E1)),
+                            strokeWidth: 3,
                           ),
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(height: 24),
                         Text(
-                          'Verifying your code...',
+                          'Setting up verification...',
                           style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF4299E1),
-                            fontWeight: FontWeight.w500,
+                            fontSize: 18,
+                            color: Color(0xFF2D3748),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
+                        // const SizedBox(height: 8),
+                        // Text(
+                        //   'Preparing SMS auto-detection',
+                        //   style: TextStyle(
+                        //     fontSize: 14,
+                        //     color: Colors.grey[500],
+                        //   ),
+                        // ),
                       ],
                     ),
+                  );
+                }
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 40),
+
+                      // Instructions with auto-fill status
+                      _buildInstructions(),
+
+                      const SizedBox(height: 50),
+
+                      // OTP Input Field using OTPTextField
+                      _buildOTPField(authProvider),
+
+                      const SizedBox(height: 40),
+
+                      // Verify button
+                      _buildVerifyButton(authProvider),
+
+                      const SizedBox(height: 30),
+
+                      // Resend section
+                      _buildResendSection(authProvider),
+
+                      const SizedBox(height: 20),
+
+                      // Change number
+                      _buildChangeNumberButton(),
+
+                      const SizedBox(height: 20),
+
+                      // Show verification status
+                      if (authProvider.otpStatus == OTPStatus.verifying ||
+                          _isAutoVerifying)
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Color(0xFF4299E1).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: Color(0xFF4299E1).withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Color(0xFF4299E1)),
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Verifying your code...',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF4299E1),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      const SizedBox(height: 40),
+                    ],
                   ),
-                
-                const SizedBox(height: 40),
-              ],
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 
@@ -578,18 +587,18 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
             ),
             onChanged: (pin) {
               _currentOTP = pin;
-              
+
               // Clear error when user starts typing
               if (authProvider.errorMessage != null) {
                 authProvider.clearError();
               }
-              
+
               setState(() {});
             },
             onCompleted: (pin) {
               _currentOTP = pin;
               HapticFeedback.lightImpact();
-              
+
               // Auto-verify when 6 digits are entered
               if (pin.length == 6 && !_isAutoVerifying) {
                 Future.delayed(const Duration(milliseconds: 300), () {
@@ -600,13 +609,14 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
               }
             },
             // Enable SMS autofill
-            androidSmsAutofillMethod: AndroidSmsAutofillMethod.smsUserConsentApi,
+            androidSmsAutofillMethod:
+                AndroidSmsAutofillMethod.smsUserConsentApi,
             listenForMultipleSmsOnAndroid: true,
           ),
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Auto-fill status indicator
         if (_currentOTP.isNotEmpty)
           Container(
@@ -643,13 +653,13 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
   Widget _buildVerifyButton(AuthProvider authProvider) {
     bool isValid = _currentOTP.length == 6;
     bool isLoading = authProvider.isVerifying || _isAutoVerifying;
-    
+
     return SizedBox(
       width: double.infinity,
       height: 52,
       child: ElevatedButton(
-        onPressed: isValid && !isLoading && !_isDisposed 
-            ? () => _verifyOTP(_currentOTP) 
+        onPressed: isValid && !isLoading && !_isDisposed
+            ? () => _verifyOTP(_currentOTP)
             : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: isValid && !isLoading
@@ -658,7 +668,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
           foregroundColor: Colors.white,
           elevation: isValid ? 3 : 0,
           shadowColor: Color(0xFF4299E1).withOpacity(0.4),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         child: isLoading
             ? Row(
@@ -694,8 +705,9 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
   }
 
   Widget _buildResendSection(AuthProvider authProvider) {
-    bool canResend = _resendCooldown == 0 && !authProvider.isLoading && !_isDisposed;
-    
+    bool canResend =
+        _resendCooldown == 0 && !authProvider.isLoading && !_isDisposed;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -712,18 +724,20 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> with Code
             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(6),
-              color: canResend ? Color(0xFF4299E1).withOpacity(0.1) : Colors.transparent,
-              border: canResend ? Border.all(color: Color(0xFF4299E1).withOpacity(0.3)) : null,
+              color: canResend
+                  ? Color(0xFF4299E1).withOpacity(0.1)
+                  : Colors.transparent,
+              border: canResend
+                  ? Border.all(color: Color(0xFF4299E1).withOpacity(0.3))
+                  : null,
             ),
             child: Text(
-              _resendCooldown > 0 
+              _resendCooldown > 0
                   ? 'Resend in 00:${_resendCooldown.toString().padLeft(2, '0')}'
                   : 'Resend Code',
               style: TextStyle(
                 fontSize: 14,
-                color: canResend 
-                    ? const Color(0xFF4299E1)
-                    : Colors.grey[400],
+                color: canResend ? const Color(0xFF4299E1) : Colors.grey[400],
                 fontWeight: FontWeight.w600,
               ),
             ),

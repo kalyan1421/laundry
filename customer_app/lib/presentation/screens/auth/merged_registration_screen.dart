@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:customer_app/core/routes/app_routes.dart';
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:customer_app/core/utils/validators.dart';
 import 'package:customer_app/presentation/widgets/common/custom_text_field.dart';
 import 'package:flutter/material.dart';
@@ -284,18 +285,18 @@ class _MergedRegistrationScreenState extends State<MergedRegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.backgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF2D3748)),
+          icon: Icon(Icons.arrow_back_ios, color:context.onBackgroundColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Complete Your Profile',
           style: TextStyle(
-            color: Color(0xFF2D3748),
+            color: context.onBackgroundColor,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
