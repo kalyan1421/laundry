@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:pinput/pinput.dart';
-import 'package:sms_autofill/sms_autofill.dart';
 import 'dart:async';
 import '../../providers/auth_provider.dart';
 
@@ -20,8 +19,7 @@ class OTPVerificationScreen extends StatefulWidget {
   State<OTPVerificationScreen> createState() => _OTPVerificationScreenState();
 }
 
-class _OTPVerificationScreenState extends State<OTPVerificationScreen>
-    with CodeAutoFill {
+class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   final TextEditingController _pinController = TextEditingController();
   final FocusNode _pinFocusNode = FocusNode();
 
@@ -32,7 +30,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
   bool _isDisposed = false;
   bool _showLoading = true;
   String _currentOTP = '';
-  String? _appSignature;
   bool isLoading = true;
 
   @override
@@ -40,7 +37,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
     super.initState();
     _startResendTimer();
     _initializeOTPScreen();
-    _initializeSMSAutofill();
   }
 
   Future<void> _initializeOTPScreen() async {
@@ -55,53 +51,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
     });
   }
 
-  Future<void> _initializeSMSAutofill() async {
-    try {
-      // Get app signature for SMS autofill
-      _appSignature = await SmsAutoFill().getAppSignature;
-      print('App signature for SMS autofill: $_appSignature');
 
-      // Start listening for SMS
-      await SmsAutoFill().listenForCode();
-
-      // Listen for code changes
-      SmsAutoFill().code.listen((code) {
-        if (code != null && code.length == 6 && !_isDisposed && mounted) {
-          print('Auto-detected OTP: $code');
-          _pinController.text = code;
-          _currentOTP = code;
-          setState(() {});
-
-          // Auto-verify the detected OTP
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (!_isDisposed && mounted && !_isAutoVerifying) {
-              _verifyOTP(code);
-            }
-          });
-        }
-      });
-    } catch (e) {
-      print('Error initializing SMS autofill: $e');
-    }
-  }
-
-  @override
-  void codeUpdated() {
-    // This method is called when SMS code is detected
-    if (code != null && code!.length == 6 && !_isDisposed && mounted) {
-      print('Code updated via mixin: $code');
-      _pinController.text = code!;
-      _currentOTP = code!;
-      setState(() {});
-
-      // Auto-verify the detected OTP
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (!_isDisposed && mounted && !_isAutoVerifying) {
-          _verifyOTP(code!);
-        }
-      });
-    }
-  }
 
   @override
   void dispose() {
@@ -109,9 +59,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
     _timer?.cancel();
     _pinController.dispose();
     _pinFocusNode.dispose();
-    // Stop listening for SMS codes
-    SmsAutoFill().unregisterListener();
-    cancel(); // Cancel the CodeAutoFill mixin listener
     super.dispose();
   }
 

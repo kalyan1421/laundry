@@ -36,6 +36,11 @@
 -keep class com.google.android.gms.maps.** { *; }
 -keep interface com.google.android.gms.maps.** { *; }
 
+# Google Auth API - Fix for smart_auth plugin
+-keep class com.google.android.gms.auth.api.credentials.** { *; }
+-keep interface com.google.android.gms.auth.api.credentials.** { *; }
+-dontwarn com.google.android.gms.auth.api.credentials.**
+
 # Google Play Core - Fix for R8 missing classes
 -keep class com.google.android.play.core.** { *; }
 -dontwarn com.google.android.play.core.**

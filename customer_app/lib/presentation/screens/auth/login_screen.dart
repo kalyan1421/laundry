@@ -10,7 +10,6 @@ import 'package:flutter/material.dart' as material show TextButton;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:sms_autofill/sms_autofill.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:lottie/lottie.dart';
 import 'dart:async';
@@ -60,24 +59,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _initializePhoneAutofill() async {
     try {
-      // Request phone permission
-      final status = await Permission.phone.request();
-      if (status.isGranted) {
-        // Get phone number hint
-        final phoneNumber = await SmsAutoFill().hint;
-        if (phoneNumber != null && phoneNumber.isNotEmpty) {
-          setState(() {
-            // Remove +91 if present and format the number
-            String formattedNumber = phoneNumber
-                .replaceAll('+91', '')
-                .replaceAll(' ', '')
-                .replaceAll('-', '');
-            if (formattedNumber.length == 10) {
-              _phoneController.text = formattedNumber;
-            }
-          });
-        }
-      }
+      // Note: Phone number autofill removed to fix Android security issues
+      // Users can manually enter their phone number
+      print('Phone autofill disabled for security compliance');
     } catch (e) {
       // Handle any errors silently
       print('Phone autofill error: $e');
