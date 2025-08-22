@@ -8,14 +8,11 @@ import 'package:customer_app/core/utils/text_utils.dart';
 import 'package:flutter/material.dart' hide TextButton;
 import 'package:flutter/material.dart' as material show TextButton;
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:lottie/lottie.dart';
 import 'dart:async';
 import '../../providers/auth_provider.dart';
-import '../../widgets/common/custom_text_field.dart';
-import '../../widgets/common/error_text.dart';
+import '../../widgets/common/phone_input_field.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -53,20 +50,11 @@ class _LoginScreenState extends State<LoginScreen> {
       authProvider.resetOTPState();
 
       // Initialize phone number autofill
-      _initializePhoneAutofill();
+      
     });
   }
 
-  Future<void> _initializePhoneAutofill() async {
-    try {
-      // Note: Phone number autofill removed to fix Android security issues
-      // Users can manually enter their phone number
-      print('Phone autofill disabled for security compliance');
-    } catch (e) {
-      // Handle any errors silently
-      print('Phone autofill error: $e');
-    }
-  }
+
 
   @override
   void dispose() {
@@ -122,12 +110,14 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await authProvider.sendOTP(_phoneController.text.trim());
+      // Clean phone number (remove spaces and formatting)
+      final cleanPhoneNumber = _phoneController.text.replaceAll(' ', '').trim();
+      await authProvider.sendOTP(cleanPhoneNumber);
 
       // Check if OTP was sent successfully
       if (mounted && authProvider.otpStatus == OTPStatus.sent) {
         // Create the full phone number with country code
-        final fullPhoneNumber = '+91${_phoneController.text.trim()}';
+        final fullPhoneNumber = '+91$cleanPhoneNumber';
 
         // Wait for animation middle point (0.88 seconds) before navigation
         _animationTimer = Timer(const Duration(milliseconds: 1880), () {
@@ -386,90 +376,23 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: _phoneFocusNode.hasFocus
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.outline,
-              width: _phoneFocusNode.hasFocus ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              // Country code
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  '+91',
-                  style: AppTypography.bodyLarge.copyWith(
-                    fontWeight: FontConstants.medium,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ),
-              // Phone number input
-              Expanded(
-                child: TextFormField(
-                  controller: _phoneController,
-                  focusNode: _phoneFocusNode,
-                  keyboardType: TextInputType.phone,
-                  enabled: !authProvider.isLoading,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(10),
-                  ],
-                  style: AppTypography.bodyLarge.copyWith(
-                    fontWeight: FontConstants.medium,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  decoration: InputDecoration(
-                    fillColor: Theme.of(context).colorScheme.surface,
-                    // filled: true,
-                    hintText: '9876 543210',
-                    hintStyle: AppTypography.bodyLarge.copyWith(
-                      color: const Color(0xFFA0AEC0),
-                      fontWeight: FontConstants.regular,
-                    ),
-                    border: const OutlineInputBorder(
-                        borderSide: BorderSide.none,
-                        borderRadius: BorderRadius.all(Radius.circular(0))),
-                    errorBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
-                  ),
-                  validator: Validators.validatePhoneNumber,
-                  onChanged: (value) {
-                    setState(() {});
-                    // Clear error when user starts typing
-                    if (authProvider.errorMessage != null) {
-                      authProvider.clearError();
-                    }
-                  },
-                  onFieldSubmitted: (_) {
-                    if (_phoneController.text.length == 10) {
-                      _sendOTP();
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
+        PhoneInputField(
+          controller: _phoneController,
+          focusNode: _phoneFocusNode,
+          enabled: !authProvider.isLoading,
+          hintText: '9876 543210',
+          validator: Validators.validatePhoneNumber,
+          onChanged: (value) {
+            setState(() {});
+            if (authProvider.errorMessage != null) {
+              authProvider.clearError();
+            }
+          },
+          onFieldSubmitted: () {
+            if (_phoneController.text.replaceAll(' ', '').length == 10) {
+              _sendOTP();
+            }
+          },
         ),
 
         // Show loading indicator below input when sending
@@ -493,12 +416,13 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
           ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildContinueButton(AuthProvider authProvider) {
-    bool isValid = _phoneController.text.length == 10;
+    bool isValid = _phoneController.text.replaceAll(' ', '').length == 10;
     bool isLoading =
         authProvider.isLoading || authProvider.otpStatus == OTPStatus.sending;
 
