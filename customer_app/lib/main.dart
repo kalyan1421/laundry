@@ -21,9 +21,7 @@ import 'package:customer_app/presentation/providers/allied_service_provider.dart
 import 'package:customer_app/presentation/providers/order_provider.dart';
 import 'package:customer_app/presentation/providers/special_offer_provider.dart';
 import 'package:customer_app/presentation/providers/payment_provider.dart';
-import 'package:customer_app/presentation/providers/app_update_provider.dart';
 import 'package:customer_app/presentation/providers/theme_provider.dart';
-import 'package:customer_app/presentation/widgets/update_dialog.dart';
 
 // Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -56,7 +54,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => OrderProvider()),
         ChangeNotifierProvider(create: (_) => SpecialOfferProvider()),
         ChangeNotifierProvider(create: (_) => PaymentProvider()),
-        ChangeNotifierProvider(create: (_) => AppUpdateProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
@@ -139,20 +136,14 @@ class _AppUpdateWrapperState extends State<AppUpdateWrapper> {
   }
 
   Future<void> _checkForUpdates() async {
-    final updateProvider = Provider.of<AppUpdateProvider>(context, listen: false);
-    await updateProvider.initializeVersionControl();
-    await updateProvider.checkForUpdates();
+    // Version service removed - no longer checking for updates
+    print('Version service disabled - app update checks removed');
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<AuthProvider, AppUpdateProvider>(
-      builder: (context, authProvider, updateProvider, child) {
-        // Show update dialog if update is required and hasn't been shown yet
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _handleUpdateDialog(context, updateProvider);
-        });
-
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
         // Show appropriate screen based on auth status
         switch (authProvider.authStatus) {
           case AuthStatus.authenticating:
@@ -172,20 +163,7 @@ class _AppUpdateWrapperState extends State<AppUpdateWrapper> {
     );
   }
 
-  void _handleUpdateDialog(BuildContext context, AppUpdateProvider updateProvider) {
-    if (updateProvider.updateInfo != null && 
-        !updateProvider.hasShownDialog &&
-        (updateProvider.isUpdateRequired || updateProvider.isUpdateAvailable)) {
-      
-      updateProvider.markDialogShown();
-      
-      showUpdateDialog(
-        context,
-        updateProvider.updateInfo!,
-        barrierDismissible: !updateProvider.isUpdateRequired,
-      );
-    }
-  }
+
 }
 
 // Helper methods for showing snackbars (optional, can be moved to a utility file)
