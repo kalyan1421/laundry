@@ -341,26 +341,182 @@ class OrderProvider extends ChangeNotifier {
   
   Future<void> assignOrder(String orderId, String deliveryPersonId) async {
     try {
-      await _firestore.collection('orders').doc(orderId).update({
-        'assignedDeliveryPartner': deliveryPersonId, // Updated to use consistent field name
-        'assignedDeliveryPerson': deliveryPersonId, // Keep old field for backward compatibility
-        'status': 'assigned',
-        'assignedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'statusHistory': FieldValue.arrayUnion([
+      // Get current order to check for previous assignment
+      final orderDoc = await _firestore.collection('orders').doc(orderId).get();
+      if (!orderDoc.exists) {
+        throw Exception('Order not found');
+      }
+
+      final orderData = orderDoc.data()!;
+      final previousDeliveryPartner = orderData['assignedDeliveryPerson'];
+      final batch = _firestore.batch();
+
+      // Update order with assignment
+      batch.update(
+        _firestore.collection('orders').doc(orderId),
+        {
+          'assignedDeliveryPerson': deliveryPersonId, // Primary field
+          'assignedTo': deliveryPersonId, // Keep for backward compatibility
+          'status': 'assigned',
+          'assignedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+          'isAcceptedByDeliveryPerson': false, // Reset acceptance status
+          'statusHistory': FieldValue.arrayUnion([
+            {
+              'status': 'assigned',
+              'timestamp': Timestamp.now(),
+              'assignedTo': deliveryPersonId,
+              'updatedBy': 'admin',
+            }
+          ]),
+        },
+      );
+
+      // Clean up previous delivery partner's records (if reassignment)
+      if (previousDeliveryPartner != null && 
+          previousDeliveryPartner.toString().isNotEmpty &&
+          previousDeliveryPartner != deliveryPersonId) {
+        
+        print('🚚 🧹 Cleaning up previous delivery partner records: $previousDeliveryPartner');
+        
+        // Remove order from previous partner's currentOrders array
+        batch.update(
+          _firestore.collection('delivery').doc(previousDeliveryPartner),
           {
-            'status': 'assigned',
-            'timestamp': Timestamp.now(), // Fixed: Use Timestamp.now() instead of FieldValue.serverTimestamp()
-            'assignedTo': deliveryPersonId,
-          }
-        ]),
-      });
+            'currentOrders': FieldValue.arrayRemove([orderId]),
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        );
+
+        // Delete the assigned_orders subcollection document
+        batch.delete(
+          _firestore
+              .collection('delivery')
+              .doc(previousDeliveryPartner)
+              .collection('assigned_orders')
+              .doc(orderId),
+        );
+      }
+
+      // Add order to new delivery partner's records
+      // Add order to new partner's currentOrders array
+      batch.update(
+        _firestore.collection('delivery').doc(deliveryPersonId),
+        {
+          'currentOrders': FieldValue.arrayUnion([orderId]),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      );
+
+      // Create detailed order assignment record for new delivery partner
+      batch.set(
+        _firestore
+            .collection('delivery')
+            .doc(deliveryPersonId)
+            .collection('assigned_orders')
+            .doc(orderId),
+        {
+          'orderId': orderId,
+          'assignedAt': FieldValue.serverTimestamp(),
+          'status': 'assigned',
+          'orderDetails': {
+            'customerName': orderData['customerName'] ?? 'Unknown',
+            'customerPhone': orderData['customerPhone'] ?? '',
+            'pickupAddress': _getPickupAddressString(orderData),
+            'deliveryAddress': _getDeliveryAddressString(orderData),
+            'totalAmount': orderData['totalAmount'] ?? 0.0,
+            'items': orderData['items'] ?? [],
+            'specialInstructions': orderData['specialInstructions'] ?? '',
+            'orderType': orderData['orderType'] ?? 'pickup_delivery',
+            'serviceType': orderData['serviceType'] ?? 'laundry',
+            'priority': orderData['priority'] ?? 'normal',
+            'orderNumber': orderData['orderNumber'] ?? orderId,
+            'createdAt': orderData['createdAt'],
+            'pickupDate': orderData['pickupDate'],
+            'deliveryDate': orderData['deliveryDate'],
+            'paymentMethod': orderData['paymentMethod'] ?? 'cod',
+          },
+        },
+      );
+
+      await batch.commit();
+      print('✅ Order $orderId assigned to delivery partner $deliveryPersonId');
+
     } catch (e) {
       _error = e.toString();
       notifyListeners();
+      print('❌ Error assigning order: $e');
     }
   }
   
+  // Helper method to get pickup address string from order data
+  String _getPickupAddressString(Map<String, dynamic> orderData) {
+    try {
+      // Check if pickupAddress is a map (new structure)
+      if (orderData['pickupAddress'] is Map<String, dynamic>) {
+        final pickupAddressMap = orderData['pickupAddress'] as Map<String, dynamic>;
+        return pickupAddressMap['formatted'] ?? 
+               _formatAddressFromDetails(pickupAddressMap['details']) ??
+               'Pickup address not available';
+      }
+      // Check if it's a string (legacy structure)
+      else if (orderData['pickupAddress'] is String) {
+        return orderData['pickupAddress'] as String;
+      }
+      // Default fallback
+      else {
+        return 'Pickup address not available';
+      }
+    } catch (e) {
+      print('Error getting pickup address: $e');
+      return 'Pickup address not available';
+    }
+  }
+
+  // Helper method to get delivery address string from order data
+  String _getDeliveryAddressString(Map<String, dynamic> orderData) {
+    try {
+      // Check if deliveryAddress is a map (new structure)
+      if (orderData['deliveryAddress'] is Map<String, dynamic>) {
+        final deliveryAddressMap = orderData['deliveryAddress'] as Map<String, dynamic>;
+        return deliveryAddressMap['formatted'] ?? 
+               _formatAddressFromDetails(deliveryAddressMap['details']) ??
+               'Delivery address not available';
+      }
+      // Check if it's a string (legacy structure)
+      else if (orderData['deliveryAddress'] is String) {
+        return orderData['deliveryAddress'] as String;
+      }
+      // Default fallback
+      else {
+        return 'Delivery address not available';
+      }
+    } catch (e) {
+      print('Error getting delivery address: $e');
+      return 'Delivery address not available';
+    }
+  }
+
+  // Helper method to format address from details
+  String? _formatAddressFromDetails(Map<String, dynamic>? details) {
+    if (details == null) return null;
+    
+    List<String> parts = [];
+    if (details['doorNumber'] != null) parts.add('Door: ${details['doorNumber']}');
+    if (details['floorNumber'] != null) parts.add('Floor: ${details['floorNumber']}');
+    if (details['apartmentName'] != null) parts.add(details['apartmentName']);
+    if (details['addressLine1'] != null) parts.add(details['addressLine1']);
+    if (details['addressLine2'] != null && details['addressLine2'].toString().isNotEmpty) {
+      parts.add(details['addressLine2']);
+    }
+    if (details['landmark'] != null) parts.add('Near ${details['landmark']}');
+    if (details['city'] != null) parts.add(details['city']);
+    if (details['state'] != null) parts.add(details['state']);
+    if (details['pincode'] != null) parts.add(details['pincode']);
+    
+    return parts.isNotEmpty ? parts.join(', ') : null;
+  }
+
   // Accept order by delivery partner
   Future<bool> acceptOrder(String orderId, String deliveryPartnerId, {String? notes}) async {
     try {

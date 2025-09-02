@@ -4,13 +4,14 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../models/user_model.dart';
+import '../../models/address_model.dart';
 import '../../models/order_model.dart';
-import '../../providers/user_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../utils/phone_formatter.dart';
 import '../../services/pdf_generation_service.dart';
 import 'edit_user_screen.dart';
 import 'order_details_screen.dart';
+import 'place_order_for_customer_screen.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   final UserModel customer;
@@ -23,7 +24,7 @@ class CustomerDetailScreen extends StatefulWidget {
 
 class _CustomerDetailScreenState extends State<CustomerDetailScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<Map<String, dynamic>> _customerAddresses = [];
+  List<AddressModel> _customerAddresses = [];
   List<OrderModel> _customerOrders = [];
   bool _isLoadingAddresses = true;
   bool _isLoadingOrders = true;
@@ -42,24 +43,81 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> with Single
     super.dispose();
   }
 
+  // Helper methods for service type display
+  Color _getServiceTypeColor(String serviceType) {
+    if (serviceType.toLowerCase().contains('iron')) {
+      return Colors.orange;
+    } else if (serviceType.toLowerCase().contains('laundry')) {
+      return Colors.blue;
+    } else if (serviceType.toLowerCase().contains('mixed')) {
+      return Colors.purple;
+    } else {
+      return Colors.grey;
+    }
+  }
+
+  IconData _getServiceTypeIcon(String serviceType) {
+    if (serviceType.toLowerCase().contains('iron')) {
+      return Icons.iron;
+    } else if (serviceType.toLowerCase().contains('laundry')) {
+      return Icons.local_laundry_service;
+    } else if (serviceType.toLowerCase().contains('mixed')) {
+      return Icons.miscellaneous_services;
+    } else {
+      return Icons.help_outline;
+    }
+  }
+
   Future<void> _loadCustomerAddresses() async {
     try {
-      final addressesSnapshot = await FirebaseFirestore.instance
-          .collection('customer')
-          .doc(widget.customer.uid)
-          .collection('addresses')
-          .get();
+      // First try to get addresses ordered by isPrimary and createdAt
+      QuerySnapshot addressesSnapshot;
+      try {
+        addressesSnapshot = await FirebaseFirestore.instance
+            .collection('customer')
+            .doc(widget.customer.uid)
+            .collection('addresses')
+            .orderBy('isPrimary', descending: true)
+            .orderBy('createdAt', descending: false)
+            .get();
+      } catch (orderByError) {
+        // If ordering fails (e.g., missing index), get all addresses without ordering
+        print('OrderBy failed, fetching all addresses: $orderByError');
+        addressesSnapshot = await FirebaseFirestore.instance
+            .collection('customer')
+            .doc(widget.customer.uid)
+            .collection('addresses')
+            .get();
+      }
 
       setState(() {
         _customerAddresses = addressesSnapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            ...data,
-          };
+          final data = doc.data() as Map<String, dynamic>;
+          return AddressModel.fromFirestore(data, doc.id);
         }).toList();
+        
+        // Sort addresses manually if we couldn't order in query
+        _customerAddresses.sort((a, b) {
+          // Primary addresses first
+          if (a.isPrimary && !b.isPrimary) return -1;
+          if (!a.isPrimary && b.isPrimary) return 1;
+          
+          // Then by creation date (newest first if no createdAt)
+          if (a.createdAt != null && b.createdAt != null) {
+            return a.createdAt!.compareTo(b.createdAt!);
+          } else if (a.createdAt != null) {
+            return -1;
+          } else if (b.createdAt != null) {
+            return 1;
+          }
+          
+          return 0;
+        });
+        
         _isLoadingAddresses = false;
       });
+      
+      print('Loaded ${_customerAddresses.length} addresses for customer ${widget.customer.uid}');
     } catch (e) {
       print('Error loading customer addresses: $e');
       setState(() {
@@ -158,6 +216,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> with Single
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildCustomerInfoCard(),
+          const SizedBox(height: 16),
+          _buildActionButtonsCard(),
           const SizedBox(height: 16),
           _buildQRCodeCard(),
           const SizedBox(height: 16),
@@ -283,6 +343,92 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> with Single
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtonsCard() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.admin_panel_settings, color: Colors.blue[600]),
+                const SizedBox(width: 8),
+                Text(
+                  'Admin Actions',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PlaceOrderForCustomerScreen(
+                            customer: widget.customer,
+                          ),
+                        ),
+                      );
+                      
+                      // Refresh orders if order was placed
+                      if (result == true) {
+                        _loadCustomerOrders();
+                      }
+                    },
+                    icon: const Icon(Icons.add_shopping_cart, size: 20),
+                    label: const Text('Place Order'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditUserScreen(user: widget.customer),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.edit, size: 20),
+                    label: const Text('Edit Customer'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -474,8 +620,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> with Single
               );
   }
 
-  Widget _buildAddressCard(Map<String, dynamic> address, int index) {
-    final isPrimary = address['isPrimary'] == true;
+  Widget _buildAddressCard(AddressModel address, int index) {
+    final isPrimary = address.isPrimary;
     
     return Card(
       elevation: 2,
@@ -494,7 +640,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> with Single
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    isPrimary ? 'Primary Address' : 'Address ${index + 1}',
+                    isPrimary ? 'Primary Address (${address.typeDisplayName})' : '${address.typeDisplayName} Address',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -521,28 +667,117 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> with Single
               ],
             ),
             const SizedBox(height: 12),
-            if (address['doorNumber'] != null)
-              _buildAddressRow('Door Number', address['doorNumber']),
-            if (address['floorNumber'] != null)
-              _buildAddressRow('Floor', address['floorNumber']),
-            if (address['apartmentName'] != null)
-              _buildAddressRow('Apartment', address['apartmentName']),
-            if (address['addressLine1'] != null)
-              _buildAddressRow('Address Line 1', address['addressLine1']),
-            if (address['addressLine2'] != null)
-              _buildAddressRow('Address Line 2', address['addressLine2']),
-            if (address['nearbyLandmark'] != null)
-              _buildAddressRow('Landmark', address['nearbyLandmark']),
-            if (address['city'] != null)
-              _buildAddressRow('City', address['city']),
-            if (address['state'] != null)
-              _buildAddressRow('State', address['state']),
-            if (address['pincode'] != null)
-              _buildAddressRow('Pincode', address['pincode']),
-            if (address['latitude'] != null && address['longitude'] != null)
-              _buildAddressRow('Coordinates', '${address['latitude']}, ${address['longitude']}'),
+            _buildEnhancedAddressDisplay(address),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedAddressDisplay(AddressModel address) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Full formatted address
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.location_on_outlined, size: 18, color: Colors.grey[600]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  address.fullAddress,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          // Structured address details
+          if (address.doorNumber.isNotEmpty || 
+              (address.floorNumber != null && address.floorNumber!.isNotEmpty) ||
+              (address.apartmentName != null && address.apartmentName!.isNotEmpty)) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            Text(
+              'Address Details',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                if (address.doorNumber.isNotEmpty)
+                  _buildAddressChip('Door', address.doorNumber, Icons.door_front_door),
+                if (address.floorNumber != null && address.floorNumber!.isNotEmpty)
+                  _buildAddressChip('Floor', address.floorNumber!, Icons.layers),
+                if (address.apartmentName != null && address.apartmentName!.isNotEmpty)
+                  _buildAddressChip('Building', address.apartmentName!, Icons.apartment),
+              ],
+            ),
+          ],
+          
+          // Coordinates if available
+          if (address.latitude != null && address.longitude != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.my_location, size: 16, color: Colors.blue[600]),
+                const SizedBox(width: 6),
+                Text(
+                  'GPS: ${address.latitude!.toStringAsFixed(6)}, ${address.longitude!.toStringAsFixed(6)}',
+                  style: TextStyle(
+                    color: Colors.blue[600],
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddressChip(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.blue[700]),
+          const SizedBox(width: 4),
+          Text(
+            '$label: $value',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.blue[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -682,6 +917,44 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> with Single
                   ),
                 ],
               ),
+              // Service Type Display
+              if (order.serviceType != null && order.serviceType!.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _getServiceTypeColor(order.serviceType!).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: _getServiceTypeColor(order.serviceType!),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getServiceTypeIcon(order.serviceType!),
+                            size: 12,
+                            color: _getServiceTypeColor(order.serviceType!),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            order.serviceType!,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: _getServiceTypeColor(order.serviceType!),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               if (order.items.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 const Divider(),

@@ -399,7 +399,7 @@ class DeliveryPartnerService {
     });
   }
 
-  /// Assign order to delivery partner
+  /// Assign order to delivery partner with cleanup of previous assignments
   Future<void> assignOrderToPartner({
     required String orderId,
     required String partnerId,
@@ -408,16 +408,49 @@ class DeliveryPartnerService {
     try {
       final batch = _firestore.batch();
 
-      // Update order with assignment
+      // Get current order to check for previous assignment
+      final orderDoc = await _firestore.collection('orders').doc(orderId).get();
+      final previousDeliveryPartner = orderDoc.exists 
+          ? (orderDoc.data()!['assignedDeliveryPerson'] ?? orderDoc.data()!['assignedTo'])
+          : null;
+
+      // Update order with assignment (using consistent field names)
       batch.update(
         _firestore.collection('orders').doc(orderId),
         {
           'assignedTo': partnerId,
+          'assignedDeliveryPerson': partnerId, // Primary field
           'status': 'assigned',
           'assignedAt': Timestamp.now(),
           'updatedAt': Timestamp.now(),
         },
       );
+
+      // Clean up previous delivery partner's records (if reassignment)
+      if (previousDeliveryPartner != null && 
+          previousDeliveryPartner.toString().isNotEmpty &&
+          previousDeliveryPartner != partnerId) {
+        
+        print('🚚 🧹 Cleaning up previous delivery partner records: $previousDeliveryPartner');
+        
+        // Remove order from previous partner's currentOrders array
+        batch.update(
+          _firestore.collection('delivery').doc(previousDeliveryPartner),
+          {
+            'currentOrders': FieldValue.arrayRemove([orderId]),
+            'updatedAt': Timestamp.now(),
+          },
+        );
+
+        // Delete the assigned_orders subcollection document
+        batch.delete(
+          _firestore
+              .collection('delivery')
+              .doc(previousDeliveryPartner)
+              .collection('assigned_orders')
+              .doc(orderId),
+        );
+      }
 
       // Add order to delivery partner's current orders
       batch.update(
@@ -441,7 +474,7 @@ class DeliveryPartnerService {
 
       await batch.commit();
 
-      print('✅ Order $orderId assigned to partner $partnerId');
+      print('✅ Order $orderId assigned to partner $partnerId with proper cleanup');
 
     } catch (e) {
       print('❌ Error assigning order to partner: $e');

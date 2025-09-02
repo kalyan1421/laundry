@@ -36,7 +36,7 @@
 -keep class com.google.android.gms.maps.** { *; }
 -keep interface com.google.android.gms.maps.** { *; }
 
-# Google Auth API - Fix for smart_auth plugin
+# Google Auth API - For Firebase Auth and other Google services
 -keep class com.google.android.gms.auth.api.credentials.** { *; }
 -keep interface com.google.android.gms.auth.api.credentials.** { *; }
 -dontwarn com.google.android.gms.auth.api.credentials.**

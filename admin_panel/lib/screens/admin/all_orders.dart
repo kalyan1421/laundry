@@ -45,6 +45,31 @@ class _AllOrdersState extends State<AllOrders> {
     super.dispose();
   }
 
+  // Helper methods for service type display
+  Color _getServiceTypeColor(String serviceType) {
+    if (serviceType.toLowerCase().contains('iron')) {
+      return Colors.orange;
+    } else if (serviceType.toLowerCase().contains('laundry')) {
+      return Colors.blue;
+    } else if (serviceType.toLowerCase().contains('mixed')) {
+      return Colors.purple;
+    } else {
+      return Colors.grey;
+    }
+  }
+
+  IconData _getServiceTypeIcon(String serviceType) {
+    if (serviceType.toLowerCase().contains('iron')) {
+      return Icons.iron;
+    } else if (serviceType.toLowerCase().contains('laundry')) {
+      return Icons.local_laundry_service;
+    } else if (serviceType.toLowerCase().contains('mixed')) {
+      return Icons.miscellaneous_services;
+    } else {
+      return Icons.help_outline;
+    }
+  }
+
   // Search customers collection for name, phone, or email matches
   Future<List<String>> _searchCustomerIds(String query) async {
     if (query.length < 3) return []; // Require at least 3 characters
@@ -910,6 +935,49 @@ class _AllOrdersState extends State<AllOrders> {
                           ],
                         ),
                         const SizedBox(height: 6),
+
+                        // Service Type Badge
+                        if (order.serviceType != null && order.serviceType!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _getServiceTypeColor(order.serviceType!).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: _getServiceTypeColor(order.serviceType!),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _getServiceTypeIcon(order.serviceType!),
+                                      size: 12,
+                                      color: _getServiceTypeColor(order.serviceType!),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      order.serviceType!,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: _getServiceTypeColor(order.serviceType!),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                        ],
 
                         // Time and date below order ID
                         Row(

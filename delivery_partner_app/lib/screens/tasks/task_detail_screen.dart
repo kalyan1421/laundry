@@ -65,56 +65,346 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return widget.order.hasCoordinates;
   }
 
+  Widget _buildModernHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF87CEEB), Color(0xFFB8E6FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top row with back and menu
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.arrow_back,
+                    color: Color(0xFF1E3A8A),
+                    size: 20,
+                  ),
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.more_horiz,
+                  color: Color(0xFF1E3A8A),
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Order title
+          Text(
+            '${_isPickupTask ? 'Pick up' : 'Delivery'} Order ${widget.order.orderNumber ?? 'N/A'}',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'SFProDisplay',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernCustomerInfoCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Customer Info',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+              fontFamily: 'SFProDisplay',
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          _buildInfoRow('Customer ID', widget.order.customerId ?? 'N/A'),
+          const SizedBox(height: 12),
+          _buildInfoRow('Name', widget.order.customer?.name ?? 'Unknown'),
+          const SizedBox(height: 12),
+          _buildInfoRow('Phone', widget.order.customer?.phoneNumber ?? 'N/A'),
+          
+          const SizedBox(height: 20),
+          
+          // Call customer button
+          Container(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: () => _callCustomer(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF4CAF50),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: Text(
+                'Call Customer',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'SFProDisplay',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernAddressCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Address',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+              fontFamily: 'SFProDisplay',
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          _buildInfoRow('Door No.', widget.order.pickupAddress.split(',').first),
+          const SizedBox(height: 12),
+          _buildInfoRow('Floor No.', '2'), // This could be extracted from address if structured
+          const SizedBox(height: 12),
+          _buildInfoRow('Street', widget.order.pickupAddress.split(',').length > 1 ? widget.order.pickupAddress.split(',')[1] : ''),
+          const SizedBox(height: 12),
+          _buildInfoRow('Colony', widget.order.pickupAddress.split(',').last),
+          
+          const SizedBox(height: 20),
+          
+          // Map thumbnail and navigate button
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Container(
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.map,
+                      color: Color(0xFF9E9E9E),
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 3,
+                child: Container(
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _openMaps(widget.order.pickupAddress),
+                    icon: Icon(Icons.navigation, size: 16),
+                    label: Text(
+                      'Navigate',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'SFProDisplay',
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF4CAF50),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(
+            '$label :',
+            style: TextStyle(
+              color: Color(0xFF9E9E9E),
+              fontSize: 14,
+              fontFamily: 'SFProDisplay',
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'SFProDisplay',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1E3A8A),
-        foregroundColor: Colors.white,
-        title: Text(
-          _isPickupTask ? 'Pickup Task' : 'Delivery Task',
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontFamily: 'SFProDisplay',
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          // Custom header
+          _buildModernHeader(),
+          
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Customer info card
+                  _buildModernCustomerInfoCard(),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Address card
+                  _buildModernAddressCard(),
+            
+                  const SizedBox(height: 20),
+            
+                  // Items card
+                  _buildItemsCard(),
+            
+                  const SizedBox(height: 20),
+            
+                  // Payment info (if COD)
+                  if (widget.order.paymentMethod == 'cash_on_delivery')
+                    _buildPaymentCard(),
+            
+                  const SizedBox(height: 120), // Space for floating action button
+                ],
+              ),
+            ),
           ),
-        ),
-        elevation: 0,
+          
+          // Floating action button
+          if (!_isLoading) _buildModernActionButton(),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Order info card
-            _buildOrderInfoCard(),
-            
-            const SizedBox(height: 20),
-            
-            // Customer info card
-            _buildCustomerInfoCard(),
-            
-            const SizedBox(height: 20),
-            
-            // Address card
-            _buildAddressCard(),
-            
-            const SizedBox(height: 20),
-            
-            // Items card
-            _buildItemsCard(),
-            
-            const SizedBox(height: 20),
-            
-            // Payment info (if COD)
-            if (widget.order.paymentMethod == 'cash_on_delivery')
-              _buildPaymentCard(),
-            
-            const SizedBox(height: 30),
-            
-            // Action buttons
-            _buildActionButtons(),
-          ],
+    );
+  }
+
+  Widget _buildModernActionButton() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Container(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: _isPickupTask ? _markAsPickedUp : _markAsDelivered,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF4CAF50),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            child: Text(
+              _isPickupTask ? 'Marked As Pickup' : 'Mark as Delivered',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'SFProDisplay',
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -670,34 +960,27 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontFamily: 'SFProDisplay',
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontFamily: 'SFProDisplay',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  Future<void> _callCustomer() async {
+    final phoneNumber = widget.order.customer?.phoneNumber;
+    if (phoneNumber != null && phoneNumber.isNotEmpty) {
+      await _makePhoneCall(phoneNumber);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Customer phone number not available')),
+      );
+    }
+  }
+
+  Future<void> _markAsPickedUp() async {
+    setState(() => _isLoading = true);
+    
+    await _markPickupComplete();
+  }
+
+  Future<void> _markAsDelivered() async {
+    setState(() => _isLoading = true);
+    
+    await _markDeliveryComplete();
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {

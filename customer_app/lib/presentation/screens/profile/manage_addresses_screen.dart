@@ -281,61 +281,61 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
             ),
 
             // Coordinates Debug Info
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: hasCoordinates ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: hasCoordinates ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        hasCoordinates ? Icons.location_on : Icons.location_off,
-                        size: 16,
-                        color: hasCoordinates ? Colors.green : Colors.red,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'GPS Coordinates',
-                        style: AppTextTheme.bodySmall.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: hasCoordinates ? Colors.green : Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  if (hasCoordinates) ...[
-                    Text(
-                      'Lat: ${latitude.toString()}',
-                      style: AppTextTheme.bodySmall.copyWith(fontFamily: 'monospace'),
-                    ),
-                    Text(
-                      'Lng: ${longitude.toString()}',
-                      style: AppTextTheme.bodySmall.copyWith(fontFamily: 'monospace'),
-                    ),
-                    Text(
-                      'Type: ${latitude.runtimeType} / ${longitude.runtimeType}',
-                      style: AppTextTheme.bodySmall.copyWith(
-                        fontFamily: 'monospace',
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ] else
-                    Text(
-                      'No coordinates saved',
-                      style: AppTextTheme.bodySmall.copyWith(color: Colors.red),
-                    ),
-                ],
-              ),
-            ),
+            // const SizedBox(height: 12),
+            // Container(
+            //   padding: const EdgeInsets.all(12),
+            //   decoration: BoxDecoration(
+            //     color: hasCoordinates ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+            //     borderRadius: BorderRadius.circular(8),
+            //     border: Border.all(
+            //       color: hasCoordinates ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+            //     ),
+            //   ),
+            //   child: Column(
+            //     crossAxisAlignment: CrossAxisAlignment.start,
+            //     children: [
+            //       Row(
+            //         children: [
+            //           Icon(
+            //             hasCoordinates ? Icons.location_on : Icons.location_off,
+            //             size: 16,
+            //             color: hasCoordinates ? Colors.green : Colors.red,
+            //           ),
+            //           const SizedBox(width: 4),
+            //           Text(
+            //             'GPS Coordinates',
+            //             style: AppTextTheme.bodySmall.copyWith(
+            //               fontWeight: FontWeight.bold,
+            //               color: hasCoordinates ? Colors.green : Colors.red,
+            //             ),
+            //           ),
+            //         ],
+            //       ),
+            //       const SizedBox(height: 4),
+            //       if (hasCoordinates) ...[
+            //         Text(
+            //           'Lat: ${latitude.toString()}',
+            //           style: AppTextTheme.bodySmall.copyWith(fontFamily: 'monospace'),
+            //         ),
+            //         Text(
+            //           'Lng: ${longitude.toString()}',
+            //           style: AppTextTheme.bodySmall.copyWith(fontFamily: 'monospace'),
+            //         ),
+            //         Text(
+            //           'Type: ${latitude.runtimeType} / ${longitude.runtimeType}',
+            //           style: AppTextTheme.bodySmall.copyWith(
+            //             fontFamily: 'monospace',
+            //             color: Colors.grey[600],
+            //           ),
+            //         ),
+            //       ] else
+            //         Text(
+            //           'No coordinates saved',
+            //           style: AppTextTheme.bodySmall.copyWith(color: Colors.red),
+            //         ),
+            //     ],
+            //   ),
+            // ),
 
             // Action buttons replaced with PopupMenuButton
             Row(

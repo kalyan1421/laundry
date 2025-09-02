@@ -12,6 +12,8 @@ class BannerService {
           .get();
 
       return bannerSnapshot.docs.map((doc) {
+        // Debug logging to check Firestore data
+        print('Firestore Banner Doc Data: ${doc.data()}');
         return BannerModel.fromFirestore(doc);
       }).toList();
     } catch (e) {

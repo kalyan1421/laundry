@@ -474,10 +474,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ),
               ],
             ),
-            SizedBox(
-              width: double.maxFinite,
-              // height: 300,
-              child: StatusStepper(statusHistory: _order!.statusHistory),
+            // SizedBox(
+            //   width: double.maxFinite,
+            //   // height: 300,
+            //   child: StatusStepper(statusHistory: _order!.statusHistory),
 
               // _order!.statusHistory.isEmpty
               //     ? const Center(child: Text('No status history available'))
@@ -509,7 +509,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               //         );
               //       },
               //     ),
-            ),
+            // ),
           ],
         ),
       ),
@@ -1757,7 +1757,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // Fixed order reassignment in OrderDetailsScreen
+  // Enhanced order reassignment with delivery collection cleanup
   Future<void> _assignDeliveryPerson(DocumentSnapshot deliveryPersonDoc) async {
     Navigator.pop(context); // Close dialog
     setState(() => _isUpdating = true);
@@ -1771,6 +1771,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       print('🚚 📋 Reassigning order ${widget.orderId}');
       print('🚚 📋 From: $previousDeliveryPartner');
       print('🚚 📋 To: $newDeliveryPartnerId (${person['name']})');
+
+      // Use batch for atomic operations
+      final batch = _firestore.batch();
 
       // Prepare the update data - Using assignedDeliveryPerson as primary field
       Map<String, dynamic> updateData = {
@@ -1826,13 +1829,86 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
       updateData['statusHistory'] = FieldValue.arrayUnion([statusHistoryEntry]);
 
-      // Perform the update
-      await _firestore
-          .collection('orders')
-          .doc(widget.orderId)
-          .update(updateData);
+      // 1. Update the order document
+      batch.update(
+        _firestore.collection('orders').doc(widget.orderId),
+        updateData,
+      );
 
-      print('🚚 ✅ Order reassignment completed successfully');
+      // 2. Clean up previous delivery partner's records (if reassignment)
+      if (previousDeliveryPartner != 'none' && 
+          previousDeliveryPartner.isNotEmpty &&
+          previousDeliveryPartner != newDeliveryPartnerId) {
+        
+        print('🚚 🧹 Cleaning up previous delivery partner records: $previousDeliveryPartner');
+        
+        // Remove order from previous partner's currentOrders array
+        batch.update(
+          _firestore.collection('delivery').doc(previousDeliveryPartner),
+          {
+            'currentOrders': FieldValue.arrayRemove([widget.orderId]),
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        );
+
+        // Delete the assigned_orders subcollection document
+        batch.delete(
+          _firestore
+              .collection('delivery')
+              .doc(previousDeliveryPartner)
+              .collection('assigned_orders')
+              .doc(widget.orderId),
+        );
+      }
+
+      // 3. Add order to new delivery partner's records
+      // Get order details for the assignment record
+      final orderData = _order!.toMap();
+      
+      // Add order to new partner's currentOrders array
+      batch.update(
+        _firestore.collection('delivery').doc(newDeliveryPartnerId),
+        {
+          'currentOrders': FieldValue.arrayUnion([widget.orderId]),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      );
+
+      // Create detailed order assignment record for new delivery partner
+      batch.set(
+        _firestore
+            .collection('delivery')
+            .doc(newDeliveryPartnerId)
+            .collection('assigned_orders')
+            .doc(widget.orderId),
+        {
+          'orderId': widget.orderId,
+          'assignedAt': FieldValue.serverTimestamp(),
+          'status': 'assigned',
+          'orderDetails': {
+            'customerName': orderData['customerName'] ?? _customerDetails?['name'] ?? 'Unknown',
+            'customerPhone': orderData['customerPhone'] ?? _customerDetails?['phoneNumber'] ?? '',
+            'pickupAddress': _getPickupAddressString(orderData),
+            'deliveryAddress': _order!.displayDeliveryAddress,
+            'totalAmount': orderData['totalAmount'] ?? _order!.totalAmount,
+            'items': orderData['items'] ?? _order!.items.map((item) => item.toMap()).toList(),
+            'specialInstructions': orderData['specialInstructions'] ?? _order!.specialInstructions ?? '',
+            'orderType': orderData['orderType'] ?? 'pickup_delivery',
+            'serviceType': orderData['serviceType'] ?? _order!.serviceType ?? 'laundry',
+            'priority': orderData['priority'] ?? 'normal',
+            'orderNumber': orderData['orderNumber'] ?? _order!.orderNumber ?? widget.orderId,
+            'createdAt': orderData['createdAt'] ?? _order!.createdAt,
+            'pickupDate': orderData['pickupDate'] ?? _order!.pickupDate,
+            'deliveryDate': orderData['deliveryDate'] ?? _order!.deliveryDate,
+            'paymentMethod': orderData['paymentMethod'] ?? _order!.paymentMethod ?? 'cod',
+          },
+        },
+      );
+
+      // Commit all changes atomically
+      await batch.commit();
+
+      print('🚚 ✅ Order reassignment and delivery collection cleanup completed successfully');
 
       // Send notification to NEW delivery person
       await _sendNotificationToDeliveryPerson(
@@ -2067,6 +2143,50 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         '🚚 ❌ Error sending reassignment notification to previous partner: $e',
       );
     }
+  }
+
+  // Helper method to get pickup address string from order data
+  String _getPickupAddressString(Map<String, dynamic> orderData) {
+    try {
+      // Check if pickupAddress is a map (new structure)
+      if (orderData['pickupAddress'] is Map<String, dynamic>) {
+        final pickupAddressMap = orderData['pickupAddress'] as Map<String, dynamic>;
+        return pickupAddressMap['formatted'] ?? 
+               _formatAddressFromDetails(pickupAddressMap['details']) ??
+               'Pickup address not available';
+      }
+      // Check if it's a string (legacy structure)
+      else if (orderData['pickupAddress'] is String) {
+        return orderData['pickupAddress'] as String;
+      }
+      // Fall back to order model's pickup address
+      else {
+        return _order!.pickupAddress;
+      }
+    } catch (e) {
+      print('Error getting pickup address: $e');
+      return _order!.pickupAddress;
+    }
+  }
+
+  // Helper method to format address from details
+  String? _formatAddressFromDetails(Map<String, dynamic>? details) {
+    if (details == null) return null;
+    
+    List<String> parts = [];
+    if (details['doorNumber'] != null) parts.add('Door: ${details['doorNumber']}');
+    if (details['floorNumber'] != null) parts.add('Floor: ${details['floorNumber']}');
+    if (details['apartmentName'] != null) parts.add(details['apartmentName']);
+    if (details['addressLine1'] != null) parts.add(details['addressLine1']);
+    if (details['addressLine2'] != null && details['addressLine2'].toString().isNotEmpty) {
+      parts.add(details['addressLine2']);
+    }
+    if (details['landmark'] != null) parts.add('Near ${details['landmark']}');
+    if (details['city'] != null) parts.add(details['city']);
+    if (details['state'] != null) parts.add(details['state']);
+    if (details['pincode'] != null) parts.add(details['pincode']);
+    
+    return parts.isNotEmpty ? parts.join(', ') : null;
   }
 
   void _showStatusHistoryDialog() {
@@ -2325,18 +2445,59 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 }
 
-class StatusStepper extends StatelessWidget {
+class StatusStepper extends StatefulWidget {
   final List<Map<String, dynamic>> statusHistory;
 
   const StatusStepper({Key? key, required this.statusHistory})
     : super(key: key);
 
+  @override
+  State<StatusStepper> createState() => _StatusStepperState();
+}
+
+class _StatusStepperState extends State<StatusStepper> {
+  late List<Map<String, dynamic>> _stableStatusHistory;
+
+  @override
+  void initState() {
+    super.initState();
+    _stableStatusHistory = List.from(widget.statusHistory);
+  }
+
+  @override
+  void didUpdateWidget(StatusStepper oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only update if the history length has actually changed significantly
+    if (widget.statusHistory.length != _stableStatusHistory.length) {
+      // Rebuild the widget tree entirely to avoid stepper assertion
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _stableStatusHistory = List.from(widget.statusHistory);
+          });
+        }
+      });
+    } else {
+      // Safe to update without changing step count
+      _stableStatusHistory = List.from(widget.statusHistory);
+    }
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case "pending":
         return Colors.orange;
+      case "assigned":
+        return Colors.purple;
+      case "picked_up":
+        return Colors.teal;
       case "processing":
         return Colors.blue;
+      case "ready_for_delivery":
+        return Colors.amber[700]!;
+      case "out_for_delivery":
+        return Colors.deepOrange;
+      case "delivered":
       case "completed":
         return Colors.green;
       case "cancelled":
@@ -2348,35 +2509,78 @@ class StatusStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stepper(
-      physics: const NeverScrollableScrollPhysics(),
-      currentStep: statusHistory.length - 1, // highlight latest step
-      controlsBuilder:
-          (context, details) =>
-              const SizedBox.shrink(), // hide next/back buttons
-      steps:
-          statusHistory.map((history) {
-            String status = (history['status'] ?? 'Unknown').toString();
-            Timestamp? ts = history['timestamp'] as Timestamp?;
-            String formattedTime =
-                ts != null
-                    ? DateFormat('MMM d, yyyy • h:mm a').format(ts.toDate())
-                    : "No timestamp";
+    if (_stableStatusHistory.isEmpty) {
+      return const Center(
+        child: Text(
+          'No status history available',
+          style: TextStyle(color: Colors.grey),
+        ),
+      );
+    }
 
-            return Step(
-              isActive: true,
-              state: StepState.complete,
-              title: Text(
-                status.toUpperCase(),
-                style: TextStyle(
-                  color: _getStatusColor(status),
-                  fontWeight: FontWeight.bold,
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _stableStatusHistory.length,
+      itemBuilder: (context, index) {
+        final history = _stableStatusHistory[index];
+        String status = (history['status'] ?? 'Unknown').toString();
+        Timestamp? ts = history['timestamp'] as Timestamp?;
+        String formattedTime = ts != null
+            ? DateFormat('MMM d, yyyy • h:mm a').format(ts.toDate())
+            : "No timestamp";
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _getStatusColor(status).withOpacity(0.1),
+            border: Border(
+              left: BorderSide(
+                color: _getStatusColor(status),
+                width: 4,
+              ),
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.circle,
+                color: _getStatusColor(status),
+                size: 12,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      status.replaceAll('_', ' ').toUpperCase(),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _getStatusColor(status),
+                      ),
+                    ),
+                    Text(
+                      formattedTime,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    if (history['description'] != null)
+                      Text(
+                        history['description'].toString(),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                  ],
                 ),
               ),
-              subtitle: Text(formattedTime),
-              content: const SizedBox.shrink(), // we don’t need extra content
-            );
-          }).toList(),
+            ],
+          ),
+        );
+      },
     );
   }
 }

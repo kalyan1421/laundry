@@ -9,6 +9,8 @@ import '../../services/delivery_partner_service.dart';
 import '../../services/customer_deletion_service.dart';
 import '../../utils/phone_formatter.dart';
 import 'customer_detail_screen.dart';
+import 'add_customer_screen.dart';
+import 'place_order_for_customer_screen.dart';
 
 class ManageClientsScreen extends StatefulWidget {
   final String? roleFilter;
@@ -131,12 +133,36 @@ class _ManageClientsScreenState extends State<ManageClientsScreen> {
     }
   }
 
+  Future<void> _navigateToAddCustomer(BuildContext context) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AddCustomerScreen(),
+      ),
+    );
+
+    if (result == true) {
+      // Refresh the user list after adding a customer
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      userProvider.refreshUsers();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
     final deliveryPartnerService = DeliveryPartnerService(); // Add this line
 
     return Scaffold(
+      floatingActionButton: widget.roleFilter == 'customer'
+          ? FloatingActionButton.extended(
+              onPressed: () => _navigateToAddCustomer(context),
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.person_add_rounded),
+              label: const Text('Add Customer'),
+            )
+          : null,
       body: Column(
         children: [
           // Search Bar
@@ -400,6 +426,42 @@ class SimplifiedUserCard extends StatelessWidget {
     }
   }
 
+  void _navigateToPlaceOrder(BuildContext context, UserModel user) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PlaceOrderForCustomerScreen(customer: user),
+      ),
+    );
+    if (result == true) {
+      // Order was placed successfully
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order placed successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  static void navigateToPlaceOrder(BuildContext context, UserModel user) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PlaceOrderForCustomerScreen(customer: user),
+      ),
+    );
+    if (result == true) {
+      // Order was placed successfully
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order placed successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     
@@ -514,6 +576,9 @@ class SimplifiedUserCard extends StatelessWidget {
                       case 'details':
                         _showUserDetails(context);
                         break;
+                      case 'place_order':
+                        _navigateToPlaceOrder(context, user);
+                        break;
                       case 'delete':
                         _showDeleteCustomerDialog(context, user);
                         break;
@@ -537,6 +602,16 @@ class SimplifiedUserCard extends StatelessWidget {
                           Icon(Icons.visibility, size: 16, color: Colors.green),
                           SizedBox(width: 8),
                           Text('View Details'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'place_order',
+                      child: Row(
+                        children: [
+                          Icon(Icons.shopping_cart_outlined, size: 16, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text('Place Order'),
                         ],
                       ),
                     ),
@@ -773,6 +848,22 @@ class UserDetailsDialog extends StatelessWidget {
                         label: const Text('Download PDF'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          SimplifiedUserCard.navigateToPlaceOrder(context, user);
+                        },
+                        icon: const Icon(Icons.shopping_cart_rounded),
+                        label: const Text('Place Order'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,
                         ),
                       ),

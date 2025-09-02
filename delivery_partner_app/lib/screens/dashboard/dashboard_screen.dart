@@ -2,12 +2,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/delivery_partner_model.dart';
 import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../tasks/task_detail_screen.dart';
+import '../../widgets/custom_bottom_navigation.dart';
 
 class DashboardScreen extends StatefulWidget {
   final DeliveryPartnerModel deliveryPartner;
@@ -49,8 +49,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: _buildAppBar(),
+      backgroundColor: Colors.white,
       body: RefreshIndicator(
         onRefresh: () async {
           print('🚚 🔄 Dashboard: Manual refresh triggered');
@@ -82,26 +81,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
           }
         },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            children: [
-              // Header with greeting and stats
-              _buildHeader(),
-              
-              // Quick stats cards
-              _buildStatsCards(),
-              
-              // Today's tasks section
-              _buildTodaysTasks(),
-              
-              // Tab bar for pickups/deliveries
-              _buildTabBar(),
-              
-              // Task list based on selected tab
-              _buildTaskList(),
-            ],
-          ),
+        child: Column(
+          children: [
+            // Custom header without AppBar
+            _buildModernHeader(),
+            
+            // Content section
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    // Today's stats cards
+                    _buildTodayStats(),
+                    
+                    // Today's schedule section
+                    _buildTodaysSchedule(),
+                    
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
+            
+            // Enhanced Bottom navigation
+            EnhancedBottomNavigation(
+              currentIndex: 0,
+              deliveryPartner: widget.deliveryPartner,
+            ),
+          ],
         ),
       ),
     );
@@ -179,58 +187,89 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildHeader() {
-    final currentHour = DateTime.now().hour;
-    String greeting = 'Good Morning';
-    if (currentHour >= 12 && currentHour < 17) {
-      greeting = 'Good Afternoon';
-    } else if (currentHour >= 17) {
-      greeting = 'Good Evening';
-    }
-
+  Widget _buildModernHeader() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
+          colors: [Color(0xFF87CEEB), Color(0xFFB8E6FF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
+        ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$greeting,',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
-              fontFamily: 'SFProDisplay',
-            ),
+          // Top row with logo and notifications
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.iron,
+                    color: Color(0xFF1E3A8A),
+                    size: 24,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Cloud Ironing Factory',
+                    style: TextStyle(
+                      color: Color(0xFF1E3A8A),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'SFProDisplay',
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.notifications_outlined,
+                  color: Color(0xFF1E3A8A),
+                  size: 20,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            widget.deliveryPartner.name,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'SFProDisplay',
-            ),
-          ),
-          const SizedBox(height: 12),
+          
+          const SizedBox(height: 30),
+          
+          // Profile section
           Row(
             children: [
-              _buildHeaderStat(
-                'Today Completed',
-                _stats['todayCompleted']?.toString() ?? '0',
-                Icons.check_circle_outline,
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Icon(
+                  Icons.person,
+                  color: Color(0xFF1E3A8A),
+                  size: 30,
+                ),
               ),
-              const SizedBox(width: 24),
-              _buildHeaderStat(
-                'Pending',
-                _stats['todayPending']?.toString() ?? '0',
-                Icons.access_time,
+              SizedBox(width: 20),
+              Expanded(
+                child: Text(
+                  widget.deliveryPartner.name,
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'SFProDisplay',
+                  ),
+                ),
               ),
             ],
           ),
@@ -274,29 +313,94 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatsCards() {
+  Widget _buildTodayStats() {
     return Container(
       padding: const EdgeInsets.all(20),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: _buildStatCard(
-              'This Week',
-              _stats['weekCompleted']?.toString() ?? '0',
-              'Completed',
-              Colors.green,
-              Icons.trending_up,
+          Text(
+            'Today',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+              fontFamily: 'SFProDisplay',
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildStatCard(
-              'This Month',
-              _stats['monthCompleted']?.toString() ?? '0',
-              'Completed',
-              Colors.blue,
-              Icons.calendar_month,
-            ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Color(0xFFE8F5E8),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Color(0xFFC8E6C9), width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Completed\nOrders',
+                        style: TextStyle(
+                          color: Color(0xFF2E7D32),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'SFProDisplay',
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        _stats['todayCompleted']?.toString() ?? '20',
+                        style: TextStyle(
+                          color: Color(0xFF2E7D32),
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'SFProDisplay',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Color(0xFFFFE082), width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Pending\nOrders',
+                        style: TextStyle(
+                          color: Color(0xFFF57F17),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'SFProDisplay',
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        _stats['todayPending']?.toString() ?? '5',
+                        style: TextStyle(
+                          color: Color(0xFFF57F17),
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'SFProDisplay',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -361,17 +465,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildTodaysTasks() {
+  Widget _buildTodaysSchedule() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
             offset: const Offset(0, 4),
           ),
         ],
@@ -383,29 +487,103 @@ class _DashboardScreenState extends State<DashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Today\'s Schedule',
+                'Today \'s Schedule',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'SFProDisplay',
+                  color: Colors.black,
                 ),
               ),
               Text(
-                DateFormat('MMM dd, yyyy').format(DateTime.now()),
+                DateFormat('dd MMM yyyy').format(DateTime.now()),
                 style: const TextStyle(
-                  color: Colors.grey,
+                  color: Color(0xFF9E9E9E),
                   fontSize: 14,
                   fontFamily: 'SFProDisplay',
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          
+          // Tab buttons for Pickups/Deliveries
+          Container(
+            decoration: BoxDecoration(
+              color: Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedTabIndex = 0;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedTabIndex == 0 ? Color(0xFF1E3A8A) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Pickups',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _selectedTabIndex == 0 ? Colors.white : Color(0xFF9E9E9E),
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'SFProDisplay',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedTabIndex = 1;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedTabIndex == 1 ? Color(0xFF1E3A8A) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Deliveries',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _selectedTabIndex == 1 ? Colors.white : Color(0xFF9E9E9E),
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'SFProDisplay',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Orders list
           StreamBuilder<List<OrderModel>>(
-            stream: context.read<OrderProvider>().getTodayTasksStream(widget.deliveryPartner.id),
+            stream: _selectedTabIndex == 0
+                ? context.read<OrderProvider>().getPickupTasksStream(widget.deliveryPartner.id)
+                : context.read<OrderProvider>().getDeliveryTasksStream(widget.deliveryPartner.id),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
               }
               
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -413,9 +591,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Padding(
                     padding: EdgeInsets.all(20),
                     child: Text(
-                      'No tasks scheduled for today',
+                      'No tasks scheduled',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: Color(0xFF9E9E9E),
                         fontFamily: 'SFProDisplay',
                       ),
                     ),
@@ -425,7 +603,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               
               return Column(
                 children: snapshot.data!.take(3).map((order) {
-                  return _buildTodayTaskItem(order);
+                  return _buildModernTaskItem(order);
                 }).toList(),
               );
             },
@@ -435,65 +613,75 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildTodayTaskItem(OrderModel order) {
-    bool isPickup = order.status == 'confirmed' || order.status == 'ready_for_pickup';
+  Widget _buildModernTaskItem(OrderModel order) {
+    // Match the same statuses used in OrderProvider.getPickupTasksStream
+    final pickupStatuses = ['assigned', 'confirmed', 'ready_for_pickup'];
+    bool isPickup = pickupStatuses.contains(order.status);
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isPickup ? Colors.orange[100] : Colors.green[100],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              isPickup ? Icons.arrow_upward : Icons.arrow_downward,
-              color: isPickup ? Colors.orange[700] : Colors.green[700],
-              size: 16,
-            ),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TaskDetailScreen(order: order),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  order.orderNumber ?? 'N/A',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    fontFamily: 'SFProDisplay',
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Color(0xFFFAFAFA),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Color(0xFFE0E0E0), width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isPickup ? Color(0xFFFFF3E0) : Color(0xFFE8F5E8),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                isPickup ? Icons.north_east : Icons.south_east,
+                color: isPickup ? Color(0xFFFF8F00) : Color(0xFF4CAF50),
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    order.orderNumber ?? 'N/A',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      fontFamily: 'SFProDisplay',
+                      color: Colors.black,
+                    ),
                   ),
-                ),
-                Text(
-                  isPickup ? 'Pickup' : 'Delivery',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                    fontFamily: 'SFProDisplay',
+                  const SizedBox(height: 4),
+                  Text(
+                    '${isPickup ? 'Pickup' : 'Delivery'} Assigned',
+                    style: const TextStyle(
+                      color: Color(0xFF9E9E9E),
+                      fontSize: 14,
+                      fontFamily: 'SFProDisplay',
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Text(
-            order.status.replaceAll('_', ' ').toUpperCase(),
-            style: TextStyle(
-              color: isPickup ? Colors.orange[700] : Colors.green[700],
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'SFProDisplay',
+            Icon(
+              Icons.chevron_right,
+              color: Color(0xFF9E9E9E),
+              size: 20,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -741,6 +929,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+
 
 
 } 

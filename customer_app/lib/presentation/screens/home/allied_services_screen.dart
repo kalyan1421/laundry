@@ -127,19 +127,19 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
           'Allied Services',
           style: TextStyle(
             color: context.onBackgroundColor,
-            fontSize: 18,
+            fontSize: 22,
             fontWeight: FontWeight.w600,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black),
-            onPressed: () {
-              Provider.of<AlliedServiceProvider>(context, listen: false)
-                  .refreshServices();
-            },
-          ),
-        ],
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.refresh, color: Colors.black),
+        //     onPressed: () {
+        //       Provider.of<AlliedServiceProvider>(context, listen: false)
+        //           .refreshServices();
+        //     },
+        //   ),
+        // ],
       ),
       body: Consumer<AlliedServiceProvider>(
         builder: (context, alliedServiceProvider, child) {
@@ -219,290 +219,242 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header Section
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.blue.shade50,
-                        Colors.white,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade100),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.home_repair_service,
-                            color: Colors.blue.shade600,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Additional Services',
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: context.onInverseSurface,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Professional washing and care for your bedding and special stain removal',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
+                // // Header Section
+                // Container(
+                //   width: double.infinity,
+                //   padding: const EdgeInsets.all(20),
+                //   decoration: BoxDecoration(
+                //     gradient: LinearGradient(
+                //       begin: Alignment.topLeft,
+                //       end: Alignment.bottomRight,
+                //       colors: [
+                //         Colors.blue.shade50,
+                //         Colors.white,
+                //       ],
+                //     ),
+                //     borderRadius: BorderRadius.circular(12),
+                //     border: Border.all(color: Colors.blue.shade100),
+                //   ),
+                //   child: Column(
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Row(
+                //         children: [
+                //           Icon(
+                //             Icons.home_repair_service,
+                //             color: Colors.blue.shade600,
+                //             size: 28,
+                //           ),
+                //           const SizedBox(width: 12),
+                //           Text(
+                //             'Additional Services',
+                //             style: TextStyle(
+                //               fontSize: 20,
+                //               color: context.onInverseSurface,
+                //               fontWeight: FontWeight.bold,
+                //             ),
+                //           ),
+                //         ],
+                //       ),
+                //       const SizedBox(height: 8),
+                //       Text(
+                //         'Professional washing and care for your bedding and special stain removal',
+                //         style: TextStyle(
+                //           color: Colors.grey[600],
+                //           fontSize: 14,
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                // ),
 
                 // Services List
-                const Text(
-                  'Available Services',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 16),
+                // const Text(
+                //   'Available Services',
+                //   style: TextStyle(
+                //     fontSize: 18,
+                //     fontWeight: FontWeight.bold,
+                //   ),
+                // ),
 
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
                   itemCount: services.length,
                   itemBuilder: (context, index) {
                     final service = services[index];
                     final quantity = serviceQuantities[service.id] ?? 0;
 
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: context.surfaceColor,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: context.outlineVariant),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 1,
-                            blurRadius: 4,
+                            color: context.shadowColor.withOpacity(0.1),
+                            blurRadius: 10,
                             offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                // Service Image or Icon
-                                Container(
-                                  width: 60,
-                                  height: 60,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    color: Colors.blue.withOpacity(0.1),
-                                  ),
-                                  child: service.imageUrl != null
-                                      ? ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          child: CachedNetworkImage(
-                                            imageUrl: service.imageUrl!,
-                                            fit: BoxFit.cover,
-                                            placeholder: (context, url) =>
-                                                const Center(
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            ),
-                                            errorWidget:
-                                                (context, url, error) => Icon(
-                                              Icons.local_laundry_service,
-                                              color: Colors.blue.shade600,
-                                              size: 24,
-                                            ),
-                                          ),
-                                        )
-                                      : Icon(
-                                          Icons.local_laundry_service,
-                                          color: Colors.blue.shade600,
-                                          size: 24,
-                                        ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              service.name,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                          ),
-                                          if (service.hasOffer)
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                horizontal: 6,
-                                                vertical: 2,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.red.shade100,
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                '${service.discountPercentage.toInt()}% OFF',
-                                                style: TextStyle(
-                                                  color: Colors.red.shade700,
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        service.description,
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 14,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      if (service.hasPrice)
-                                        Row(
-                                          children: [
-                                            if (service.hasOffer) ...[
-                                              Text(
-                                                '₹${service.price.toInt()}',
-                                                style: TextStyle(
-                                                  color: Colors.grey[500],
-                                                  fontSize: 12,
-                                                  decoration: TextDecoration
-                                                      .lineThrough,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 6),
-                                            ],
-                                            Text(
-                                              '₹${service.effectivePrice.toInt()} per ${service.unit}',
-                                              style: TextStyle(
-                                                color: Colors.green[600],
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        )
-                                      else
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Colors.orange.withOpacity(0.1),
-                                            borderRadius:
-                                                BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            'Quote after inspection',
-                                            style: TextStyle(
-                                              color: Colors.orange[700],
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                // Quantity Controls
-                                Container(
-                                  decoration: BoxDecoration(
-                                    border:
-                                        Border.all(color: Colors.grey[300]!),
+                      child: Row(
+                        children: [
+                          // Service Image or Icon - smaller size to match ironing items
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: context.surfaceVariant,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: service.imageUrl != null
+                                ? ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
+                                    child: CachedNetworkImage(
+                                      imageUrl: service.imageUrl!,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (context, url, error) => Icon(
+                                        Icons.local_laundry_service,
+                                        color: context.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.local_laundry_service,
+                                    color: context.onSurfaceVariant,
                                   ),
-                                  child: Row(
-                                    children: [
-                                      IconButton(
-                                        onPressed: quantity > 0
-                                            ? () =>
-                                                _decrementQuantity(service.id)
-                                            : null,
-                                        icon: Icon(
-                                          Icons.remove,
-                                          color: quantity > 0
-                                              ? Colors.grey[600]
-                                              : Colors.grey[300],
-                                          size: 20,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        service.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
                                         ),
                                       ),
+                                    ),
+                                    // Offer badge - same as regular items
+                                    if (service.offerPrice != null && service.originalPrice != null && service.originalPrice! > service.offerPrice!)
                                       Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
+                                        margin: const EdgeInsets.only(left: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.shade100,
+                                          borderRadius: BorderRadius.circular(4),
                                         ),
                                         child: Text(
-                                          '$quantity',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 16,
+                                          '${(((service.originalPrice! - service.offerPrice!) / service.originalPrice!) * 100).toInt()}% OFF',
+                                          style: TextStyle(
+                                            color: Colors.red.shade700,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                       ),
-                                      IconButton(
-                                        onPressed: () =>
-                                            _incrementQuantity(service.id),
-                                        icon: Container(
-                                          padding: const EdgeInsets.all(2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue,
-                                            borderRadius:
-                                                BorderRadius.circular(4),
-                                          ),
-                                          child: const Icon(
-                                            Icons.add,
-                                            color: Colors.white,
-                                            size: 16,
-                                          ),
+                                  ],
+                                ),
+                                // Price display with original and offer prices (exactly matching regular items)
+                                Row(
+                                  children: [
+                                    // Original Price (strikethrough) - Show first if there's an offer
+                                    if (service.originalPrice != null &&
+                                        service.originalPrice! >
+                                            (service.offerPrice ?? service.price))
+                                      Text(
+                                        '₹${service.originalPrice!.toInt()}',
+                                        style: TextStyle(
+                                          decoration: TextDecoration.lineThrough,
+                                          color: context.onSurfaceVariant,
+                                          fontSize: 12,
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    // Add spacing between original and offer price
+                                    if (service.originalPrice != null &&
+                                        service.originalPrice! >
+                                            (service.offerPrice ?? service.price))
+                                      const SizedBox(width: 8),
+                                    // Current/Offer Price
+                                    if (service.hasPrice)
+                                      Text(
+                                        '₹${(service.offerPrice ?? service.price).toInt()} per ${service.unit}',
+                                        style: TextStyle(
+                                          color: service.offerPrice != null
+                                              ? Theme.of(context).colorScheme.tertiary
+                                              : context.onSurfaceVariant,
+                                          fontSize: 14,
+                                          fontWeight: service.offerPrice != null
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
+                                        ),
+                                      )
+                                    else
+                                      Text(
+                                        'Quote after inspection',
+                                        style: TextStyle(
+                                          color: Colors.orange[700],
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                          // Quantity Controls matching ironing items design
+                          Row(
+                            children: [
+                              IconButton(
+                                onPressed: quantity > 0
+                                    ? () => _decrementQuantity(service.id)
+                                    : null,
+                                icon: Icon(
+                                  Icons.remove,
+                                  color: quantity > 0
+                                      ? context.onSurfaceVariant
+                                      : context.outlineVariant,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
+                                child: Text(
+                                  '$quantity',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => _incrementQuantity(service.id),
+                                icon: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.add,
+                                    color: Theme.of(context).colorScheme.onPrimary,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -511,44 +463,44 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                 const SizedBox(height: 24),
 
                 // Important Notes
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.info, color: Colors.amber[700], size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Important Notes',
-                            style: TextStyle(
-                              color: Colors.amber[700],
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '• Stain removal pricing depends on stain type and fabric\n'
-                        '• Final quote will be provided after inspection\n'
-                        '• All items are handled with professional care\n'
-                        '• Pickup and delivery included in service',
-                        style: TextStyle(
-                          color: Colors.amber[700],
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // Container(
+                //   padding: const EdgeInsets.all(16),
+                //   decoration: BoxDecoration(
+                //     color: Colors.amber.withOpacity(0.1),
+                //     borderRadius: BorderRadius.circular(8),
+                //     border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                //   ),
+                //   child: Column(
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Row(
+                //         children: [
+                //           Icon(Icons.info, color: Colors.amber[700], size: 20),
+                //           const SizedBox(width: 8),
+                //           Text(
+                //             'Important Notes',
+                //             style: TextStyle(
+                //               color: Colors.amber[700],
+                //               fontWeight: FontWeight.w600,
+                //               fontSize: 14,
+                //             ),
+                //           ),
+                //         ],
+                //       ),
+                //       const SizedBox(height: 8),
+                //       Text(
+                //         '• Stain removal pricing depends on stain type and fabric\n'
+                //         '• Final quote will be provided after inspection\n'
+                //         '• All items are handled with professional care\n'
+                //         '• Pickup and delivery included in service',
+                //         style: TextStyle(
+                //           color: Colors.amber[700],
+                //           fontSize: 12,
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                // ),
 
                 const SizedBox(height: 24),
 
@@ -568,10 +520,12 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
       padding: const EdgeInsets.only(bottom: 50),
       child: Container(
         decoration: BoxDecoration(
-          color: context.surfaceColor,
+          color: context.backgroundColor,
+            borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.outlineVariant),
           boxShadow: [
             BoxShadow(
-              color: context.shadowColor,
+              color: context.shadowColor.withOpacity(0.1),
               spreadRadius: 0,
               blurRadius: 10,
               offset: const Offset(0, -2),
@@ -580,6 +534,10 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
         ),
         child: SafeArea(
           child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.outlineVariant),
+            ),
             padding:
                 const EdgeInsets.fromLTRB(16, 16, 16, 20), // 20px from bottom
             child: Column(

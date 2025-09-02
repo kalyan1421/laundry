@@ -165,7 +165,7 @@ class VersionControlSetup {
     
     // Initialize version control
     await initializeVersionControl(
-      currentVersion: '1.4.0',
+      currentVersion: '1.6.0',
       currentBuildNumber: 15,
     );
     
@@ -174,7 +174,7 @@ class VersionControlSetup {
     
     // Set latest version (optional update)
     await setLatestVersion(
-      latestVersion: '1.5.0',
+      latestVersion: '1.6.0',
       latestBuildNumber: 16,
       updateMessage: 'New features: Enhanced UI and better performance!',
     );

@@ -555,10 +555,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                 });
               }
             },
-            // Enable SMS autofill
-            androidSmsAutofillMethod:
-                AndroidSmsAutofillMethod.smsUserConsentApi,
-            listenForMultipleSmsOnAndroid: true,
           ),
         ),
 

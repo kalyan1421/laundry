@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; // For date formatting
-// Import for OrderDetailsScreen - will create this file later
+// Import for OrderDetailsScreen and OrderTrackingScreen
 import 'package:customer_app/presentation/screens/orders/order_details_screen.dart';
+import 'package:customer_app/presentation/screens/orders/order_tracking_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -20,6 +21,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Stream<List<OrderModel>>? _ordersStream;
+  String _selectedFilter = 'All'; // All, Ironing, Alien, Laundry, Mixed
 
   @override
   void initState() {
@@ -123,6 +125,91 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
+  IconData _getServiceIcon(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('ironing')) {
+      return Icons.iron;
+    } else if (type.contains('alien')) {
+      return Icons.space_dashboard;
+    } else if (type.contains('mixed')) {
+      return Icons.miscellaneous_services;
+    } else {
+      return Icons.local_laundry_service_outlined;
+    }
+  }
+
+  Color _getServiceColor(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('ironing')) {
+      return Colors.orange[600]!;
+    } else if (type.contains('alien')) {
+      return Colors.green[600]!;
+    } else if (type.contains('mixed')) {
+      return Colors.purple[600]!;
+    } else {
+      return Colors.blue[600]!;
+    }
+  }
+
+  Widget _buildFilterChips() {
+    final filters = ['All', 'Ironing', 'Laundry'];
+    
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: filters.length,
+        itemBuilder: (context, index) {
+          final filter = filters[index];
+          final isSelected = _selectedFilter == filter;
+          
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(filter),
+              selected: isSelected,
+              onSelected: (selected) {
+                setState(() {
+                  _selectedFilter = filter;
+                });
+              },
+              backgroundColor: Colors.grey[100],
+              selectedColor: const Color(0xFF0F3057).withOpacity(0.15),
+              checkmarkColor: const Color(0xFF0F3057),
+              labelStyle: TextStyle(
+                color: isSelected ? const Color(0xFF0F3057) : Colors.grey[700],
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  List<OrderModel> _filterOrders(List<OrderModel> orders) {
+    if (_selectedFilter == 'All') return orders;
+    
+    return orders.where((order) {
+      switch (_selectedFilter) {
+        case 'Ironing':
+          return order.serviceType.toLowerCase().contains('ironing') && 
+                 !order.serviceType.toLowerCase().contains('mixed');
+        case 'Alien':
+          return order.serviceType.toLowerCase().contains('alien') && 
+                 !order.serviceType.toLowerCase().contains('mixed');
+        case 'Laundry':
+          return order.serviceType.toLowerCase().contains('laundry') && 
+                 !order.serviceType.toLowerCase().contains('mixed');
+        case 'Mixed':
+          return order.serviceType.toLowerCase().contains('mixed');
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
   Widget _buildOrderCard(OrderModel order) {
     // Using order.orderTimestamp for display, which maps to 'orderTimestamp' from Firestore
     String formattedDate =
@@ -153,8 +240,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.local_laundry_service_outlined,
-                    color: Colors.grey[600], size: 20),
+                Icon(_getServiceIcon(order.serviceType),
+                    color: _getServiceColor(order.serviceType), size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -191,19 +278,46 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       fontWeight: FontWeight.bold,
                       color: Colors.blueAccent),
                 ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => OrderDetailsScreen(order: order),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => OrderDetailsScreen(order: order),
+                          ),
+                        );
+                      },
+                      child: const Text('View Details',
+                          style: TextStyle(
+                              color: Colors.blueAccent,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        // Navigate to order tracking screen with the specific order
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => OrderTrackingScreen(order: order),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.track_changes, size: 16),
+                      label: const Text('Track'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F3057),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        textStyle: const TextStyle(fontSize: 12),
                       ),
-                    );
-                  },
-                  child: const Text('View Details',
-                      style: TextStyle(
-                          color: Colors.blueAccent,
-                          fontWeight: FontWeight.w600)),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -293,12 +407,48 @@ class _OrdersScreenState extends State<OrdersScreen> {
             );
           }
 
-          List<OrderModel> orders = snapshot.data!;
-          return ListView.builder(
-            itemCount: orders.length,
-            itemBuilder: (context, index) {
-              return _buildOrderCard(orders[index]);
-            },
+          List<OrderModel> allOrders = snapshot.data!;
+          List<OrderModel> filteredOrders = _filterOrders(allOrders);
+          
+          return Column(
+            children: [
+              _buildFilterChips(),
+              Expanded(
+                child: filteredOrders.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.filter_list_off,
+                                  size: 100, color: Colors.grey[400]),
+                              const SizedBox(height: 20),
+                              Text(
+                                'No ${_selectedFilter.toLowerCase()} orders',
+                                style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF0F3057)),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Try selecting a different filter or place a new order.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: filteredOrders.length,
+                        itemBuilder: (context, index) {
+                          return _buildOrderCard(filteredOrders[index]);
+                        },
+                      ),
+              ),
+            ],
           );
         },
       ),

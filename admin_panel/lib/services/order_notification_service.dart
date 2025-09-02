@@ -426,9 +426,9 @@ class OrderNotificationService {
                 }
               }
 
-              // Check for other changes
+              // Check for other changes (exclude assignment changes from admin notifications)
               final changes = _getChanges(oldData, data);
-              if (changes.isNotEmpty) {
+              if (changes.isNotEmpty && !_isAssignmentOnlyChange(changes)) {
                 await notifyAdminOfOrderEdit(
                   orderId: orderId,
                   orderNumber: orderNumber,
@@ -452,6 +452,45 @@ class OrderNotificationService {
     final createdAt = (timestamp as Timestamp).toDate();
     final now = DateTime.now();
     return now.difference(createdAt).inMinutes <= 5;
+  }
+
+  /// Helper method to check if changes are only assignment-related
+  static bool _isAssignmentOnlyChange(Map<String, dynamic> changes) {
+    // Assignment-related display names from _getChanges method
+    final assignmentFieldDisplayNames = {
+      'Assigned Delivery Person',
+      'Status', // Only when it's assignment-related
+    };
+    
+    // Assignment-related raw field names (fallback)
+    final assignmentRawFields = {
+      'assignedTo',
+      'assignedDeliveryPerson', 
+      'assignedDeliveryPersonName',
+      'assignedAt',
+      'assignedBy',
+      'isAcceptedByDeliveryPerson',
+      'statusHistory',
+      'updatedAt'
+    };
+    
+    // Check if all changes are assignment-related
+    bool isAssignmentOnly = changes.keys.every((key) => 
+      assignmentFieldDisplayNames.contains(key) || 
+      assignmentRawFields.contains(key)
+    );
+    
+    // Additional check: if status change is to 'assigned', it's assignment-related
+    if (changes.containsKey('Status') && changes['Status']?.toString() == 'assigned') {
+      // If only Status and assignment fields changed, it's assignment-only
+      final nonStatusChanges = Map.from(changes)..remove('Status');
+      if (nonStatusChanges.isEmpty || 
+          nonStatusChanges.keys.every((key) => assignmentFieldDisplayNames.contains(key))) {
+        return true;
+      }
+    }
+    
+    return isAssignmentOnly;
   }
 
   /// Helper method to get customer's FCM token
@@ -479,7 +518,7 @@ class OrderNotificationService {
   ) {
     final changes = <String, dynamic>{};
     
-    // Fields to check for changes
+    // Fields to check for changes (excluding assignment-related fields)
     final fieldsToCheck = {
       'totalAmount': 'Total Amount',
       'items': 'Items',
@@ -487,8 +526,7 @@ class OrderNotificationService {
       'pickupAddress': 'Pickup Address',
       'specialInstructions': 'Special Instructions',
       'paymentMethod': 'Payment Method',
-      'status': 'Status',
-      'assignedDeliveryPerson': 'Assigned Delivery Person',
+      // Note: 'status' and 'assignedDeliveryPerson' removed to prevent assignment notifications
     };
 
     for (var entry in fieldsToCheck.entries) {

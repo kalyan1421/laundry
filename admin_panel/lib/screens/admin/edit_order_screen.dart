@@ -47,15 +47,47 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
 
   Future<void> _fetchAvailableItems() async {
     try {
-      QuerySnapshot snapshot = await _firestore
+      // Fetch regular items
+      QuerySnapshot itemsSnapshot = await _firestore
           .collection('items')
           .where('isActive', isEqualTo: true)
           .orderBy('sortOrder')
           .get();
 
-      _availableItems = snapshot.docs
+      List<ItemModel> items = itemsSnapshot.docs
           .map((doc) => ItemModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
           .toList();
+
+      // Fetch allied services
+      QuerySnapshot alliedSnapshot = await _firestore
+          .collection('allied_services')
+          .where('isActive', isEqualTo: true)
+          .orderBy('sortOrder')
+          .get();
+
+      // Convert allied services to ItemModel format
+      List<ItemModel> alliedServices = alliedSnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return ItemModel(
+          id: doc.id,
+          name: data['name'] ?? '',
+          category: 'Allied Service',
+          price: (data['offerPrice'] ?? data['price'] ?? 0.0).toDouble(),
+          unit: data['unit'] ?? 'service',
+          isActive: data['isActive'] ?? true,
+          sortOrder: data['sortOrder'] ?? 0,
+          updatedAt: DateTime.now(),
+          imageUrl: data['imageUrl'],
+          originalPrice: data['originalPrice']?.toDouble(),
+          offerPrice: data['offerPrice']?.toDouble(),
+        );
+      }).toList();
+
+      // Combine all items
+      _availableItems = [...items, ...alliedServices];
+
+      // Filter items based on order service type
+      _availableItems = _filterItemsByServiceType(_availableItems);
 
       setState(() {
         _isLoading = false;
@@ -67,6 +99,51 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
       });
       _showErrorSnackBar('Failed to load items. Please try again.');
     }
+  }
+
+  List<ItemModel> _filterItemsByServiceType(List<ItemModel> allItems) {
+    final serviceType = widget.order.serviceType?.toLowerCase() ?? '';
+    
+    print('Admin Edit Order - Filtering for service type: "$serviceType"');
+    print('Total items available: ${allItems.length}');
+    
+    List<ItemModel> filteredItems;
+    
+    if (serviceType.contains('mixed')) {
+      // For mixed services, show all items
+      filteredItems = allItems;
+      print('Mixed service - showing all items');
+    } else if (serviceType.contains('ironing')) {
+      // For ironing services, show only ironing items
+      filteredItems = allItems.where((item) => 
+        item.category.toLowerCase().contains('iron') || 
+        item.category.toLowerCase() == 'ironing'
+      ).toList();
+      print('Ironing service - showing ${filteredItems.length} ironing items');
+    } else if (serviceType.contains('laundry')) {
+      // For laundry services, show only allied services
+      filteredItems = allItems.where((item) => 
+        item.category.toLowerCase() == 'allied service' ||
+        item.category.toLowerCase() == 'allied services'
+      ).toList();
+      print('Laundry service - showing ${filteredItems.length} allied service items');
+      for (var item in filteredItems) {
+        print('  - ${item.name} (${item.category})');
+      }
+    } else if (serviceType.contains('alien')) {
+      // For alien services, show only alien items
+      filteredItems = allItems.where((item) => 
+        item.category.toLowerCase().contains('alien') || 
+        item.category.toLowerCase() == 'alien'
+      ).toList();
+      print('Alien service - showing ${filteredItems.length} alien items');
+    } else {
+      // Default: show all items
+      filteredItems = allItems;
+      print('Default - showing all ${filteredItems.length} items');
+    }
+    
+    return filteredItems;
   }
 
   void _calculateTotal() {
@@ -262,13 +339,58 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Order Number
+                // Order Number and Service Type
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Order #${widget.order.orderNumber ?? widget.order.id.substring(0, 8)}',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    if (widget.order.serviceType != null && widget.order.serviceType!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _getServiceTypeColor(widget.order.serviceType!).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _getServiceTypeColor(widget.order.serviceType!),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getServiceTypeIcon(widget.order.serviceType!),
+                              size: 16,
+                              color: _getServiceTypeColor(widget.order.serviceType!),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              widget.order.serviceType!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _getServiceTypeColor(widget.order.serviceType!),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Text(
-                  'Order #${widget.order.orderNumber ?? widget.order.id.substring(0, 8)}',
+                  'Editing items for ${widget.order.serviceType ?? 'Mixed Service'} order',
                   style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1976D2),
+                    fontSize: 14,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -587,5 +709,30 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
         ),
       ),
     );
+  }
+
+  // Helper methods for service type display
+  Color _getServiceTypeColor(String serviceType) {
+    if (serviceType.toLowerCase().contains('iron')) {
+      return Colors.orange;
+    } else if (serviceType.toLowerCase().contains('laundry')) {
+      return Colors.blue;
+    } else if (serviceType.toLowerCase().contains('mixed')) {
+      return Colors.purple;
+    } else {
+      return Colors.grey;
+    }
+  }
+
+  IconData _getServiceTypeIcon(String serviceType) {
+    if (serviceType.toLowerCase().contains('iron')) {
+      return Icons.iron;
+    } else if (serviceType.toLowerCase().contains('laundry')) {
+      return Icons.local_laundry_service;
+    } else if (serviceType.toLowerCase().contains('mixed')) {
+      return Icons.miscellaneous_services;
+    } else {
+      return Icons.help_outline;
+    }
   }
 } 

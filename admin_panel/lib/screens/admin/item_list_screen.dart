@@ -3,6 +3,7 @@ import 'package:admin_panel/models/item_model.dart';
 import 'package:admin_panel/providers/item_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'add_item_screen.dart';
 
 class ItemListScreen extends StatefulWidget {
@@ -412,27 +413,44 @@ class _ItemListScreenState extends State<ItemListScreen> {
           child: item.imageUrl != null && item.imageUrl!.isNotEmpty
               ? ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    item.imageUrl!,
+                  child: CachedNetworkImage(
+                    imageUrl: item.imageUrl!,
                     fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
+                    placeholder: (context, url) => Container(
+                      color: Colors.blue[50],
+                      child: Center(
                         child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
                           strokeWidth: 2,
+                          color: Colors.blue[300],
+                        ),
+                      ),
+                    ),
+                    errorWidget: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.blue[50],
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.iron,
+                              color: Colors.blue[300],
+                              size: 24,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Image\nError',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Colors.blue[300],
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(
-                        Icons.iron,
-                        color: Colors.blue[300],
-                        size: 30,
-                      );
+                    httpHeaders: const {
+                      'Cache-Control': 'max-age=3600',
                     },
                   ),
                 )
@@ -700,16 +718,36 @@ class _ItemListScreenState extends State<ItemListScreen> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        item.imageUrl!,
+                      child: CachedNetworkImage(
+                        imageUrl: item.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey[200],
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                        errorWidget: (context, error, stackTrace) {
                           return Container(
                             color: Colors.grey[200],
-                            child: Icon(
-                              Icons.iron,
-                              size: 50,
-                              color: Colors.grey[400],
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.iron,
+                                  size: 50,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Failed to load image',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
                           );
                         },

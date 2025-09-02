@@ -5,9 +5,8 @@ class OrderNumberService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final Random _random = Random();
 
-  /// Generates a unique sequential order number starting from 100000
-  /// Format: XXXXXX (where X is a digit from 0-9)
-  /// Range: 100000 and increments by 1 for each order
+  /// Generates a unique sequential order number starting from C000001
+  /// Format: C000001, C000002, C000003, etc.
   static Future<String> generateUniqueOrderNumber() async {
     try {
       // Use Firestore transaction to get and increment the counter atomically
@@ -20,11 +19,11 @@ class OrderNumberService {
         if (counterSnapshot.exists) {
           // Get current counter value and increment
           final data = counterSnapshot.data() as Map<String, dynamic>?;
-          final currentValue = data?['value'] as int? ?? 99999;
+          final currentValue = data?['value'] as int? ?? 0;
           nextOrderNumber = currentValue + 1;
         } else {
-          // First time - start from 100000
-          nextOrderNumber = 100000;
+          // First time - start from 1 (will become C000001)
+          nextOrderNumber = 1;
         }
         
         // Update the counter
@@ -33,10 +32,16 @@ class OrderNumberService {
           'lastUpdated': FieldValue.serverTimestamp(),
         });
         
-        return nextOrderNumber.toString();
+        // Format as A000001, A000002, etc.
+        return 'A${nextOrderNumber.toString().padLeft(6, '0')}';
       });
     } catch (e) {
       print('Error generating sequential order number: $e');
+      // Check if it's a permission error and provide helpful message
+      if (e.toString().contains('permission-denied')) {
+        print('⚠️ Permission denied for order counter. Using fallback method.');
+        print('💡 To fix: Update Firestore rules to allow counter access or run admin setup script.');
+      }
       // Fallback to timestamp-based approach
       return _generateTimestampBasedOrderNumber();
     }
@@ -44,7 +49,7 @@ class OrderNumberService {
 
 
 
-  /// Generate a timestamp-based 6-digit order number as fallback
+  /// Generate a timestamp-based order number as fallback with C prefix
   static String _generateTimestampBasedOrderNumber() {
     // Use current timestamp and some randomness
     final now = DateTime.now();
@@ -57,19 +62,19 @@ class OrderNumberService {
     // Combine to create 6-digit number
     final orderNumber = (lastFourDigits * 100 + randomTwoDigits) % 1000000;
     
-    // Ensure it's at least 6 digits
-    return orderNumber.toString().padLeft(6, '0');
+    // Ensure it's at least 6 digits and add C prefix
+    return 'C${orderNumber.toString().padLeft(6, '0')}';
   }
 
-  /// Validate if a string is a valid 6-digit order number
+  /// Validate if a string is a valid order number (C000001 format)
   static bool isValidOrderNumber(String orderNumber) {
-    if (orderNumber.length != 6) return false;
+    if (orderNumber.length != 7) return false;
     
-    // Check if all characters are digits
-    return RegExp(r'^\d{6}$').hasMatch(orderNumber);
+    // Check if format is C followed by 6 digits
+    return RegExp(r'^C\d{6}$').hasMatch(orderNumber);
   }
 
-  /// Generate a formatted order number with prefix (e.g., "ORD-123456")
+  /// Generate a formatted order number with prefix (e.g., "ORD-C000001")
   static String generateFormattedOrderNumber(String orderNumber) {
     return 'ORD-$orderNumber';
   }

@@ -40,17 +40,10 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
-            Text(
-              '.FACTORY.',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                letterSpacing: 1.0,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
+           
             const SizedBox(height: 8),
             Text(
-              'Ironing Service',
+              'Ironing & Laundry Service',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface,
               ),

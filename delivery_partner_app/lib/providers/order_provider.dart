@@ -604,6 +604,25 @@ class OrderProvider extends ChangeNotifier {
 
 
 
+  // Method to get orders by statuses
+  Stream<List<OrderModel>> getOrdersByStatuses(String deliveryPartnerId, List<String> statuses) {
+    print('🚚 📊 Getting orders for delivery partner $deliveryPartnerId with statuses: $statuses');
+    
+    return _firestore
+        .collection('orders')
+        .where('assignedDeliveryPerson', isEqualTo: deliveryPartnerId)
+        .where('status', whereIn: statuses)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      print('🚚 📊 Found ${snapshot.docs.length} orders with statuses $statuses');
+      
+      return snapshot.docs.map((doc) {
+        return OrderModel.fromFirestore(doc);
+      }).toList();
+    });
+  }
+
   // Clear error
   void clearError() {
     _error = null;

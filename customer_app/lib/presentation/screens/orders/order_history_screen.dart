@@ -300,6 +300,38 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
               const SizedBox(height: 12),
 
+              // Service Type
+              Row(
+                children: [
+                  Icon(
+                    _getServiceIcon(order.serviceType),
+                    color: _getServiceColor(order.serviceType),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getServiceColor(order.serviceType).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _getServiceColor(order.serviceType).withOpacity(0.3),
+                      ),
+                    ),
+                    child: Text(
+                      order.serviceType,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _getServiceColor(order.serviceType),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
               // Order Items Preview
               if (order.items.isNotEmpty) ...[
                 Text(
@@ -396,6 +428,42 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         return Colors.green;
       case 'cancelled':
         return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getServiceIcon(String serviceType) {
+    switch (serviceType.toLowerCase()) {
+      case 'ironing service':
+      case 'ironing':
+        return Icons.iron;
+      case 'laundry service':
+      case 'laundry':
+        return Icons.local_laundry_service;
+      case 'alien service':
+      case 'alien':
+        return Icons.cleaning_services;
+      case 'mixed':
+        return Icons.miscellaneous_services;
+      default:
+        return Icons.room_service;
+    }
+  }
+
+  Color _getServiceColor(String serviceType) {
+    switch (serviceType.toLowerCase()) {
+      case 'ironing service':
+      case 'ironing':
+        return Colors.orange;
+      case 'laundry service':
+      case 'laundry':
+        return Colors.blue;
+      case 'alien service':
+      case 'alien':
+        return Colors.green;
+      case 'mixed':
+        return Colors.purple;
       default:
         return Colors.grey;
     }

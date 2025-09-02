@@ -496,6 +496,8 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
               viewportFraction: 1.0,
             ),
             items: bannerProvider.banners.map((banner) {
+              // Debug logging to check banner data
+              print('Banner ID: ${banner.id}, ImageURL: ${banner.imageUrl}');
               return Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
@@ -504,59 +506,7 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                     fit: BoxFit.cover,
                   ),
                 ),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Theme.of(context).colorScheme.scrim.withOpacity(0.3),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        banner.title ?? 'Professional Ironing',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Theme.of(context).colorScheme.onPrimary,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Text(
-                      //   banner.description ?? 'Crisp & Fresh Clothes',
-                      //   style: const TextStyle(
-                      //     color: Colors.white,
-                      //     fontSize: 14,
-                      //   ),
-                      // ),
-                      // const Spacer(),
-                      // Add offer text if available in your banner model
-                      // Container(
-                      //   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      //   decoration: BoxDecoration(
-                      //     color: Colors.blue,
-                      //     borderRadius: BorderRadius.circular(20),
-                      //   ),
-                      //   child: const Text(
-                      //     '30% OFF First Order',
-                      //     style: TextStyle(
-                      //       color: Colors.white,
-                      //       fontSize: 12,
-                      //       fontWeight: FontWeight.w600,
-                      //     ),
-                      //   ),
-                      // ),
-                    ],
-                  ),
-                ),
+                // Show only the image without any text overlay
               );
             }).toList(),
           ),
@@ -789,7 +739,7 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Bed sheets, stain removal',
+                          'Washing and Ironing',
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall
@@ -1061,10 +1011,7 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                     'Special Offers',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text('View All'),
-                  ),
+                 
                 ],
               ),
             ),
@@ -1193,10 +1140,7 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                     'Select Items for Ironing',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text('View All'),
-                  ),
+                  
                 ],
               ),
             ),

@@ -38,6 +38,7 @@ class OrderModel {
   final bool notificationSentToAdmin;
   final bool notificationSentToDeliveryPerson;
   final List<String> notificationTokens; // FCM tokens for notifications
+  final List<Map<String, dynamic>> notifications; // All notification details stored in order
 
   OrderModel({
     required this.id,
@@ -74,24 +75,15 @@ class OrderModel {
     this.notificationSentToAdmin = false,
     this.notificationSentToDeliveryPerson = false,
     this.notificationTokens = const [],
+    this.notifications = const [],
   });
 
   factory OrderModel.fromFirestore(DocumentSnapshot doc) {
     try {
       Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
       
-      // Determine serviceType with safe conversion
-      String determinedServiceType = 'Laundry Service';
-      if (data['items'] != null && (data['items'] as List).isNotEmpty) {
-        final firstItem = (data['items'] as List).first;
-        if (firstItem is Map<String, dynamic>) {
-          if (firstItem['category'] != null) {
-            determinedServiceType = firstItem['category'].toString();
-          } else if (firstItem['name'] != null) {
-            determinedServiceType = firstItem['name'].toString();
-          }
-        }
-      }
+      // Determine serviceType based on items with intelligent categorization
+      String determinedServiceType = _determineServiceTypeFromItems(data['items'] as List?);
       
       // Parse statusHistory safely
       List<Map<String, dynamic>> parsedStatusHistory = [];
@@ -107,6 +99,16 @@ class OrderModel {
       List<String> tokens = [];
       if (data['notificationTokens'] is List) {
         tokens = List<String>.from(data['notificationTokens']);
+      }
+      
+      // Parse notifications
+      List<Map<String, dynamic>> notificationsList = [];
+      if (data['notifications'] is List) {
+        for (var item in (data['notifications'] as List)) {
+          if (item is Map<String, dynamic>) {
+            notificationsList.add(item);
+          }
+        }
       }
       
       // Parse pickup address from the nested structure
@@ -245,6 +247,7 @@ class OrderModel {
         notificationSentToAdmin: data['notificationSentToAdmin'] ?? false,
         notificationSentToDeliveryPerson: data['notificationSentToDeliveryPerson'] ?? false,
         notificationTokens: tokens,
+        notifications: notificationsList,
       );
     } catch (e) {
       print('Error parsing order document ${doc.id}: $e');
@@ -266,6 +269,7 @@ class OrderModel {
         pickupTimeSlot: 'N/A',
         paymentMethod: 'N/A',
         statusHistory: [],
+        notifications: [],
       );
     }
   }
@@ -306,8 +310,58 @@ class OrderModel {
       'notificationSentToAdmin': notificationSentToAdmin,
       'notificationSentToDeliveryPerson': notificationSentToDeliveryPerson,
       'notificationTokens': notificationTokens,
+      'notifications': notifications,
       'updatedAt': Timestamp.now(),
     };
+  }
+  
+  // Static method to determine service type from items
+  static String _determineServiceTypeFromItems(List? items) {
+    if (items == null || items.isEmpty) {
+      return 'Laundry Service';
+    }
+    
+    // Count items by category
+    Map<String, int> categoryCount = {};
+    int totalItems = 0;
+    
+    for (var item in items) {
+      if (item is Map<String, dynamic>) {
+        totalItems += (item['quantity'] as int?) ?? 1;
+        String category = item['category']?.toString().toLowerCase() ?? '';
+        
+        // Normalize category names
+        if (category.contains('iron') || category == 'ironing') {
+          categoryCount['ironing'] = (categoryCount['ironing'] ?? 0) + ((item['quantity'] as int?) ?? 1);
+        } else if (category.contains('alien') || category == 'alien') {
+          categoryCount['alien'] = (categoryCount['alien'] ?? 0) + ((item['quantity'] as int?) ?? 1);
+        } else {
+          // Everything else is considered laundry (wash & fold, dry cleaning, etc.)
+          categoryCount['laundry'] = (categoryCount['laundry'] ?? 0) + ((item['quantity'] as int?) ?? 1);
+        }
+      }
+    }
+    
+    // Determine service type based on items
+    int ironingCount = categoryCount['ironing'] ?? 0;
+    int alienCount = categoryCount['alien'] ?? 0;
+    int laundryCount = categoryCount['laundry'] ?? 0;
+    
+    // Check for combinations
+    List<String> serviceTypes = [];
+    if (ironingCount > 0) serviceTypes.add('Ironing');
+    if (alienCount > 0) serviceTypes.add('Alien');
+    if (laundryCount > 0) serviceTypes.add('Laundry');
+    
+    if (serviceTypes.length > 1) {
+      return 'Mixed Service (${serviceTypes.join(' & ')})';
+    } else if (ironingCount > 0) {
+      return 'Ironing Service';
+    } else if (alienCount > 0) {
+      return 'Alien Service';
+    } else {
+      return 'Laundry Service';
+    }
   }
   
   // Copy with method for updates
@@ -324,6 +378,7 @@ class OrderModel {
     bool? notificationSentToDeliveryPerson,
     List<String>? notificationTokens,
     List<Map<String, dynamic>>? statusHistory,
+    List<Map<String, dynamic>>? notifications,
   }) {
     return OrderModel(
       id: id,
@@ -359,6 +414,7 @@ class OrderModel {
       notificationSentToAdmin: notificationSentToAdmin ?? this.notificationSentToAdmin,
       notificationSentToDeliveryPerson: notificationSentToDeliveryPerson ?? this.notificationSentToDeliveryPerson,
       notificationTokens: notificationTokens ?? this.notificationTokens,
+      notifications: notifications ?? this.notifications,
     );
   }
 }

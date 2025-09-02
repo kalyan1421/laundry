@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "laundry-management-57453"
-  }
+    "default": "laundry-management-57453",
+    "staginh ": "laundry-management-57453"
+  },
+  "targets": {},
+  "etags": {}
 }

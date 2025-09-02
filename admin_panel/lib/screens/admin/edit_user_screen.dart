@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/user_model.dart';
-import '../../providers/user_provider.dart';
+import '../../models/address_model.dart';
 
 class EditUserScreen extends StatefulWidget {
   final UserModel user;
@@ -20,7 +19,7 @@ class _EditUserScreenState extends State<EditUserScreen> with SingleTickerProvid
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   
-  List<Map<String, dynamic>> _customerAddresses = [];
+  List<AddressModel> _customerAddresses = [];
   bool _isLoadingAddresses = true;
   bool _isSaving = false;
 
@@ -45,22 +44,54 @@ class _EditUserScreenState extends State<EditUserScreen> with SingleTickerProvid
 
   Future<void> _loadCustomerAddresses() async {
     try {
-      final addressesSnapshot = await FirebaseFirestore.instance
-          .collection('customer')
-          .doc(widget.user.uid)
-          .collection('addresses')
-          .get();
+      // First try to get addresses ordered by isPrimary and createdAt
+      QuerySnapshot addressesSnapshot;
+      try {
+        addressesSnapshot = await FirebaseFirestore.instance
+            .collection('customer')
+            .doc(widget.user.uid)
+            .collection('addresses')
+            .orderBy('isPrimary', descending: true)
+            .orderBy('createdAt', descending: false)
+            .get();
+      } catch (orderByError) {
+        // If ordering fails (e.g., missing index), get all addresses without ordering
+        print('OrderBy failed, fetching all addresses: $orderByError');
+        addressesSnapshot = await FirebaseFirestore.instance
+            .collection('customer')
+            .doc(widget.user.uid)
+            .collection('addresses')
+            .get();
+      }
 
       setState(() {
         _customerAddresses = addressesSnapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            ...data,
-          };
+          final data = doc.data() as Map<String, dynamic>;
+          return AddressModel.fromFirestore(data, doc.id);
         }).toList();
+        
+        // Sort addresses manually if we couldn't order in query
+        _customerAddresses.sort((a, b) {
+          // Primary addresses first
+          if (a.isPrimary && !b.isPrimary) return -1;
+          if (!a.isPrimary && b.isPrimary) return 1;
+          
+          // Then by creation date (newest first if no createdAt)
+          if (a.createdAt != null && b.createdAt != null) {
+            return a.createdAt!.compareTo(b.createdAt!);
+          } else if (a.createdAt != null) {
+            return -1;
+          } else if (b.createdAt != null) {
+            return 1;
+          }
+          
+          return 0;
+        });
+        
         _isLoadingAddresses = false;
       });
+      
+      print('Loaded ${_customerAddresses.length} addresses for user ${widget.user.uid}');
     } catch (e) {
       print('Error loading customer addresses: $e');
       setState(() {
@@ -141,7 +172,7 @@ class _EditUserScreenState extends State<EditUserScreen> with SingleTickerProvid
     }
   }
 
-  Future<void> _editAddress(Map<String, dynamic> address) async {
+  Future<void> _editAddress(AddressModel address) async {
     await showDialog(
       context: context,
       builder: (context) => EditAddressDialog(
@@ -348,8 +379,8 @@ class _EditUserScreenState extends State<EditUserScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildAddressCard(Map<String, dynamic> address, int index) {
-    final isPrimary = address['isPrimary'] == true;
+  Widget _buildAddressCard(AddressModel address, int index) {
+    final isPrimary = address.isPrimary;
     
     return Card(
       elevation: 2,
@@ -368,7 +399,7 @@ class _EditUserScreenState extends State<EditUserScreen> with SingleTickerProvid
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    isPrimary ? 'Primary Address' : 'Address ${index + 1}',
+                    isPrimary ? 'Primary Address (${address.typeDisplayName})' : '${address.typeDisplayName} Address',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -397,7 +428,7 @@ class _EditUserScreenState extends State<EditUserScreen> with SingleTickerProvid
                     if (value == 'edit') {
                       _editAddress(address);
                     } else if (value == 'delete') {
-                      _showDeleteConfirmation(address['id']);
+                      _showDeleteConfirmation(address.id);
                     }
                   },
                   itemBuilder: (context) => [
@@ -433,25 +464,35 @@ class _EditUserScreenState extends State<EditUserScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildAddressDetails(Map<String, dynamic> address) {
-    List<String> addressParts = [];
-    
-    if (address['doorNumber'] != null) addressParts.add(address['doorNumber']);
-    if (address['apartmentName'] != null) addressParts.add(address['apartmentName']);
-    if (address['addressLine1'] != null) addressParts.add(address['addressLine1']);
-    if (address['addressLine2'] != null) addressParts.add(address['addressLine2']);
-    if (address['nearbyLandmark'] != null) addressParts.add('Near ${address['nearbyLandmark']}');
-    if (address['city'] != null && address['pincode'] != null) {
-      addressParts.add('${address['city']} - ${address['pincode']}');
-    }
-    if (address['state'] != null) addressParts.add(address['state']);
-    
-    return Text(
-      addressParts.join(', '),
-      style: TextStyle(
-        color: Colors.grey[700],
-        fontSize: 14,
-      ),
+  Widget _buildAddressDetails(AddressModel address) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          address.fullAddress,
+          style: TextStyle(
+            color: Colors.grey[700],
+            fontSize: 14,
+            height: 1.4,
+          ),
+        ),
+        if (address.latitude != null && address.longitude != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.location_on, size: 16, color: Colors.grey[500]),
+              const SizedBox(width: 4),
+              Text(
+                'Coordinates: ${address.latitude!.toStringAsFixed(6)}, ${address.longitude!.toStringAsFixed(6)}',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 
@@ -481,7 +522,7 @@ class _EditUserScreenState extends State<EditUserScreen> with SingleTickerProvid
 }
 
 class EditAddressDialog extends StatefulWidget {
-  final Map<String, dynamic>? address;
+  final AddressModel? address;
   final String userId;
   final VoidCallback onAddressUpdated;
 
@@ -499,6 +540,7 @@ class EditAddressDialog extends StatefulWidget {
 class _EditAddressDialogState extends State<EditAddressDialog> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _doorNumberController;
+  late TextEditingController _floorNumberController;
   late TextEditingController _apartmentController;
   late TextEditingController _addressLine1Controller;
   late TextEditingController _addressLine2Controller;
@@ -506,6 +548,7 @@ class _EditAddressDialogState extends State<EditAddressDialog> {
   late TextEditingController _cityController;
   late TextEditingController _stateController;
   late TextEditingController _pincodeController;
+  String _selectedType = 'home';
   bool _isPrimary = false;
   bool _isSaving = false;
 
@@ -513,20 +556,23 @@ class _EditAddressDialogState extends State<EditAddressDialog> {
   void initState() {
     super.initState();
     final address = widget.address;
-    _doorNumberController = TextEditingController(text: address?['doorNumber'] ?? '');
-    _apartmentController = TextEditingController(text: address?['apartmentName'] ?? '');
-    _addressLine1Controller = TextEditingController(text: address?['addressLine1'] ?? '');
-    _addressLine2Controller = TextEditingController(text: address?['addressLine2'] ?? '');
-    _landmarkController = TextEditingController(text: address?['nearbyLandmark'] ?? '');
-    _cityController = TextEditingController(text: address?['city'] ?? '');
-    _stateController = TextEditingController(text: address?['state'] ?? '');
-    _pincodeController = TextEditingController(text: address?['pincode'] ?? '');
-    _isPrimary = address?['isPrimary'] ?? false;
+    _doorNumberController = TextEditingController(text: address?.doorNumber ?? '');
+    _floorNumberController = TextEditingController(text: address?.floorNumber ?? '');
+    _apartmentController = TextEditingController(text: address?.apartmentName ?? '');
+    _addressLine1Controller = TextEditingController(text: address?.addressLine1 ?? '');
+    _addressLine2Controller = TextEditingController(text: address?.addressLine2 ?? '');
+    _landmarkController = TextEditingController(text: address?.landmark ?? '');
+    _cityController = TextEditingController(text: address?.city ?? '');
+    _stateController = TextEditingController(text: address?.state ?? '');
+    _pincodeController = TextEditingController(text: address?.pincode ?? '');
+    _selectedType = address?.type ?? 'home';
+    _isPrimary = address?.isPrimary ?? false;
   }
 
   @override
   void dispose() {
     _doorNumberController.dispose();
+    _floorNumberController.dispose();
     _apartmentController.dispose();
     _addressLine1Controller.dispose();
     _addressLine2Controller.dispose();
@@ -543,14 +589,19 @@ class _EditAddressDialogState extends State<EditAddressDialog> {
       
       try {
         final addressData = {
+          'type': _selectedType,
+          'addressType': _selectedType, // For backward compatibility
           'doorNumber': _doorNumberController.text.trim(),
+          'floorNumber': _floorNumberController.text.trim(),
           'apartmentName': _apartmentController.text.trim(),
           'addressLine1': _addressLine1Controller.text.trim(),
           'addressLine2': _addressLine2Controller.text.trim(),
-          'nearbyLandmark': _landmarkController.text.trim(),
+          'landmark': _landmarkController.text.trim(),
+          'nearbyLandmark': _landmarkController.text.trim(), // For backward compatibility
           'city': _cityController.text.trim(),
           'state': _stateController.text.trim(),
           'pincode': _pincodeController.text.trim(),
+          'country': 'India',
           'isPrimary': _isPrimary,
           'updatedAt': FieldValue.serverTimestamp(),
         };
@@ -569,7 +620,7 @@ class _EditAddressDialogState extends State<EditAddressDialog> {
               .collection('customer')
               .doc(widget.userId)
               .collection('addresses')
-              .doc(widget.address!['id'])
+              .doc(widget.address!.id)
               .update(addressData);
         }
 
@@ -643,125 +694,197 @@ class _EditAddressDialogState extends State<EditAddressDialog> {
                 padding: const EdgeInsets.all(16),
                 child: Form(
                   key: _formKey,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _doorNumberController,
-                          decoration: const InputDecoration(
-                            labelText: 'Door Number',
-                            border: OutlineInputBorder(),
+                                      child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          // Address Type Selection
+                          DropdownButtonFormField<String>(
+                            value: _selectedType,
+                            decoration: const InputDecoration(
+                              labelText: 'Address Type *',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.category),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'home', child: Text('Home')),
+                              DropdownMenuItem(value: 'work', child: Text('Work')),
+                              DropdownMenuItem(value: 'other', child: Text('Other')),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedType = value ?? 'home';
+                              });
+                            },
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please select address type';
+                              }
+                              return null;
+                            },
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter door number';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _apartmentController,
-                          decoration: const InputDecoration(
-                            labelText: 'Apartment/Building Name',
-                            border: OutlineInputBorder(),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _doorNumberController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Door Number *',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.door_front_door),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Please enter door number';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _floorNumberController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Floor Number',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.layers),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _addressLine1Controller,
-                          decoration: const InputDecoration(
-                            labelText: 'Address Line 1 *',
-                            border: OutlineInputBorder(),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _apartmentController,
+                            decoration: const InputDecoration(
+                              labelText: 'Apartment/Building Name',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.apartment),
+                            ),
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter address line 1';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _addressLine2Controller,
-                          decoration: const InputDecoration(
-                            labelText: 'Address Line 2',
-                            border: OutlineInputBorder(),
+                                                  const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _addressLine1Controller,
+                            decoration: const InputDecoration(
+                              labelText: 'Street Address *',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.location_on),
+                              hintText: 'Enter street name and area',
+                            ),
+                            maxLines: 2,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter street address';
+                              }
+                              return null;
+                            },
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _landmarkController,
-                          decoration: const InputDecoration(
-                            labelText: 'Nearby Landmark',
-                            border: OutlineInputBorder(),
+                                                  const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _addressLine2Controller,
+                            decoration: const InputDecoration(
+                              labelText: 'Additional Address Info',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.add_location),
+                              hintText: 'Optional additional address details',
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _landmarkController,
+                            decoration: const InputDecoration(
+                              labelText: 'Nearby Landmark',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.place),
+                              hintText: 'E.g., Near City Mall, Opposite Bank',
+                            ),
+                          ),
                         const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(
-                              child: TextFormField(
-                                controller: _cityController,
-                                decoration: const InputDecoration(
-                                  labelText: 'City *',
-                                  border: OutlineInputBorder(),
+                                                              child: TextFormField(
+                                  controller: _cityController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'City *',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.location_city),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Please enter city';
+                                    }
+                                    return null;
+                                  },
                                 ),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Please enter city';
-                                  }
-                                  return null;
-                                },
                               ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _pincodeController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Pincode *',
-                                  border: OutlineInputBorder(),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _pincodeController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Pincode *',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.pin_drop),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  maxLength: 6,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Please enter pincode';
+                                    }
+                                    if (value.length != 6) {
+                                      return 'Enter valid 6-digit pincode';
+                                    }
+                                    return null;
+                                  },
                                 ),
-                                keyboardType: TextInputType.number,
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Please enter pincode';
-                                  }
-                                  if (value.length != 6) {
-                                    return 'Enter valid 6-digit pincode';
-                                  }
-                                  return null;
-                                },
                               ),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _stateController,
-                          decoration: const InputDecoration(
-                            labelText: 'State *',
-                            border: OutlineInputBorder(),
+                                                  TextFormField(
+                            controller: _stateController,
+                            decoration: const InputDecoration(
+                              labelText: 'State *',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.map),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter state';
+                              }
+                              return null;
+                            },
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter state';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        CheckboxListTile(
-                          title: const Text('Set as Primary Address'),
-                          value: _isPrimary,
-                          onChanged: (value) {
-                            setState(() {
-                              _isPrimary = value ?? false;
-                            });
-                          },
-                          controlAffinity: ListTileControlAffinity.leading,
-                        ),
+                          const SizedBox(height: 24),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                            ),
+                            child: CheckboxListTile(
+                              title: const Text(
+                                'Set as Primary Address',
+                                style: TextStyle(fontWeight: FontWeight.w500),
+                              ),
+                              subtitle: const Text(
+                                'This will be used as the default address for orders',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              value: _isPrimary,
+                              onChanged: (value) {
+                                setState(() {
+                                  _isPrimary = value ?? false;
+                                });
+                              },
+                              controlAffinity: ListTileControlAffinity.leading,
+                              activeColor: Colors.blue,
+                            ),
+                          ),
                       ],
                     ),
                   ),

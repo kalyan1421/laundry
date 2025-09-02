@@ -27,6 +27,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/delivery_partner_service.dart';
 import 'manage_admins_screen.dart';
 import 'manage_delivery_partners_screen.dart';
+import '../../widgets/enhanced_order_analytics_chart.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
@@ -61,8 +62,8 @@ class _AdminHomeState extends State<AdminHome> {
     'Delivery Staff',
     // 'Administrators',
     // 'Supervisors',
-    'Manage Items',
-    'Allied Services',
+    'Ironing service Items',
+    'Allied Services Items',
     'Manage Banners',
     'Special Offers',
     // 'Add Delivery Person',
@@ -412,7 +413,7 @@ class _AdminHomeState extends State<AdminHome> {
           _buildDrawerItem(Icons.shopping_cart_rounded, 'All Orders', 1),
           _buildDrawerItem(Icons.people_alt_rounded, 'Customers', 2),
           _buildDrawerItem(Icons.delivery_dining_rounded, 'Delivery Staff', 3),
-          _buildDrawerItem(Icons.inventory_2_rounded, 'Manage Items', 4),
+          _buildDrawerItem(Icons.inventory_2_rounded, 'Ironing Items', 4),
           _buildDrawerItem(
             Icons.local_laundry_service_rounded,
             'Allied Services',
@@ -572,29 +573,8 @@ class AdminDashboard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          Text(
-            'Orders Analytics',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          OrderAnalyticsChart(),
-          // const SizedBox(height: 24),
-          // Text(
-          //   'Order Status Overview',
-          //   style: Theme.of(
-          //     context,
-          //   ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          // ),
-          // const SizedBox(height: 16),
-          // _buildOrderStatusOverview(
-          //   context,
-          //   dashboardProvider.orderStatusOverviewStream,
-          // ),
-
-          // const SizedBox(height: 24),
-          // _buildMigrationSection(context),
+          // Enhanced Order Analytics Chart
+          const EnhancedOrderAnalyticsChart(),
         ],
       ),
     );
@@ -1059,4 +1039,6 @@ class _OrderAnalyticsChartState extends State<OrderAnalyticsChart> {
       ),
     );
   }
+
+
 }

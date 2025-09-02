@@ -66,6 +66,7 @@ class BannerProvider with ChangeNotifier {
       BannerModel newBanner = BannerModel(
         id: bannerId,
         imageUrl: imageUrl,
+        order: _banners.length, // Auto-assign order based on current count
         isActive: true,
         createdAt: Timestamp.now(),
       );

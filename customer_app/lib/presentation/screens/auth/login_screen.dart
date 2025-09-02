@@ -7,13 +7,16 @@ import 'package:customer_app/core/constants/font_constants.dart';
 import 'package:customer_app/core/utils/text_utils.dart';
 import 'package:flutter/material.dart' hide TextButton;
 import 'package:flutter/material.dart' as material show TextButton;
-import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
+import 'package:permission_handler/permission_handler.dart';
 import 'package:lottie/lottie.dart';
 import 'dart:async';
 import '../../providers/auth_provider.dart';
-import '../../widgets/common/phone_input_field.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/common/error_text.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -50,8 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // Reset OTP state when coming to login screen
       authProvider.resetOTPState();
 
-      // Initialize phone number autofill
-      
+
     });
   }
 
@@ -375,94 +377,89 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AutofillGroup(
-          child: Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: _phoneFocusNode.hasFocus
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.outline,
-                width: _phoneFocusNode.hasFocus ? 2 : 1,
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _phoneFocusNode.hasFocus
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.outline,
+              width: _phoneFocusNode.hasFocus ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Country code
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    bottomLeft: Radius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  '+91',
+                  style: AppTypography.bodyLarge.copyWith(
+                    fontWeight: FontConstants.medium,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
               ),
-            ),
-            child: Row(
-              children: [
-                // Country code
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 16,
+              // Phone number input
+              Expanded(
+                child: TextFormField(
+                  controller: _phoneController,
+                  focusNode: _phoneFocusNode,
+                  keyboardType: TextInputType.phone,
+                  enabled: !authProvider.isLoading,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  style: AppTypography.bodyLarge.copyWith(
+                    fontWeight: FontConstants.medium,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(8),
-                      bottomLeft: Radius.circular(8),
+                  decoration: InputDecoration(
+                    fillColor: Theme.of(context).colorScheme.surface,
+                    // filled: true,
+                    hintText: '9876 543210',
+                    hintStyle: AppTypography.bodyLarge.copyWith(
+                      color: const Color(0xFFA0AEC0),
+                      fontWeight: FontConstants.regular,
                     ),
-                  ),
-                  child: Text(
-                    '+91',
-                    style: AppTypography.bodyLarge.copyWith(
-                      fontWeight: FontConstants.medium,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-                // Phone number input with autofill
-                Expanded(
-                  child: TextFormField(
-                    controller: _phoneController,
-                    focusNode: _phoneFocusNode,
-                    keyboardType: TextInputType.phone,
-                    textInputAction: TextInputAction.done,
-                    enabled: !authProvider.isLoading,
-                    autofillHints: const [
-                      AutofillHints.telephoneNumber,
-                      AutofillHints.telephoneNumberNational,
-                    ],
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
-                    ],
-                    style: AppTypography.bodyLarge.copyWith(
-                      fontWeight: FontConstants.medium,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: '9876543210',
-                      hintStyle: AppTypography.bodyLarge.copyWith(
-                        color: const Color(0xFFA0AEC0),
-                        fontWeight: FontConstants.regular,
-                      ),
-                      border: const OutlineInputBorder(
+                    border: const OutlineInputBorder(
                         borderSide: BorderSide.none,
-                        borderRadius: BorderRadius.all(Radius.circular(0)),
-                      ),
-                      errorBorder: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
+                        borderRadius: BorderRadius.all(Radius.circular(0))),
+                    errorBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
                     ),
-                    validator: Validators.validatePhoneNumber,
-                    onChanged: (value) {
-                      setState(() {});
-                      if (authProvider.errorMessage != null) {
-                        authProvider.clearError();
-                      }
-                    },
-                    onFieldSubmitted: (_) {
-                      if (_phoneController.text.length == 10) {
-                        _sendOTP();
-                      }
-                    },
                   ),
+                  validator: Validators.validatePhoneNumber,
+                  onChanged: (value) {
+                    setState(() {});
+                    // Clear error when user starts typing
+                    if (authProvider.errorMessage != null) {
+                      authProvider.clearError();
+                    }
+                  },
+                  onFieldSubmitted: (_) {
+                    if (_phoneController.text.length == 10) {
+                      _sendOTP();
+                    }
+                  },
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
 

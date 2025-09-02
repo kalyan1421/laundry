@@ -37,12 +37,10 @@ class OrderNotificationService {
 
       final customerData = customerDoc.data() as Map<String, dynamic>;
 
-      // Save notification to orders collection
-      await _firestore
-          .collection('orders')
-          .doc(orderId)
-          .collection('notifications')
-          .add({
+      // Create notification object
+      final now = Timestamp.now();
+      Map<String, dynamic> notification = {
+        'id': _firestore.collection('orders').doc().id, // Generate unique ID
         'type': 'new_order',
         'title': 'New Order Received',
         'body': 'Order #$orderNumber has been placed',
@@ -57,11 +55,21 @@ class OrderNotificationService {
           'pickupAddress': pickupAddress,
           'specialInstructions': specialInstructions,
         },
-        'notifiedAt': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
+        'notifiedAt': now,
+        'createdAt': now,
         'status': 'sent',
         'forAdmin': true,
         'read': false,
+      };
+
+      // Add notification to order document's notifications array
+      await _firestore
+          .collection('orders')
+          .doc(orderId)
+          .update({
+        'notifications': FieldValue.arrayUnion([notification]),
+        'notificationSentToAdmin': true,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       print('✅ Order notification sent to admin successfully');
@@ -98,12 +106,10 @@ class OrderNotificationService {
 
       final customerData = customerDoc.data() as Map<String, dynamic>;
 
-      // Save notification to orders collection
-      await _firestore
-          .collection('orders')
-          .doc(orderId)
-          .collection('notifications')
-          .add({
+      // Create notification object
+      final now = Timestamp.now();
+      Map<String, dynamic> notification = {
+        'id': _firestore.collection('orders').doc().id, // Generate unique ID
         'type': 'order_cancellation',
         'title': 'Order Cancelled',
         'body': 'Order #$orderNumber has been cancelled by customer',
@@ -115,11 +121,20 @@ class OrderNotificationService {
           'customerPhone': customerData['phoneNumber'] ?? 'Unknown',
           'reason': reason,
         },
-        'notifiedAt': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
+        'notifiedAt': now,
+        'createdAt': now,
         'status': 'sent',
         'forAdmin': true,
         'read': false,
+      };
+
+      // Add notification to order document's notifications array
+      await _firestore
+          .collection('orders')
+          .doc(orderId)
+          .update({
+        'notifications': FieldValue.arrayUnion([notification]),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       print('✅ Order cancellation notification sent to admin successfully');
@@ -199,12 +214,10 @@ class OrderNotificationService {
         print('❌ Error sending FCM notifications to admins: $e');
       }
 
-      // Save notification to orders collection
-      await _firestore
-          .collection('orders')
-          .doc(orderId)
-          .collection('notifications')
-          .add({
+      // Create notification object
+      final now = Timestamp.now();
+      Map<String, dynamic> notification = {
+        'id': _firestore.collection('orders').doc().id, // Generate unique ID
         'type': 'order_edit',
         'title': title,
         'body': body,
@@ -217,10 +230,19 @@ class OrderNotificationService {
           'changes': changes,
           'changesText': changesText,
         },
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': now,
         'status': 'sent',
         'forAdmin': true,
         'read': false,
+      };
+
+      // Add notification to order document's notifications array
+      await _firestore
+          .collection('orders')
+          .doc(orderId)
+          .update({
+        'notifications': FieldValue.arrayUnion([notification]),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       print('✅ Order edit notification saved successfully');
@@ -252,12 +274,10 @@ class OrderNotificationService {
       final String title = 'Order Status Updated';
       final String body = 'Order #$orderNumber: ${_formatStatus(newStatus)}';
 
-      // Save notification to orders collection
-      await _firestore
-          .collection('orders')
-          .doc(orderId)
-          .collection('notifications')
-          .add({
+      // Create notification object
+      final now = Timestamp.now();
+      Map<String, dynamic> notification = {
+        'id': _firestore.collection('orders').doc().id, // Generate unique ID
         'type': 'status_change',
         'title': title,
         'body': body,
@@ -268,10 +288,19 @@ class OrderNotificationService {
           'oldStatus': oldStatus,
           'newStatus': newStatus,
         },
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': now,
         'status': 'sent',
         'forAdmin': false,
         'read': false,
+      };
+
+      // Add notification to order document's notifications array
+      await _firestore
+          .collection('orders')
+          .doc(orderId)
+          .update({
+        'notifications': FieldValue.arrayUnion([notification]),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       // Show local notification if available
@@ -347,13 +376,11 @@ class OrderNotificationService {
                 }.toString(),
               );
 
-              // Save notification to order's notifications collection
+              // Save notification to order's notifications array
               try {
-                await _firestore
-                    .collection('orders')
-                    .doc(orderId)
-                    .collection('notifications')
-                    .add({
+                final now = Timestamp.now();
+                Map<String, dynamic> notification = {
+                  'id': _firestore.collection('orders').doc().id, // Generate unique ID
                   'type': 'status_change',
                   'title': title,
                   'body': body,
@@ -363,11 +390,19 @@ class OrderNotificationService {
                     'oldStatus': oldStatus,
                     'newStatus': newStatus,
                   },
-                  'notifiedAt': FieldValue.serverTimestamp(),
-                  'createdAt': FieldValue.serverTimestamp(),
+                  'notifiedAt': now,
+                  'createdAt': now,
                   'status': 'sent',
                   'forAdmin': false,
                   'read': false,
+                };
+
+                await _firestore
+                    .collection('orders')
+                    .doc(orderId)
+                    .update({
+                  'notifications': FieldValue.arrayUnion([notification]),
+                  'updatedAt': FieldValue.serverTimestamp(),
                 });
                 print('✅ Status change notification saved to database');
               } catch (e) {
@@ -433,32 +468,55 @@ class OrderNotificationService {
     }
 
     return _firestore
-        .collectionGroup('notifications')
-        .where('data.customerId', isEqualTo: user.uid)
-        .orderBy('notifiedAt', descending: true)
-        .limit(50)
+        .collection('orders')
+        .where('customerId', isEqualTo: user.uid)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return {
-          'id': doc.id,
-          ...doc.data(),
-        };
-      }).toList();
+      List<Map<String, dynamic>> allNotifications = [];
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['notifications'] is List) {
+          final notifications = List<Map<String, dynamic>>.from(data['notifications']);
+          allNotifications.addAll(notifications);
+        }
+      }
+      
+      // Sort by creation date, most recent first
+      allNotifications.sort((a, b) {
+        final aTime = a['createdAt'] as Timestamp?;
+        final bTime = b['createdAt'] as Timestamp?;
+        if (aTime == null || bTime == null) return 0;
+        return bTime.compareTo(aTime);
+      });
+      
+      return allNotifications.take(50).toList();
     });
   }
 
   /// Mark notification as read
   static Future<void> markNotificationAsRead(String orderId, String notificationId) async {
     try {
-      await _firestore
-          .collection('orders')
-          .doc(orderId)
-          .collection('notifications')
-          .doc(notificationId)
-          .update({
-        'read': true,
-        'readAt': FieldValue.serverTimestamp(),
+      // Get the order document
+      final orderDoc = await _firestore.collection('orders').doc(orderId).get();
+      if (!orderDoc.exists) return;
+      
+      final data = orderDoc.data() as Map<String, dynamic>;
+      final notifications = List<Map<String, dynamic>>.from(data['notifications'] ?? []);
+      
+      // Find and update the specific notification
+      for (int i = 0; i < notifications.length; i++) {
+        if (notifications[i]['id'] == notificationId) {
+          notifications[i]['read'] = true;
+          notifications[i]['readAt'] = Timestamp.now();
+          break;
+        }
+      }
+      
+      // Update the order document with the modified notifications array
+      await _firestore.collection('orders').doc(orderId).update({
+        'notifications': notifications,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       print('Error marking notification as read: $e');

@@ -169,13 +169,7 @@ class _SchedulePickupDeliveryScreenState
     selectedDeliveryDate =
         _getMinimumDeliveryDate().add(const Duration(days: 1));
 
-    // Skip Sunday for both dates
-    while (selectedPickupDate!.weekday == DateTime.sunday) {
-      selectedPickupDate = selectedPickupDate!.add(const Duration(days: 1));
-    }
-    while (selectedDeliveryDate!.weekday == DateTime.sunday) {
-      selectedDeliveryDate = selectedDeliveryDate!.add(const Duration(days: 1));
-    }
+    // Allow Sunday scheduling - no restrictions on any day
 
     _updateAvailablePickupSlots();
     _updateAvailableDeliverySlots();
@@ -204,10 +198,7 @@ class _SchedulePickupDeliveryScreenState
         return DateTime(now.year, now.month, now.day);
     }
 
-    // Skip Sunday (weekday 7) for pickup and delivery
-    while (date.weekday == DateTime.sunday) {
-      date = date.add(const Duration(days: 1));
-    }
+    // Allow scheduling on all days including Sunday
 
     return date;
   }
@@ -235,10 +226,7 @@ class _SchedulePickupDeliveryScreenState
       date = minDate;
     }
 
-    // Skip Sunday (weekday 7) for delivery
-    while (date.weekday == DateTime.sunday) {
-      date = date.add(const Duration(days: 1));
-    }
+    // Allow delivery scheduling on all days including Sunday
 
     return date;
   }
@@ -1013,6 +1001,52 @@ class _SchedulePickupDeliveryScreenState
     }
   }
 
+  // Helper method to determine service type based on items
+  String _determineServiceType(List<Map<String, dynamic>> items) {
+    if (items.isEmpty) {
+      return 'Laundry Service';
+    }
+    
+    // Count items by category
+    Map<String, int> categoryCount = {};
+    
+    for (var item in items) {
+      String category = item['category']?.toString().toLowerCase() ?? '';
+      int quantity = item['quantity'] ?? 1;
+      
+      // Normalize category names
+      if (category.contains('iron') || category == 'ironing') {
+        categoryCount['ironing'] = (categoryCount['ironing'] ?? 0) + quantity;
+      } else if (category.contains('alien') || category == 'alien') {
+        categoryCount['alien'] = (categoryCount['alien'] ?? 0) + quantity;
+      } else {
+        // Everything else is considered laundry (wash & fold, dry cleaning, etc.)
+        categoryCount['laundry'] = (categoryCount['laundry'] ?? 0) + quantity;
+      }
+    }
+    
+    // Determine service type based on items
+    int ironingCount = categoryCount['ironing'] ?? 0;
+    int alienCount = categoryCount['alien'] ?? 0;
+    int laundryCount = categoryCount['laundry'] ?? 0;
+    
+    // Check for combinations
+    List<String> serviceTypes = [];
+    if (ironingCount > 0) serviceTypes.add('Ironing');
+    if (alienCount > 0) serviceTypes.add('Alien');
+    if (laundryCount > 0) serviceTypes.add('Laundry');
+    
+    if (serviceTypes.length > 1) {
+      return 'Mixed Service (${serviceTypes.join(' & ')})';
+    } else if (ironingCount > 0) {
+      return 'Ironing Service';
+    } else if (alienCount > 0) {
+      return 'Alien Service';
+    } else {
+      return 'Laundry Service';
+    }
+  }
+
   Future<void> _processOrder(
       {required String paymentStatus, String? transactionId}) async {
     setState(() => _isSavingOrder = true);
@@ -1112,10 +1146,14 @@ class _SchedulePickupDeliveryScreenState
           ? pickupAddressData
           : (_selectedDeliveryAddress!.data() as Map<String, dynamic>);
 
+      // Determine service type based on selected items
+      String serviceType = _determineServiceType(itemsForOrder);
+
       Map<String, dynamic> orderData = {
         'customerId': userId,
         'orderNumber': orderNumber,
         'orderTimestamp': Timestamp.now(),
+        'serviceType': serviceType,
         'items': itemsForOrder,
         'totalAmount': widget.totalAmount,
         'totalItemCount': _totalItemCount,
@@ -1725,8 +1763,7 @@ class _SchedulePickupDeliveryScreenState
               helpText: 'Select Delivery Date',
               fieldLabelText: 'Must be at least 20 hours after pickup',
               selectableDayPredicate: (DateTime date) {
-                // Disable Sundays
-                if (date.weekday == DateTime.sunday) return false;
+                // Allow all days including Sunday
                 // Ensure it meets minimum requirement
                 return !date.isBefore(_getMinimumDeliveryDate());
               },
@@ -1798,10 +1835,7 @@ class _SchedulePickupDeliveryScreenState
     DateTime minDate =
         DateTime(minDateTime.year, minDateTime.month, minDateTime.day);
 
-    // Skip Sunday for minimum delivery date
-    while (minDate.weekday == DateTime.sunday) {
-      minDate = minDate.add(const Duration(days: 1));
-    }
+    // Allow minimum delivery date on any day including Sunday
 
     return minDate;
   }
@@ -1837,10 +1871,27 @@ class _SchedulePickupDeliveryScreenState
           child: GestureDetector(
             onTap: () async {
               if (option == DateOption.custom) {
-                DateTime initialDate =
-                    isDelivery ? _getMinimumDeliveryDate() : DateTime.now();
-                DateTime firstDate =
-                    isDelivery ? _getMinimumDeliveryDate() : DateTime.now();
+                DateTime initialDate;
+                DateTime firstDate;
+                
+                if (isDelivery) {
+                  initialDate = _getMinimumDeliveryDate();
+                  firstDate = _getMinimumDeliveryDate();
+                } else {
+                  // For pickup, check if today is available
+                  final now = DateTime.now();
+                  final today = DateTime(now.year, now.month, now.day);
+                  
+                  if (now.hour >= 20) {
+                    // After 8 PM, start from tomorrow
+                    initialDate = today.add(const Duration(days: 1));
+                    firstDate = today.add(const Duration(days: 1));
+                  } else {
+                    // Before 8 PM, allow today
+                    initialDate = today;
+                    firstDate = today;
+                  }
+                }
 
                 final DateTime? picked = await showDatePicker(
                   context: context,
@@ -1854,15 +1905,22 @@ class _SchedulePickupDeliveryScreenState
                       ? 'Must be at least 20 hours after pickup'
                       : 'Select date',
                   selectableDayPredicate: (DateTime date) {
-                    // Disable Sundays
-                    if (date.weekday == DateTime.sunday) return false;
+                    // Allow all days including Sunday
 
                     // For delivery, ensure it meets minimum requirement
                     if (isDelivery) {
                       return !date.isBefore(_getMinimumDeliveryDate());
                     }
 
-                    return true;
+                    // For pickup, allow today and future dates
+                    // But if it's late in the day (after 8 PM), don't allow today
+                    final now = DateTime.now();
+                    final today = DateTime(now.year, now.month, now.day);
+                    if (date.isAtSameMomentAs(today) && now.hour >= 20) {
+                      return false; // Can't schedule pickup for today if it's after 8 PM
+                    }
+
+                    return !date.isBefore(today);
                   },
                 );
                 if (picked != null) {

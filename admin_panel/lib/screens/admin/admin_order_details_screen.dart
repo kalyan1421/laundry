@@ -42,6 +42,8 @@ class AdminOrderDetailsScreen extends StatelessWidget {
                 Text('Order Number: ${order.orderNumber}'),
                 Text('Client ID: ${PhoneFormatter.getClientId(order.customer?.phoneNumber)}'),
                 Text('Status: ${order.status}'),
+                if (order.serviceType != null && order.serviceType!.isNotEmpty)
+                  Text('Service Type: ${order.serviceType}'),
                 Text('Total Amount: ₹${order.totalAmount}'),
                 Text('Payment Method: ${order.paymentMethod ?? "N/A"}'),
                 Text('Order Date: ${DateFormat('dd/MM/yyyy HH:mm').format(order.orderTimestamp.toDate())}'),

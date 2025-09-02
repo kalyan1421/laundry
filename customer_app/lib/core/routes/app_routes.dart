@@ -3,7 +3,7 @@ import 'package:customer_app/presentation/screens/auth/login_screen.dart';
 import 'package:customer_app/presentation/screens/auth/otp_verification_screen.dart';
 import 'package:customer_app/presentation/screens/auth/profile_setup_screen.dart';
 import 'package:customer_app/presentation/screens/auth/merged_registration_screen.dart';
-import 'package:customer_app/presentation/screens/auth/welcome_screen.dart';
+
 import 'package:customer_app/presentation/screens/main/main_wrapper.dart';
 import 'package:customer_app/presentation/screens/profile/edit_profile_screen.dart';
 import 'package:customer_app/presentation/screens/profile/manage_addresses_screen.dart';
@@ -28,7 +28,7 @@ class AppRoutes {
   static const String profileSetup = '/profile-setup';
   static const String mergedRegistration = '/merged-registration';
   static const String addAddress = '/add-address';
-  static const String welcome = '/welcome';
+
   static const String home = '/home';
   static const String orders = '/orders';
   static const String trackOrder = '/track-order';
@@ -51,7 +51,7 @@ class AppRoutes {
         profileSetup: (context) => const ProfileSetupScreen(),
         mergedRegistration: (context) => const MergedRegistrationScreen(),
         addAddress: (context) => const AddAddressScreen(),
-        welcome: (context) => const WelcomeScreen(),
+
         home: (context) => const MainWrapper(),
       };
 
@@ -81,8 +81,6 @@ class AppRoutes {
       case addAddress:
         return MaterialPageRoute(builder: (_) => const AddAddressScreen());
 
-      case welcome:
-        return MaterialPageRoute(builder: (_) => const WelcomeScreen());
         
       case home:
         return MaterialPageRoute(builder: (_) => const MainWrapper());
@@ -157,9 +155,7 @@ class AppRoutes {
     Navigator.pushReplacementNamed(context, addAddress);
   }
 
-  static void navigateToWelcome(BuildContext context) {
-    Navigator.pushReplacementNamed(context, welcome);
-  }
+
 }
 
 // Profile Completion Check Widget

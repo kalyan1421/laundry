@@ -24,6 +24,7 @@ class BannerProvider with ChangeNotifier {
 
     try {
       _banners = await _bannerService.getBanners();
+      print('BannerProvider: Loaded ${_banners.length} banners');
     } catch (e) {
       _error = e.toString();
       print('Error in BannerProvider fetching banners: $_error');
@@ -31,5 +32,11 @@ class BannerProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // Force refresh banners (bypasses any caching)
+  Future<void> refreshBanners() async {
+    _banners.clear();
+    await fetchBanners();
   }
 }

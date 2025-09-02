@@ -9,6 +9,8 @@ import 'package:customer_app/presentation/widgets/common/custom_button.dart';
 import 'package:customer_app/services/order_notification_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'package:customer_app/core/theme/theme_extensions.dart';
+
 
 class EditOrderScreen extends StatefulWidget {
   final OrderModel order;
@@ -50,15 +52,56 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
 
   Future<void> _fetchAvailableItems() async {
     try {
-      QuerySnapshot snapshot = await _firestore
+      List<ItemModel> allItems = [];
+      
+      // Always fetch regular items
+      QuerySnapshot itemsSnapshot = await _firestore
           .collection('items')
           .where('isActive', isEqualTo: true)
           .orderBy('sortOrder')
           .get();
 
-      _availableItems = snapshot.docs
+      List<ItemModel> regularItems = itemsSnapshot.docs
           .map((doc) => ItemModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
           .toList();
+
+      // If service type is Laundry, also fetch allied services
+      if (widget.order.serviceType.toLowerCase().contains('laundry')) {
+        try {
+          QuerySnapshot alliedSnapshot = await _firestore
+              .collection('allied_services')
+              .where('isActive', isEqualTo: true)
+              .orderBy('sortOrder')
+              .get();
+
+          List<ItemModel> alliedServices = alliedSnapshot.docs.map((doc) {
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            // Convert allied service to ItemModel format
+            return ItemModel(
+              id: doc.id,
+              name: data['name'] ?? '',
+              category: 'Allied Service', // Set category for allied services
+              pricePerPiece: (data['offerPrice'] ?? data['price'] ?? 0.0).toDouble(),
+              unit: data['unit'] ?? 'service',
+              isActive: data['isActive'] ?? true,
+              order: data['sortOrder'] ?? 0,
+              imageUrl: data['imageUrl'], // Add image URL field
+              originalPrice: data['originalPrice']?.toDouble(),
+              offerPrice: data['offerPrice']?.toDouble(),
+            );
+          }).toList();
+          
+          allItems.addAll(alliedServices);
+        } catch (e) {
+          print('Error fetching allied services: $e');
+        }
+      }
+      
+      // Add regular items
+      allItems.addAll(regularItems);
+
+      // Filter items based on the current order's service type
+      _availableItems = _filterItemsByServiceType(allItems, widget.order.serviceType);
 
       setState(() {
         _isLoading = false;
@@ -69,6 +112,34 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
         _isLoading = false;
       });
       _showErrorSnackBar('Failed to load items. Please try again.');
+    }
+  }
+
+  // Helper method to filter items based on service type
+  List<ItemModel> _filterItemsByServiceType(List<ItemModel> allItems, String serviceType) {
+    if (serviceType.toLowerCase().contains('mixed')) {
+      // For mixed services, show all items
+      return allItems;
+    } else if (serviceType.toLowerCase().contains('ironing')) {
+      // For ironing services, show only ironing items
+      return allItems.where((item) => 
+        item.category.toLowerCase().contains('iron') || 
+        item.category.toLowerCase() == 'ironing'
+      ).toList();
+    } else if (serviceType.toLowerCase().contains('laundry')) {
+      // For laundry services, show only allied services
+      return allItems.where((item) => 
+        item.category.toLowerCase() == 'allied service'
+      ).toList();
+    } else if (serviceType.toLowerCase().contains('alien')) {
+      // For alien services, show only alien items
+      return allItems.where((item) => 
+        item.category.toLowerCase().contains('alien') || 
+        item.category.toLowerCase() == 'alien'
+      ).toList();
+    } else {
+      // Default: show all items
+      return allItems;
     }
   }
 
@@ -95,6 +166,109 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     setState(() {
       _totalAmount = total;
     });
+  }
+
+  // Helper method to determine service type based on selected items
+  String _determineServiceType() {
+    if (_selectedItems.isEmpty) {
+      return 'Laundry Service';
+    }
+    
+    Map<String, int> categoryCount = {};
+    
+    for (String itemName in _selectedItems.keys) {
+      int quantity = _selectedItems[itemName] ?? 0;
+      ItemModel? item = _availableItems.firstWhere(
+        (item) => item.name == itemName,
+        orElse: () => ItemModel(
+          id: '',
+          name: itemName,
+          category: '',
+          pricePerPiece: 0.0,
+          unit: 'piece',
+          isActive: true,
+          order: 0,
+        ),
+      );
+      
+      String category = item.category.toLowerCase();
+      
+      // Normalize category names
+      if (category.contains('iron') || category == 'ironing') {
+        categoryCount['ironing'] = (categoryCount['ironing'] ?? 0) + quantity;
+      } else if (category.contains('alien') || category == 'alien') {
+        categoryCount['alien'] = (categoryCount['alien'] ?? 0) + quantity;
+      } else {
+        // Everything else is considered laundry (wash & fold, dry cleaning, etc.)
+        categoryCount['laundry'] = (categoryCount['laundry'] ?? 0) + quantity;
+      }
+    }
+    
+    // Determine service type based on items
+    int ironingCount = categoryCount['ironing'] ?? 0;
+    int alienCount = categoryCount['alien'] ?? 0;
+    int laundryCount = categoryCount['laundry'] ?? 0;
+    
+    // Check for combinations
+    List<String> serviceTypes = [];
+    if (ironingCount > 0) serviceTypes.add('Ironing');
+    if (alienCount > 0) serviceTypes.add('Alien');
+    if (laundryCount > 0) serviceTypes.add('Laundry');
+    
+    if (serviceTypes.length > 1) {
+      return 'Mixed Service (${serviceTypes.join(' & ')})';
+    } else if (ironingCount > 0) {
+      return 'Ironing Service';
+    } else if (alienCount > 0) {
+      return 'Alien Service';
+    } else {
+      return 'Laundry Service';
+    }
+  }
+
+  // Helper methods for service type display
+  Widget _buildServiceTypeChip(String serviceType) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: _getServiceTypeColor(serviceType),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        serviceType.toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Color _getServiceTypeColor(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('ironing')) {
+      return Colors.orange[600]!;
+    } else if (type.contains('alien')) {
+      return Colors.green[600]!;
+    } else if (type.contains('mixed')) {
+      return Colors.purple[600]!;
+    } else {
+      return Colors.blue[600]!;
+    }
+  }
+
+  IconData _getServiceTypeIcon(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('ironing')) {
+      return Icons.iron;
+    } else if (type.contains('alien')) {
+      return Icons.space_dashboard; // Sci-fi/alien themed icon
+    } else if (type.contains('mixed')) {
+      return Icons.miscellaneous_services;
+    } else {
+      return Icons.local_laundry_service_outlined;
+    }
   }
 
   void _updateItemQuantity(String itemName, int newQuantity) {
@@ -190,10 +364,14 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
         });
       }
 
+      // Determine the new service type based on updated items
+      String newServiceType = _determineServiceType();
+
       // Update order in Firestore with enhanced tracking
       await _firestore.collection('orders').doc(widget.order.id).update({
         'items': updatedItems,
         'totalAmount': _totalAmount,
+        'serviceType': newServiceType,
         'updatedAt': FieldValue.serverTimestamp(),
         'lastModifiedBy': 'customer',
         'lastModifiedAt': FieldValue.serverTimestamp(),
@@ -258,6 +436,173 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     );
   }
 
+
+
+Widget _buildItemsSection() {
+  return Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Edit Items for ${widget.order.serviceType}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          children: _availableItems.map((item) {
+            final quantity = _selectedItems[item.name] ?? 0;
+            // Debug: Print item information
+            print('Item: ${item.name}, ImageURL: ${item.imageUrl}, Category: ${item.category}');
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: context.surfaceColor,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: context.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: context.surfaceVariant,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: item.imageUrl != null && item.imageUrl!.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: CachedNetworkImage(
+                            imageUrl: item.imageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              color: context.surfaceVariant,
+                              child: Icon(
+                                Icons.image,
+                                color: context.onSurfaceVariant,
+                                size: 20,
+                              ),
+                            ),
+                            errorWidget: (context, url, error) {
+                              print('Error loading image for ${item.name}: $error');
+                              print('Image URL: ${item.imageUrl}');
+                              return Icon(_getItemIcon(item.name),
+                                  color: context.onSurfaceVariant);
+                            },
+                          ),
+                        )
+                      : Icon(_getItemIcon(item.name),
+                          color: context.onSurfaceVariant),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: context.onSurfaceColor,
+                        ),
+                      ),
+                      // Price display with original and offer prices
+                      Row(
+                        children: [
+                          // Original Price (strikethrough) - Show first if there's an offer
+                          if (item.originalPrice != null &&
+                              item.originalPrice! >
+                                  (item.offerPrice ?? item.pricePerPiece))
+                            Text(
+                              '₹${item.originalPrice!.toInt()}',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                decoration: TextDecoration.lineThrough,
+                                color: context.onSurfaceVariant,
+                              ),
+                            ),
+                          // Add spacing between original and offer price
+                          if (item.originalPrice != null &&
+                              item.originalPrice! >
+                                  (item.offerPrice ?? item.pricePerPiece))
+                            const SizedBox(width: 8),
+                          // Current/Offer Price
+                          Text(
+                            '₹${(item.offerPrice ?? item.pricePerPiece).toInt()} per ${item.unit}',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: item.offerPrice != null
+                                  ? context.primaryColor
+                                  : context.onSurfaceVariant,
+                              fontWeight: item.offerPrice != null
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: quantity > 0
+                          ? () => _updateItemQuantity(item.name, quantity - 1)
+                          : null,
+                      icon: Icon(
+                        Icons.remove,
+                        color: quantity > 0
+                            ? context.onSurfaceVariant
+                            : context.outlineVariant,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      child: Text(
+                        '$quantity',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: context.onSurfaceColor,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => _updateItemQuantity(item.name, quantity + 1),
+                      icon: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: context.primaryColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.add,
+                          color: context.onPrimaryColor,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+          }).toList(),
+        ),
+      ),
+      // Add bottom spacing to account for the bottom sheet
+      const SizedBox(height: 120),
+    ],
+  );
+}
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -289,9 +634,14 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     if (!_canEditOrder()) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Edit Order'),
-          backgroundColor: Colors.white,
-          foregroundColor: AppColors.primary,
+                      title: Text('Edit Order', 
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: context.onSurfaceColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            backgroundColor: context.backgroundColor,
+            foregroundColor: context.onSurfaceColor,
           elevation: 0,
         ),
         body: Center(
@@ -300,7 +650,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
+                const Icon(
                   Icons.access_time,
                   size: 80,
                   color: Colors.orange,
@@ -308,16 +658,17 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                 const SizedBox(height: 24),
                 Text(
                   'Order Cannot Be Edited',
-                  style: AppTextTheme.headlineMedium.copyWith(
-                    color: AppColors.textPrimary,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: context.onSurfaceColor,
+                    fontWeight: FontWeight.bold,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'Orders can only be edited before processing starts. Your order is already being processed.',
-                  style: AppTextTheme.bodyLarge.copyWith(
-                    color: AppColors.textSecondary,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: context.onSurfaceVariant,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -336,9 +687,14 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Edit Order'),
-          backgroundColor: Colors.white,
-          foregroundColor: AppColors.primary,
+          title: Text('Edit Order', 
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: context.onSurfaceColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          backgroundColor: context.backgroundColor,
+          foregroundColor: context.onSurfaceColor,
           elevation: 0,
         ),
         body: const Center(child: CircularProgressIndicator()),
@@ -346,11 +702,16 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
-        title: const Text('Edit Order'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.primary,
+        title: Text('Edit Order', 
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                      color: context.onSurfaceColor,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: context.backgroundColor,
+        foregroundColor: context.onSurfaceColor ,
         elevation: 0,
       ),
       body: Column(
@@ -358,32 +719,37 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
           // Order Information Header
           Container(
             width: double.infinity,
-            color: Colors.white,
+            color: context.surfaceColor,
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Order Number
-                Text(
-                  'Order #${widget.order.orderNumber ?? widget.order.id}',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F3057),
-                  ),
+                // Order Number and Service Type
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Order #${widget.order.orderNumber ?? widget.order.id}',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: context.onSurfaceColor,
+                      ),
+                    ),
+                    _buildServiceTypeChip(_determineServiceType()),
+                  ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
+               
                 
                 // Pickup Information
                 Row(
                   children: [
-                    Icon(Icons.schedule, size: 16, color: Colors.grey[600]),
+                    Icon(Icons.schedule, size: 16, color: context.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Text(
                       'Pickup: ${_formatDate(widget.order.pickupDate.toDate())} • ${widget.order.pickupTimeSlot}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: context.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -408,155 +774,14 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
             ),
           ),
           
-          // Items Section Header
-          Container(
-            width: double.infinity,
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: const Text(
-              'Select Items for Ironing',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          
           // Items List
           Expanded(
             child: _availableItems.isEmpty
                 ? const Center(child: Text('No items available'))
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _availableItems.length,
-                    itemBuilder: (context, index) {
-                      ItemModel item = _availableItems[index];
-                      int currentQuantity = _selectedItems[item.name] ?? 0;
-                      
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[200]!),
-                        ),
-                          child: Row(
-                            children: [
-                            // Item Image/Icon
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: item.imageUrl != null && item.imageUrl!.isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: CachedNetworkImage(
-                                        imageUrl: item.imageUrl!,
-                                        fit: BoxFit.cover,
-                                        errorWidget: (context, url, error) {
-                                          return Icon(_getItemIcon(item.name), color: Colors.grey[400]);
-                                        },
-                                      ),
-                                    )
-                                  : Icon(_getItemIcon(item.name), color: Colors.grey[400]),
-                            ),
-                            const SizedBox(width: 16),
-                            
-                            // Item Details
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                  // Item Name
-                                    Text(
-                                      item.name,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      fontSize: 16,
-                                      ),
-                                    ),
-                                  
-                                  // Price Display with original and offer prices
-                                  Row(
-                                    children: [
-                                      // Original Price (strikethrough) - Show first if there's an offer
-                                      if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
-                                    Text(
-                                          '₹${item.originalPrice!.toInt()}',
-                                          style: const TextStyle(
-                                            decoration: TextDecoration.lineThrough,
-                                            color: Colors.grey,
-                                            fontSize: 12,
-                                      ),
-                                    ),
-                                      // Add spacing between original and offer price
-                                      if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.pricePerPiece))
-                                        const SizedBox(width: 8),
-                                      // Current/Offer Price
-                                      Text(
-                                        '₹${(item.offerPrice ?? item.pricePerPiece).toInt()} per ${item.unit}',
-                                        style: TextStyle(
-                                          color: item.offerPrice != null ? Colors.green[700] : Colors.grey[600],
-                                          fontSize: 14,
-                                          fontWeight: item.offerPrice != null ? FontWeight.w600 : FontWeight.normal,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  ],
-                                ),
-                              ),
-                              
-                            // Quantity Controls
-                              Row(
-                                children: [
-                                  IconButton(
-                                    onPressed: currentQuantity > 0
-                                        ? () => _updateItemQuantity(item.name, currentQuantity - 1)
-                                        : null,
-                                  icon: Icon(
-                                    Icons.remove,
-                                    color: currentQuantity > 0 ? Colors.grey[600] : Colors.grey[300],
-                                  ),
-                                  ),
-                                  Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                      child: Text(
-                                    '$currentQuantity',
-                                    style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                      fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    onPressed: () => _updateItemQuantity(item.name, currentQuantity + 1),
-                                  icon: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.blue,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.add,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                        ),
-                      );
-                    },
+                : SingleChildScrollView(
+                    child: _buildItemsSection(),
                   ),
           ),
-          SizedBox(height: 120,),
         ],
       ),
       
@@ -564,54 +789,53 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
       bottomSheet: Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        decoration: const BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-              color: Colors.black12,
+        decoration: BoxDecoration(
+          color: context.surfaceColor,
+          boxShadow: [
+            BoxShadow(
+              color: context.shadowColor.withOpacity(0.1),
               blurRadius: 8,
-              offset: Offset(0, -2),
-                ),
-              ],
+              offset: const Offset(0, -2),
             ),
+          ],
+        ),
         child: SafeArea(
-            child: Column(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
-              children: [
+            children: [
               // Total Amount Display
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+                    children: [
+                      Text(
                         'Total Items: ${_selectedItems.values.fold(0, (sum, quantity) => sum + quantity)}',
-                        style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                          fontSize: 16,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: context.onSurfaceColor,
+                        ),
                       ),
-                    ),
-                    Text(
+                      Text(
                         'Total Amount: ₹${_totalAmount.toInt()}',
-                        style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: Colors.blue,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: context.primaryColor,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
                   
                   // Update Button
-                SizedBox(
+                  SizedBox(
                     width: 150,
                     height: 48,
                     child: ElevatedButton(
-                    onPressed: _selectedItems.isEmpty || _isSaving ? null : _saveChanges,
+                      onPressed: _selectedItems.isEmpty || _isSaving ? null : _saveChanges,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F3057),
-                        foregroundColor: Colors.white,
+                        backgroundColor: context.primaryColor,
+                        foregroundColor: context.onPrimaryColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -635,11 +859,11 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                     ),
                   ),
                 ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
       ),
     );
   }
-} 
+}

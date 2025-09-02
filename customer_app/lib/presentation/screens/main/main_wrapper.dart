@@ -75,8 +75,10 @@ class _MainWrapperState extends State<MainWrapper> with AuthValidationMixin {
         backgroundColor: context.backgroundColor, centerTitle: true,
         // AppBar theme is now handled by the theme system
         title: Text(
-          'Cloud Ironing Factory',
+          'Cloud  Ironing  Factory',
           style: theme.textTheme.headlineSmall?.copyWith(
+           
+            fontSize: 22,
               color: theme.colorScheme.onSurface, fontWeight: FontWeight.w700),
         ),
         // All other AppBar properties are handled by theme

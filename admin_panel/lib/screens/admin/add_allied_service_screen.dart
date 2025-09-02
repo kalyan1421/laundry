@@ -22,6 +22,8 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
+  final _originalPriceController = TextEditingController();
+  final _offerPriceController = TextEditingController();
   final _unitController = TextEditingController();
   final _categoryController = TextEditingController();
   final _sortOrderController = TextEditingController();
@@ -66,6 +68,8 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
     _nameController.text = service.name;
     _descriptionController.text = service.description;
     _priceController.text = service.price.toString();
+    _originalPriceController.text = service.originalPrice?.toString() ?? '';
+    _offerPriceController.text = service.offerPrice?.toString() ?? '';
     _unitController.text = service.unit;
     _categoryController.text = service.category;
     _sortOrderController.text = service.sortOrder.toString();
@@ -79,6 +83,8 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
     _nameController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
+    _originalPriceController.dispose();
+    _offerPriceController.dispose();
     _unitController.dispose();
     _categoryController.dispose();
     _sortOrderController.dispose();
@@ -128,6 +134,12 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
           name: _nameController.text.trim(),
           description: _descriptionController.text.trim(),
           price: _hasPrice ? double.parse(_priceController.text) : 0.0,
+          originalPrice: _originalPriceController.text.trim().isNotEmpty 
+              ? double.parse(_originalPriceController.text) 
+              : null,
+          offerPrice: _offerPriceController.text.trim().isNotEmpty 
+              ? double.parse(_offerPriceController.text) 
+              : null,
           category: _categoryController.text.trim(),
           unit: _unitController.text.trim(),
           isActive: _isActive,
@@ -165,6 +177,12 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
           'name': _nameController.text.trim(),
           'description': _descriptionController.text.trim(),
           'price': _hasPrice ? double.parse(_priceController.text) : 0.0,
+          'originalPrice': _originalPriceController.text.trim().isNotEmpty 
+              ? double.parse(_originalPriceController.text) 
+              : null,
+          'offerPrice': _offerPriceController.text.trim().isNotEmpty 
+              ? double.parse(_offerPriceController.text) 
+              : null,
           'category': _categoryController.text.trim(),
           'unit': _unitController.text.trim(),
           'isActive': _isActive,
@@ -411,13 +429,14 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
               const SizedBox(height: 8),
 
               if (_hasPrice) ...[
+                // Current/Regular Price
                 Row(
                   children: [
                     Expanded(
                       flex: 2,
                       child: CustomTextField(
                         controller: _priceController,
-                        label: 'Price (₹)',
+                        label: 'Current Price (₹)',
                         keyboardType: TextInputType.number,
                         validator: (value) {
                           if (_hasPrice && (value == null || value.trim().isEmpty)) {
@@ -454,6 +473,72 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please select unit';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                // Pricing Options Section
+                const Text(
+                  'Pricing Options (Optional)',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Set original price and offer price to show discounts like regular items',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                
+                // Original Price and Offer Price
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomTextField(
+                        controller: _originalPriceController,
+                        label: 'Original Price (₹) - Optional',
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value != null && value.trim().isNotEmpty) {
+                            if (double.tryParse(value) == null) {
+                              return 'Please enter valid price';
+                            }
+                            // Check if original price is higher than current price
+                            if (_priceController.text.isNotEmpty) {
+                              final currentPrice = double.tryParse(_priceController.text);
+                              final originalPrice = double.tryParse(value);
+                              if (currentPrice != null && originalPrice != null && originalPrice <= currentPrice) {
+                                return 'Original price should be higher than current price';
+                              }
+                            }
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: CustomTextField(
+                        controller: _offerPriceController,
+                        label: 'Offer Price (₹) - Optional',
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value != null && value.trim().isNotEmpty) {
+                            if (double.tryParse(value) == null) {
+                              return 'Please enter valid price';
+                            }
+                            // Check if offer price is lower than current price
+                            if (_priceController.text.isNotEmpty) {
+                              final currentPrice = double.tryParse(_priceController.text);
+                              final offerPrice = double.tryParse(value);
+                              if (currentPrice != null && offerPrice != null && offerPrice >= currentPrice) {
+                                return 'Offer price should be lower than current price';
+                              }
+                            }
                           }
                           return null;
                         },

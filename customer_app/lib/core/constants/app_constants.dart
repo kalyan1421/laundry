@@ -19,7 +19,7 @@ class AppConstants {
   
   // App Info
   static const String appName = 'Cloud Ironing';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.6.0';
   static const String companyName = 'Cloud Ironing Factory';
   
   // ===============================

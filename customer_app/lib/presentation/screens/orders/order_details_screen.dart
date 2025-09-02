@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:customer_app/data/models/order_model.dart';
 import 'package:customer_app/services/order_notification_service.dart';
+import 'package:customer_app/presentation/screens/orders/order_tracking_screen.dart';
 import 'package:flutter/material.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
@@ -155,23 +156,55 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   _buildPaymentSection(),
                   const SizedBox(height: 16),
 
-                  // Cancel button (only show if order is cancellable)
-                  if (_canCancelOrder())
-                    Center(
-                      child: ElevatedButton.icon(
-                        onPressed: _cancelOrder,
-                        icon: const Icon(Icons.cancel, color: Colors.white),
-                        label: const Text('Cancel Order'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 12,
+                  // Action buttons row
+                  Row(
+                    children: [
+                      // Track Order button
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            // Navigate to order tracking screen with the specific order
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => OrderTrackingScreen(order: widget.order),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.track_changes, color: Colors.white),
+                          label: const Text('Track Order'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F3057),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                      
+                      // Cancel button (only show if order is cancellable)
+                      if (_canCancelOrder()) ...[
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _cancelOrder,
+                            icon: const Icon(Icons.cancel, color: Colors.white),
+                            label: const Text('Cancel Order'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -231,6 +264,44 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             Text(
               'Placed on: ${_formatDate(widget.order.orderTimestamp)}',
               style: const TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            // Service Type section
+            Row(
+              children: [
+                Icon(
+                  _getServiceIcon(widget.order.serviceType),
+                  color: _getServiceColor(widget.order.serviceType),
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Service Type: ',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _getServiceColor(widget.order.serviceType).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _getServiceColor(widget.order.serviceType).withOpacity(0.3),
+                    ),
+                  ),
+                  child: Text(
+                    widget.order.serviceType,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _getServiceColor(widget.order.serviceType),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -342,5 +413,41 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   String _formatDate(Timestamp timestamp) {
     final date = timestamp.toDate();
     return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  IconData _getServiceIcon(String serviceType) {
+    switch (serviceType.toLowerCase()) {
+      case 'ironing service':
+      case 'ironing':
+        return Icons.iron;
+      case 'laundry service':
+      case 'laundry':
+        return Icons.local_laundry_service;
+      case 'alien service':
+      case 'alien':
+        return Icons.cleaning_services;
+      case 'mixed':
+        return Icons.miscellaneous_services;
+      default:
+        return Icons.room_service;
+    }
+  }
+
+  Color _getServiceColor(String serviceType) {
+    switch (serviceType.toLowerCase()) {
+      case 'ironing service':
+      case 'ironing':
+        return Colors.orange;
+      case 'laundry service':
+      case 'laundry':
+        return Colors.blue;
+      case 'alien service':
+      case 'alien':
+        return Colors.green;
+      case 'mixed':
+        return Colors.purple;
+      default:
+        return Colors.grey;
+    }
   }
 }

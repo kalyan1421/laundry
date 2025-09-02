@@ -21,6 +21,18 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> {
     final alliedServiceProvider = Provider.of<AlliedServiceProvider>(context);
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          if (mounted) {
+            Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddAlliedServiceScreen()),
+          );
+          }
+        },
+        child: const Icon(Icons.add),
+      ),
+      
       body: StreamBuilder<List<AlliedServiceModel>>(
         stream: alliedServiceProvider.alliedServicesStream(),
         builder: (context, snapshot) {
@@ -51,45 +63,45 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> {
           return Column(
             children: [
               // Header with Add Button
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Allied Services Management',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F3057),
-                      ),
-                    ),
-                    CustomButton(
-                      text: 'Add New Service',
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AddAlliedServiceScreen(),
-                          ),
-                        );
-                      },
-                      icon: Icons.add,
-                    ),
-                  ],
-                ),
-              ),
+              // Container(
+              //   padding: const EdgeInsets.all(16),
+              //   decoration: BoxDecoration(
+              //     color: Colors.white,
+              //     boxShadow: [
+              //       BoxShadow(
+              //         color: Colors.grey.withOpacity(0.1),
+              //         spreadRadius: 1,
+              //         blurRadius: 4,
+              //         offset: const Offset(0, 2),
+              //       ),
+              //     ],
+              //   ),
+              //   child: Row(
+              //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              //     children: [
+              //       const Text(
+              //         'Allied Services Management',
+              //         style: TextStyle(
+              //           fontSize: 24,
+              //           fontWeight: FontWeight.bold,
+              //           color: Color(0xFF0F3057),
+              //         ),
+              //       ),
+              //       CustomButton(
+              //         text: 'Add New Service',
+              //         onPressed: () {
+              //           Navigator.push(
+              //             context,
+              //             MaterialPageRoute(
+              //               builder: (context) => const AddAlliedServiceScreen(),
+              //             ),
+              //           );
+              //         },
+              //         icon: Icons.add,
+              //       ),
+              //     ],
+              //   ),
+              // ),
 
               // Services List
               Expanded(
