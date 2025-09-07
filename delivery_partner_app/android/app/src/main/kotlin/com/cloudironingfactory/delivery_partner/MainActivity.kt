@@ -1,4 +1,4 @@
-package com.example.delivery_partner_app
+package com.cloudironingfactory.delivery_partner
 
 import io.flutter.embedding.android.FlutterActivity
 
