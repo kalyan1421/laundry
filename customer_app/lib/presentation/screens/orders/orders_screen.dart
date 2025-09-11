@@ -21,7 +21,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Stream<List<OrderModel>>? _ordersStream;
-  String _selectedFilter = 'All'; // All, Ironing, Alien, Laundry, Mixed
+  String _selectedFilter = 'All'; // All, Ironing, Allied, Laundry, Mixed
 
   @override
   void initState() {
@@ -129,8 +129,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final type = serviceType.toLowerCase();
     if (type.contains('ironing')) {
       return Icons.iron;
-    } else if (type.contains('alien')) {
-      return Icons.space_dashboard;
+    } else if (type.contains('allied')) {
+      return Icons.cleaning_services;
     } else if (type.contains('mixed')) {
       return Icons.miscellaneous_services;
     } else {
@@ -142,7 +142,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final type = serviceType.toLowerCase();
     if (type.contains('ironing')) {
       return Colors.orange[600]!;
-    } else if (type.contains('alien')) {
+    } else if (type.contains('allied')) {
       return Colors.green[600]!;
     } else if (type.contains('mixed')) {
       return Colors.purple[600]!;
@@ -196,8 +196,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
         case 'Ironing':
           return order.serviceType.toLowerCase().contains('ironing') && 
                  !order.serviceType.toLowerCase().contains('mixed');
-        case 'Alien':
-          return order.serviceType.toLowerCase().contains('alien') && 
+        case 'Allied':
+          return order.serviceType.toLowerCase().contains('allied') && 
                  !order.serviceType.toLowerCase().contains('mixed');
         case 'Laundry':
           return order.serviceType.toLowerCase().contains('laundry') && 

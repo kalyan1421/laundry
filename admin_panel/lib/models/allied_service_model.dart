@@ -6,7 +6,8 @@ class AlliedServiceModel {
   final double price;
   final double? originalPrice; // Optional original price
   final double? offerPrice; // Optional offer price
-  final String category;
+  final String category; // Main category: "Allied Services"
+  final String subCategory; // Subcategory: "Allied Services", "Laundry", "Special Services"
   final String unit;
   final bool isActive;
   final bool hasPrice; // Some services might not have fixed price
@@ -23,6 +24,7 @@ class AlliedServiceModel {
     this.originalPrice,
     this.offerPrice,
     required this.category,
+    required this.subCategory,
     required this.unit,
     required this.isActive,
     required this.hasPrice,
@@ -42,6 +44,7 @@ class AlliedServiceModel {
       originalPrice: map['originalPrice'] != null ? (map['originalPrice'] as num).toDouble() : null,
       offerPrice: map['offerPrice'] != null ? (map['offerPrice'] as num).toDouble() : null,
       category: map['category'] ?? 'Allied Services',
+      subCategory: map['subCategory'] ?? 'Allied Services',
       unit: map['unit'] ?? 'piece',
       isActive: map['isActive'] ?? true,
       hasPrice: map['hasPrice'] ?? true,
@@ -61,6 +64,7 @@ class AlliedServiceModel {
       if (originalPrice != null) 'originalPrice': originalPrice,
       if (offerPrice != null) 'offerPrice': offerPrice,
       'category': category,
+      'subCategory': subCategory,
       'unit': unit,
       'isActive': isActive,
       'hasPrice': hasPrice,
@@ -80,6 +84,7 @@ class AlliedServiceModel {
     double? originalPrice,
     double? offerPrice,
     String? category,
+    String? subCategory,
     String? unit,
     bool? isActive,
     bool? hasPrice,
@@ -96,6 +101,7 @@ class AlliedServiceModel {
       originalPrice: originalPrice ?? this.originalPrice,
       offerPrice: offerPrice ?? this.offerPrice,
       category: category ?? this.category,
+      subCategory: subCategory ?? this.subCategory,
       unit: unit ?? this.unit,
       isActive: isActive ?? this.isActive,
       hasPrice: hasPrice ?? this.hasPrice,

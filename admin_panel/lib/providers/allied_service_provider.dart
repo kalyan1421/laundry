@@ -189,6 +189,45 @@ class AlliedServiceProvider extends ChangeNotifier {
     return _alliedServices.where((service) => service.category == category).toList();
   }
 
+  List<AlliedServiceModel> getServicesBySubCategory(String subCategory) {
+    return _alliedServices.where((service) => 
+        service.subCategory == subCategory && service.isActive).toList();
+  }
+
+  Map<String, List<AlliedServiceModel>> getServicesGroupedBySubCategory() {
+    Map<String, List<AlliedServiceModel>> grouped = {};
+    
+    for (var service in _alliedServices) {
+      if (service.isActive) {
+        if (!grouped.containsKey(service.subCategory)) {
+          grouped[service.subCategory] = [];
+        }
+        grouped[service.subCategory]!.add(service);
+      }
+    }
+    
+    // Sort services within each subcategory by sortOrder, then by name
+    grouped.forEach((key, services) {
+      services.sort((a, b) {
+        if (a.sortOrder != b.sortOrder) {
+          return a.sortOrder.compareTo(b.sortOrder);
+        }
+        return a.name.compareTo(b.name);
+      });
+    });
+    
+    return grouped;
+  }
+
+  List<String> getAvailableSubCategories() {
+    return _alliedServices
+        .where((service) => service.isActive)
+        .map((service) => service.subCategory)
+        .toSet()
+        .toList()
+        ..sort();
+  }
+
   AlliedServiceModel? getServiceById(String id) {
     try {
       return _alliedServices.firstWhere((service) => service.id == id);

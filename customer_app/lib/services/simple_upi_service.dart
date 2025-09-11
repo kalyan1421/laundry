@@ -3,7 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:logger/logger.dart';
 
 class SimpleUpiService {
-  static const String _merchantUpiId = '7396674546@axl';
+  static const String _merchantUpiId = '7396674546-3@ybl';
   static const String _merchantName = 'Cloud Ironing Factory';
   
   final Logger _logger = Logger();

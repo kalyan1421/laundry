@@ -17,7 +17,7 @@ class UpiApp {
 }
 
 class UpiAppSelectionService {
-  static const String _merchantUpiId = '7396674546@axl';
+  static const String _merchantUpiId = '7396674546-3@ybl';
   static const String _merchantName = 'Cloud Ironing Factory';
   
   final Logger _logger = Logger();

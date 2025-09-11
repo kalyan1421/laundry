@@ -441,8 +441,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       case 'laundry service':
       case 'laundry':
         return Icons.local_laundry_service;
-      case 'alien service':
-      case 'alien':
+      case 'allied service':
+      case 'allied':
         return Icons.cleaning_services;
       case 'mixed':
         return Icons.miscellaneous_services;
@@ -459,8 +459,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       case 'laundry service':
       case 'laundry':
         return Colors.blue;
-      case 'alien service':
-      case 'alien':
+      case 'allied service':
+      case 'allied':
         return Colors.green;
       case 'mixed':
         return Colors.purple;

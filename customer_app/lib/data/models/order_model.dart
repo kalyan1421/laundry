@@ -333,8 +333,8 @@ class OrderModel {
         // Normalize category names
         if (category.contains('iron') || category == 'ironing') {
           categoryCount['ironing'] = (categoryCount['ironing'] ?? 0) + ((item['quantity'] as int?) ?? 1);
-        } else if (category.contains('alien') || category == 'alien') {
-          categoryCount['alien'] = (categoryCount['alien'] ?? 0) + ((item['quantity'] as int?) ?? 1);
+        } else if (category.contains('allied') || category == 'allied service' || category == 'allied services') {
+          categoryCount['allied'] = (categoryCount['allied'] ?? 0) + ((item['quantity'] as int?) ?? 1);
         } else {
           // Everything else is considered laundry (wash & fold, dry cleaning, etc.)
           categoryCount['laundry'] = (categoryCount['laundry'] ?? 0) + ((item['quantity'] as int?) ?? 1);
@@ -344,21 +344,21 @@ class OrderModel {
     
     // Determine service type based on items
     int ironingCount = categoryCount['ironing'] ?? 0;
-    int alienCount = categoryCount['alien'] ?? 0;
+    int alliedCount = categoryCount['allied'] ?? 0;
     int laundryCount = categoryCount['laundry'] ?? 0;
     
     // Check for combinations
     List<String> serviceTypes = [];
     if (ironingCount > 0) serviceTypes.add('Ironing');
-    if (alienCount > 0) serviceTypes.add('Alien');
+    if (alliedCount > 0) serviceTypes.add('Allied');
     if (laundryCount > 0) serviceTypes.add('Laundry');
     
     if (serviceTypes.length > 1) {
       return 'Mixed Service (${serviceTypes.join(' & ')})';
     } else if (ironingCount > 0) {
       return 'Ironing Service';
-    } else if (alienCount > 0) {
-      return 'Alien Service';
+    } else if (alliedCount > 0) {
+      return 'Allied Service';
     } else {
       return 'Laundry Service';
     }

@@ -26,6 +26,7 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
   final _offerPriceController = TextEditingController();
   final _unitController = TextEditingController();
   final _categoryController = TextEditingController();
+  final _subCategoryController = TextEditingController();
   final _sortOrderController = TextEditingController();
 
   bool _isActive = true;
@@ -36,10 +37,13 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
   bool _isLoading = false;
 
   final List<String> _predefinedCategories = [
+    'Allied Services', // Main category - always this
+  ];
+
+  final List<String> _predefinedSubCategories = [
     'Allied Services',
-    'Cleaning Services',
+    'Laundry',
     'Special Services',
-    'Premium Services',
   ];
 
   final List<String> _predefinedUnits = [
@@ -58,6 +62,7 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
     } else {
       // Set default values for new service
       _categoryController.text = 'Allied Services';
+      _subCategoryController.text = 'Allied Services';
       _unitController.text = 'piece';
       _sortOrderController.text = '0';
     }
@@ -72,6 +77,7 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
     _offerPriceController.text = service.offerPrice?.toString() ?? '';
     _unitController.text = service.unit;
     _categoryController.text = service.category;
+    _subCategoryController.text = service.subCategory;
     _sortOrderController.text = service.sortOrder.toString();
     _isActive = service.isActive;
     _hasPrice = service.hasPrice;
@@ -87,6 +93,7 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
     _offerPriceController.dispose();
     _unitController.dispose();
     _categoryController.dispose();
+    _subCategoryController.dispose();
     _sortOrderController.dispose();
     super.dispose();
   }
@@ -141,6 +148,7 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
               ? double.parse(_offerPriceController.text) 
               : null,
           category: _categoryController.text.trim(),
+          subCategory: _subCategoryController.text.trim(),
           unit: _unitController.text.trim(),
           isActive: _isActive,
           hasPrice: _hasPrice,
@@ -184,6 +192,7 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
               ? double.parse(_offerPriceController.text) 
               : null,
           'category': _categoryController.text.trim(),
+          'subCategory': _subCategoryController.text.trim(),
           'unit': _unitController.text.trim(),
           'isActive': _isActive,
           'hasPrice': _hasPrice,
@@ -380,14 +389,15 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Category Dropdown
+              // Category Dropdown (Main Category - Always "Allied Services")
               DropdownButtonFormField<String>(
                 value: _predefinedCategories.contains(_categoryController.text) 
                     ? _categoryController.text 
                     : null,
                 decoration: const InputDecoration(
-                  labelText: 'Category',
+                  labelText: 'Main Category',
                   border: OutlineInputBorder(),
+                  helperText: 'Main category is always "Allied Services"',
                 ),
                 items: _predefinedCategories.map((category) {
                   return DropdownMenuItem(
@@ -403,6 +413,36 @@ class _AddAlliedServiceScreenState extends State<AddAlliedServiceScreen> {
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please select a category';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Subcategory Dropdown
+              DropdownButtonFormField<String>(
+                value: _predefinedSubCategories.contains(_subCategoryController.text) 
+                    ? _subCategoryController.text 
+                    : null,
+                decoration: const InputDecoration(
+                  labelText: 'Subcategory',
+                  border: OutlineInputBorder(),
+                  helperText: 'Choose the specific service subcategory',
+                ),
+                items: _predefinedSubCategories.map((subCategory) {
+                  return DropdownMenuItem(
+                    value: subCategory,
+                    child: Text(subCategory),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    _subCategoryController.text = value;
+                  }
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select a subcategory';
                   }
                   return null;
                 },

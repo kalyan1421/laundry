@@ -131,11 +131,12 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
       return allItems.where((item) => 
         item.category.toLowerCase() == 'allied service'
       ).toList();
-    } else if (serviceType.toLowerCase().contains('alien')) {
-      // For alien services, show only alien items
+    } else if (serviceType.toLowerCase().contains('allied')) {
+      // For allied services, show only allied items
       return allItems.where((item) => 
-        item.category.toLowerCase().contains('alien') || 
-        item.category.toLowerCase() == 'alien'
+        item.category.toLowerCase().contains('allied') || 
+        item.category.toLowerCase() == 'allied service' ||
+        item.category.toLowerCase() == 'allied services'
       ).toList();
     } else {
       // Default: show all items
@@ -196,8 +197,8 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
       // Normalize category names
       if (category.contains('iron') || category == 'ironing') {
         categoryCount['ironing'] = (categoryCount['ironing'] ?? 0) + quantity;
-      } else if (category.contains('alien') || category == 'alien') {
-        categoryCount['alien'] = (categoryCount['alien'] ?? 0) + quantity;
+      } else if (category.contains('allied') || category == 'allied service' || category == 'allied services') {
+        categoryCount['allied'] = (categoryCount['allied'] ?? 0) + quantity;
       } else {
         // Everything else is considered laundry (wash & fold, dry cleaning, etc.)
         categoryCount['laundry'] = (categoryCount['laundry'] ?? 0) + quantity;
@@ -206,21 +207,21 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     
     // Determine service type based on items
     int ironingCount = categoryCount['ironing'] ?? 0;
-    int alienCount = categoryCount['alien'] ?? 0;
+    int alliedCount = categoryCount['allied'] ?? 0;
     int laundryCount = categoryCount['laundry'] ?? 0;
     
     // Check for combinations
     List<String> serviceTypes = [];
     if (ironingCount > 0) serviceTypes.add('Ironing');
-    if (alienCount > 0) serviceTypes.add('Alien');
+    if (alliedCount > 0) serviceTypes.add('Allied');
     if (laundryCount > 0) serviceTypes.add('Laundry');
     
     if (serviceTypes.length > 1) {
       return 'Mixed Service (${serviceTypes.join(' & ')})';
     } else if (ironingCount > 0) {
       return 'Ironing Service';
-    } else if (alienCount > 0) {
-      return 'Alien Service';
+    } else if (alliedCount > 0) {
+      return 'Allied Service';
     } else {
       return 'Laundry Service';
     }
@@ -249,7 +250,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     final type = serviceType.toLowerCase();
     if (type.contains('ironing')) {
       return Colors.orange[600]!;
-    } else if (type.contains('alien')) {
+    } else if (type.contains('allied')) {
       return Colors.green[600]!;
     } else if (type.contains('mixed')) {
       return Colors.purple[600]!;
@@ -262,8 +263,8 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     final type = serviceType.toLowerCase();
     if (type.contains('ironing')) {
       return Icons.iron;
-    } else if (type.contains('alien')) {
-      return Icons.space_dashboard; // Sci-fi/alien themed icon
+    } else if (type.contains('allied')) {
+      return Icons.cleaning_services; // Allied services icon
     } else if (type.contains('mixed')) {
       return Icons.miscellaneous_services;
     } else {

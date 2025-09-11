@@ -782,7 +782,7 @@ class _SimpleUpiScreenState extends State<SimpleUpiScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    '• Check if UPI ID 7396674546@axl is active\n'
+                    '• Check if UPI ID 7396674546-3@ybl is active\n'
                     '• Try Google Pay instead of PhonePe\n'
                     '• Use "Pay Manually" option below\n'
                     '• Ensure stable internet connection',

@@ -15,7 +15,26 @@ class ManageAlliedServices extends StatefulWidget {
   State<ManageAlliedServices> createState() => _ManageAlliedServicesState();
 }
 
-class _ManageAlliedServicesState extends State<ManageAlliedServices> {
+class _ManageAlliedServicesState extends State<ManageAlliedServices> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  
+  final List<String> _subCategories = [
+    'Allied Services',
+    'Laundry', 
+    'Special Services',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _subCategories.length, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
   @override
   Widget build(BuildContext context) {
     final alliedServiceProvider = Provider.of<AlliedServiceProvider>(context);
@@ -25,9 +44,9 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> {
         onPressed: () {
           if (mounted) {
             Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddAlliedServiceScreen()),
-          );
+              context,
+              MaterialPageRoute(builder: (context) => const AddAlliedServiceScreen()),
+            );
           }
         },
         child: const Icon(Icons.add),
@@ -62,82 +81,180 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> {
 
           return Column(
             children: [
-              // Header with Add Button
-              // Container(
-              //   padding: const EdgeInsets.all(16),
-              //   decoration: BoxDecoration(
-              //     color: Colors.white,
-              //     boxShadow: [
-              //       BoxShadow(
-              //         color: Colors.grey.withOpacity(0.1),
-              //         spreadRadius: 1,
-              //         blurRadius: 4,
-              //         offset: const Offset(0, 2),
-              //       ),
-              //     ],
-              //   ),
-              //   child: Row(
-              //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              //     children: [
-              //       const Text(
-              //         'Allied Services Management',
-              //         style: TextStyle(
-              //           fontSize: 24,
-              //           fontWeight: FontWeight.bold,
-              //           color: Color(0xFF0F3057),
-              //         ),
-              //       ),
-              //       CustomButton(
-              //         text: 'Add New Service',
-              //         onPressed: () {
-              //           Navigator.push(
-              //             context,
-              //             MaterialPageRoute(
-              //               builder: (context) => const AddAlliedServiceScreen(),
-              //             ),
-              //           );
-              //         },
-              //         icon: Icons.add,
-              //       ),
-              //     ],
-              //   ),
-              // ),
-
-              // Services List
-              Expanded(
-                child: alliedServices.isEmpty
-                    ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.local_laundry_service, size: 64, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text(
-                              'No allied services found',
-                              style: TextStyle(fontSize: 18, color: Colors.grey),
+              // Tab Bar
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: const Color(0xFF0F3057),
+                  unselectedLabelColor: Colors.grey,
+                  indicatorColor: const Color(0xFF0F3057),
+                  indicatorWeight: 3,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.normal,
+                    fontSize: 14,
+                  ),
+                  tabs: _subCategories.map((subCategory) {
+                    final servicesInCategory = alliedServices
+                        .where((service) => service.subCategory == subCategory)
+                        .length;
+                    
+                    return Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getSubCategoryIcon(subCategory),
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(subCategory),
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _getSubCategoryColor(subCategory),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Add your first allied service to get started',
-                              style: TextStyle(fontSize: 14, color: Colors.grey),
+                            child: Text(
+                              '$servicesInCategory',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: alliedServices.length,
-                        itemBuilder: (context, index) {
-                          final service = alliedServices[index];
-                          return _buildServiceCard(service, alliedServiceProvider);
-                        },
+                          ),
+                        ],
                       ),
+                    );
+                  }).toList(),
+                ),
+              ),
+
+              // Tab Views
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: _subCategories.map((subCategory) {
+                    final servicesInCategory = alliedServices
+                        .where((service) => service.subCategory == subCategory)
+                        .toList();
+                    
+                    // Sort services by sortOrder, then by name
+                    servicesInCategory.sort((a, b) {
+                      if (a.sortOrder != b.sortOrder) {
+                        return a.sortOrder.compareTo(b.sortOrder);
+                      }
+                      return a.name.compareTo(b.name);
+                    });
+
+                    return _buildTabContent(subCategory, servicesInCategory, alliedServiceProvider);
+                  }).toList(),
+                ),
               ),
             ],
           );
         },
       ),
     );
+  }
+
+  Widget _buildTabContent(String subCategory, List<AlliedServiceModel> services, AlliedServiceProvider provider) {
+    if (services.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _getSubCategoryIcon(subCategory),
+              size: 64,
+              color: Colors.grey,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No $subCategory services found',
+              style: const TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Add your first $subCategory service to get started',
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AddAlliedServiceScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: Text('Add $subCategory Service'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _getSubCategoryColor(subCategory),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: services.length,
+      itemBuilder: (context, index) {
+        final service = services[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildServiceCard(service, provider),
+        );
+      },
+    );
+  }
+
+  Color _getSubCategoryColor(String subCategory) {
+    switch (subCategory.toLowerCase()) {
+      case 'allied services':
+        return Colors.blue;
+      case 'laundry':
+        return Colors.green;
+      case 'special services':
+        return Colors.purple;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  IconData _getSubCategoryIcon(String subCategory) {
+    switch (subCategory.toLowerCase()) {
+      case 'allied services':
+        return Icons.cleaning_services;
+      case 'laundry':
+        return Icons.local_laundry_service;
+      case 'special services':
+        return Icons.star_border;
+      default:
+        return Icons.room_service;
+    }
   }
 
   Widget _buildServiceCard(AlliedServiceModel service, AlliedServiceProvider provider) {
@@ -228,17 +345,28 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.blue[50],
+                              color: _getSubCategoryColor(service.subCategory).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.blue[200]!),
+                              border: Border.all(color: _getSubCategoryColor(service.subCategory).withOpacity(0.3)),
                             ),
-                            child: Text(
-                              service.category,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue[700],
-                                fontWeight: FontWeight.w500,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _getSubCategoryIcon(service.subCategory),
+                                  size: 12,
+                                  color: _getSubCategoryColor(service.subCategory),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  service.subCategory,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: _getSubCategoryColor(service.subCategory),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -258,6 +386,22 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: service.hasPrice ? Colors.green[700] : Colors.orange[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'Order: ${service.sortOrder}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[600],
                                 fontWeight: FontWeight.w500,
                               ),
                             ),

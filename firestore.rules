@@ -427,5 +427,12 @@ service cloud.firestore {
       // Allow admins to read all addresses across all collections
       allow read, list: if isAdmin();
     }
+    
+    // ========== ORDER COUNTERS ==========
+    match /counters/{counterId} {
+      // Allow authenticated users to read and write counter documents
+      // This is needed for order number generation
+      allow read, write: if isAuthenticated();
+    }
   }
 }

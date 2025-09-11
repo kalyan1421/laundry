@@ -18,6 +18,7 @@ import '../../providers/auth_provider.dart' as auth_provider;
 import 'package:customer_app/core/utils/address_utils.dart';
 import 'package:customer_app/services/order_notification_service.dart';
 import 'package:customer_app/presentation/screens/payment/upi_app_selection_screen.dart';
+import '../../widgets/payment/upi_payment_widget.dart';
 
 // Define PaymentMethod enum
 enum PaymentMethod { cod, upi }
@@ -976,29 +977,60 @@ class _SchedulePickupDeliveryScreenState
       return;
     }
 
-    // Navigate to our new UPI app selection screen
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => UpiAppSelectionScreen(
-          amount: widget.totalAmount >= 10
-              ? widget.totalAmount
-              : 10.0, // Minimum ₹10 for testing
-          description: 'Laundry service payment - ${_totalItemCount} items',
-          orderId: 'ORDER_${DateTime.now().millisecondsSinceEpoch}',
+    // Show enhanced UPI payment widget
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: UPIPaymentWidget(
+                amount: widget.totalAmount >= 1
+                    ? widget.totalAmount
+                    : 1.0, // Minimum ₹1 for UPI
+                description: 'Laundry service - ${_totalItemCount} items',
+                orderId: 'ORDER_${DateTime.now().millisecondsSinceEpoch}',
+                onPaymentResult: (result) async {
+                  Navigator.pop(context); // Close the payment sheet
+                  if (result['success'] == true) {
+                    // Payment successful, process the order
+                    await _processOrder(
+                      paymentStatus: 'completed',
+                      transactionId: result['transactionId'] ??
+                          'UPI_${DateTime.now().millisecondsSinceEpoch}',
+                    );
+                  } else {
+                    // Payment failed or cancelled
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(result['message'] ?? 'Payment cancelled'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  }
+                },
+                onCancel: () {
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+          ),
         ),
       ),
     );
-
-    // Check if payment was completed successfully
-    if (result != null && result['success'] == true) {
-      // Payment successful, process the order
-      await _processOrder(
-        paymentStatus: 'completed',
-        transactionId: result['transactionId'] ??
-            'UPI_${DateTime.now().millisecondsSinceEpoch}',
-      );
-    }
   }
 
   // Helper method to determine service type based on items
@@ -1017,8 +1049,8 @@ class _SchedulePickupDeliveryScreenState
       // Normalize category names
       if (category.contains('iron') || category == 'ironing') {
         categoryCount['ironing'] = (categoryCount['ironing'] ?? 0) + quantity;
-      } else if (category.contains('alien') || category == 'alien') {
-        categoryCount['alien'] = (categoryCount['alien'] ?? 0) + quantity;
+      } else if (category.contains('allied') || category == 'allied service' || category == 'allied services') {
+        categoryCount['allied'] = (categoryCount['allied'] ?? 0) + quantity;
       } else {
         // Everything else is considered laundry (wash & fold, dry cleaning, etc.)
         categoryCount['laundry'] = (categoryCount['laundry'] ?? 0) + quantity;
@@ -1027,21 +1059,21 @@ class _SchedulePickupDeliveryScreenState
     
     // Determine service type based on items
     int ironingCount = categoryCount['ironing'] ?? 0;
-    int alienCount = categoryCount['alien'] ?? 0;
+    int alliedCount = categoryCount['allied'] ?? 0;
     int laundryCount = categoryCount['laundry'] ?? 0;
     
     // Check for combinations
     List<String> serviceTypes = [];
     if (ironingCount > 0) serviceTypes.add('Ironing');
-    if (alienCount > 0) serviceTypes.add('Alien');
+    if (alliedCount > 0) serviceTypes.add('Allied');
     if (laundryCount > 0) serviceTypes.add('Laundry');
     
     if (serviceTypes.length > 1) {
       return 'Mixed Service (${serviceTypes.join(' & ')})';
     } else if (ironingCount > 0) {
       return 'Ironing Service';
-    } else if (alienCount > 0) {
-      return 'Alien Service';
+    } else if (alliedCount > 0) {
+      return 'Allied Service';
     } else {
       return 'Laundry Service';
     }
@@ -1116,11 +1148,6 @@ class _SchedulePickupDeliveryScreenState
 
       print('🔥 ORDER PLACEMENT: ✅ Using userId: $userId');
 
-      // Generate unique 6-digit order number
-      String orderNumber = await OrderNumberService.generateUniqueOrderNumber();
-
-      print('🔥 ORDER PLACEMENT: Generated order number: $orderNumber');
-
       // Prepare order data
       List<Map<String, dynamic>> itemsForOrder = [];
       widget.selectedItems.forEach((itemModel, quantity) {
@@ -1139,15 +1166,20 @@ class _SchedulePickupDeliveryScreenState
         });
       });
 
+      // Determine service type based on selected items
+      String serviceType = _determineServiceType(itemsForOrder);
+      
+      // Generate service-specific order number
+      String orderNumber = await OrderNumberService.generateUniqueOrderNumber(serviceType: serviceType);
+
+      print('🔥 ORDER PLACEMENT: Generated order number: $orderNumber for service type: $serviceType');
+
       // Prepare address data
       final pickupAddressData =
           _selectedPickupAddress!.data() as Map<String, dynamic>;
       final deliveryAddressData = sameAddressForDelivery
           ? pickupAddressData
           : (_selectedDeliveryAddress!.data() as Map<String, dynamic>);
-
-      // Determine service type based on selected items
-      String serviceType = _determineServiceType(itemsForOrder);
 
       Map<String, dynamic> orderData = {
         'customerId': userId,
@@ -2260,7 +2292,7 @@ class _SchedulePickupDeliveryScreenState
         // Container(
         //   margin: const EdgeInsets.only(bottom: 12),
         //   decoration: BoxDecoration(
-        //     color: Colors.white,
+        //     color: context.backgroundColor,
         //     borderRadius: BorderRadius.circular(12),
         //     border: Border.all(
         //       color: _selectedPaymentMethod == PaymentMethod.upi
@@ -2296,6 +2328,30 @@ class _SchedulePickupDeliveryScreenState
         //             ],
         //           ),
         //         ),
+                // UPI Badge
+                // Container(
+                //   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                //   decoration: BoxDecoration(
+                //     color: Colors.green.withOpacity(0.1),
+                //     borderRadius: BorderRadius.circular(12),
+                //     border: Border.all(color: Colors.green.withOpacity(0.3)),
+                //   ),
+                //   child: Row(
+                //     mainAxisSize: MainAxisSize.min,
+                //     children: [
+                //       Icon(Icons.flash_on, color: Colors.green, size: 14),
+                //       const SizedBox(width: 4),
+                //       Text(
+                //         'Instant',
+                //         style: TextStyle(
+                //           color: Colors.green,
+                //           fontSize: 12,
+                //           fontWeight: FontWeight.w600,
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                // ),
         //       ],
         //     ),
         //     value: PaymentMethod.upi,
@@ -2312,26 +2368,125 @@ class _SchedulePickupDeliveryScreenState
 
         const SizedBox(height: 16),
 
-        // Payment Info
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.info_outline, color: Colors.blue, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  _selectedPaymentMethod == PaymentMethod.upi
-                      ? 'Complete UPI payment to confirm your order. Your payment is secure and encrypted.'
-                      : 'Your order will be confirmed. Payment will be collected at delivery.',
-                  style: const TextStyle(color: Colors.blue, fontSize: 14),
+        // UPI Payment Details (shown when UPI is selected)
+        if (_selectedPaymentMethod == PaymentMethod.upi) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue.withOpacity(0.1)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.account_balance, color: Colors.blue, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'UPI Payment Details',
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                _buildUpiInfoRow('UPI ID', '7396674546-3@ybl'),
+                const SizedBox(height: 8),
+                _buildUpiInfoRow('Merchant', 'Cloud Ironing Factory'),
+                const SizedBox(height: 8),
+                _buildUpiInfoRow('Amount', '₹${widget.totalAmount.toStringAsFixed(0)}'),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.security, color: Colors.green, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Secure payment via UPI. Multiple payment options available after order confirmation.',
+                          style: TextStyle(
+                            color: Colors.green[700],
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Payment Info
+        // Container(
+        //   padding: const EdgeInsets.all(12),
+        //   decoration: BoxDecoration(
+        //     color: Colors.blue.withOpacity(0.1),
+        //     borderRadius: BorderRadius.circular(8),
+        //   ),
+        //   child: Row(
+        //     children: [
+        //       const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+        //       const SizedBox(width: 12),
+        //       Expanded(
+        //         child: Text(
+        //           _selectedPaymentMethod == PaymentMethod.upi
+        //               ? 'Complete UPI payment to confirm your order. Your payment is secure and encrypted.'
+        //               : 'Your order will be confirmed. Payment will be collected at delivery.',
+        //           style: const TextStyle(color: Colors.blue, fontSize: 14),
+        //         ),
+        //       ),
+        //     ],
+        //   ),
+        // ),
+      ],
+    );
+  }
+
+  Widget _buildUpiInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Text(
+          ': ',
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 14,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],

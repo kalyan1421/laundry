@@ -21,7 +21,7 @@ class UpiPaymentService {
   // Business configuration - Update these with your actual details
   static const String _merchantId = 'CLOUDIRONING001';
   static const String _merchantName = 'Cloud Ironing Factory';
-  static const String _merchantUpiId = '7396674546@axl'; // Replace with actual UPI ID
+  static const String _merchantUpiId = '7396674546-3@ybl'; // Replace with actual UPI ID
   static const String _merchantPhone = '9063290012'; // Replace with actual phone
   static const String _transactionNote = 'Payment for laundry services';
 
