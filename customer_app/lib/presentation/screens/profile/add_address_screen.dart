@@ -53,6 +53,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
   void _populateFields() {
     final address = widget.address!;
+    _doorNumberController.text = address.doorNumber ?? '';
+    _floorNumberController.text = address.floorNumber ?? '';
     _addressLine1Controller.text = address.addressLine1;
     _addressLine2Controller.text = address.addressLine2 ?? '';
     _cityController.text = address.city;
@@ -557,8 +559,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 ),
               ),
             ),
+            Padding(padding: const EdgeInsets.only(bottom: AppConstants.spacingM*3), child:  
             
-            // Save button
             Container(
               padding: const EdgeInsets.all(AppConstants.spacingM),
               decoration: BoxDecoration(
@@ -577,7 +579,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 onPressed: isLoading ? null : _saveAddress,
                 isLoading: isLoading,
               ),
-            ),
+            ),),
           ],
         ),
       ),

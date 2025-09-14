@@ -124,7 +124,7 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Allied Services',
+          'Allied Services (Wash & Iron)',
           style: TextStyle(
             color: context.onBackgroundColor,
             fontSize: 22,
@@ -344,35 +344,23 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                                         ),
                                       ),
                                     ),
-                                    // Offer badge - same as regular items
-                                    if (service.offerPrice != null && service.originalPrice != null && service.originalPrice! > service.offerPrice!)
-                                      Container(
-                                        margin: const EdgeInsets.only(left: 8),
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.shade100,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          '${(((service.originalPrice! - service.offerPrice!) / service.originalPrice!) * 100).toInt()}% OFF',
-                                          style: TextStyle(
-                                            color: Colors.red.shade700,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
                                   ],
+                                ),
+                                Text(
+                                  service.description,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
                                 ),
                                 // Price display with original and offer prices (exactly matching regular items)
                                 Row(
                                   children: [
                                     // Original Price (strikethrough) - Show first if there's an offer
-                                    if (service.originalPrice != null &&
-                                        service.originalPrice! >
-                                            (service.offerPrice ?? service.price))
+                                    if (service.hasPrice && service.offerPrice != null && service.offerPrice! < service.price)
                                       Text(
-                                        '₹${service.originalPrice!.toInt()}',
+                                        '₹${service.price.toInt()}',
                                         style: TextStyle(
                                           decoration: TextDecoration.lineThrough,
                                           color: context.onSurfaceVariant,
@@ -380,9 +368,7 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                                         ),
                                       ),
                                     // Add spacing between original and offer price
-                                    if (service.originalPrice != null &&
-                                        service.originalPrice! >
-                                            (service.offerPrice ?? service.price))
+                                    if (service.hasPrice && service.offerPrice != null && service.offerPrice! < service.price)
                                       const SizedBox(width: 8),
                                     // Current/Offer Price
                                     if (service.hasPrice)
@@ -391,11 +377,11 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                                         style: TextStyle(
                                           color: service.offerPrice != null
                                               ? Theme.of(context).colorScheme.tertiary
-                                              : context.onSurfaceVariant,
+                                              : Theme.of(context).colorScheme.tertiary,
                                           fontSize: 14,
                                           fontWeight: service.offerPrice != null
                                               ? FontWeight.w600
-                                              : FontWeight.normal,
+                                              : FontWeight.w600,
                                         ),
                                       )
                                     else
@@ -409,6 +395,24 @@ class _AlliedServicesScreenState extends State<AlliedServicesScreen> {
                                       ),
                                   ],
                                 ),
+                                // Offer badge - show discount percentage
+                                // if (service.hasPrice && service.offerPrice != null && service.offerPrice! < service.price)
+                                //   Container(
+                                //     margin: const EdgeInsets.only(top: 4),
+                                //     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                //     decoration: BoxDecoration(
+                                //       color: Colors.red.shade100,
+                                //       borderRadius: BorderRadius.circular(4),
+                                //     ),
+                                //     child: Text(
+                                //       '${(((service.price - service.offerPrice!) / service.price) * 100).toInt()}% OFF',
+                                //       style: TextStyle(
+                                //         color: Colors.red.shade700,
+                                //         fontSize: 10,
+                                //         fontWeight: FontWeight.bold,
+                                //       ),
+                                //     ),
+                                //   ),
                               ],
                             ),
                           ),

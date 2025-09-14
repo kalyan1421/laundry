@@ -35,56 +35,41 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
     _tabController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final alliedServiceProvider = Provider.of<AlliedServiceProvider>(context);
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AddAlliedServiceScreen()),
-            );
-          }
-        },
-        child: const Icon(Icons.add),
-      ),
+      backgroundColor: Colors.grey[50],
+     
       
       body: StreamBuilder<List<AlliedServiceModel>>(
         stream: alliedServiceProvider.alliedServicesStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
+            return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error, size: 64, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text('Error: ${snapshot.error}'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => alliedServiceProvider.loadAlliedServices(),
-                    child: const Text('Retry'),
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0F3057)),
                   ),
+                  SizedBox(height: 16),
+                  Text('Loading services...'),
                 ],
               ),
             );
           }
 
-          final alliedServices = snapshot.data ?? [];
-
-          return Column(
-            children: [
-              // Tab Bar
-              Container(
+          if (snapshot.hasError) {
+            return Center(
+              child: Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.grey.withOpacity(0.1),
@@ -94,55 +79,157 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
                     ),
                   ],
                 ),
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: const Color(0xFF0F3057),
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: const Color(0xFF0F3057),
-                  indicatorWeight: 3,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.normal,
-                    fontSize: 14,
-                  ),
-                  tabs: _subCategories.map((subCategory) {
-                    final servicesInCategory = alliedServices
-                        .where((service) => service.subCategory == subCategory)
-                        .length;
-                    
-                    return Tab(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _getSubCategoryIcon(subCategory),
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(subCategory),
-                          const SizedBox(width: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _getSubCategoryColor(subCategory),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '$servicesInCategory',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error loading services',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
                       ),
-                    );
-                  }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${snapshot.error}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () => alliedServiceProvider.loadAlliedServices(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F3057),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final alliedServices = snapshot.data ?? [];
+
+          return Column(
+            children: [
+              // Enhanced Tab Bar
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.15),
+                      spreadRadius: 1,
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // Statistics Row
+                    // Container(
+                    //   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    //   child: Row(
+                    //     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    //     children: _subCategories.map((subCategory) {
+                    //       final servicesInCategory = alliedServices
+                    //           .where((service) => service.subCategory == subCategory)
+                    //           .length;
+                    //       final activeServices = alliedServices
+                    //           .where((service) => service.subCategory == subCategory && service.isActive)
+                    //           .length;
+                          
+                    //       return Expanded(
+                    //         child: Container(
+                    //           margin: const EdgeInsets.symmetric(horizontal: 4),
+                    //           padding: const EdgeInsets.all(12),
+                    //           decoration: BoxDecoration(
+                    //             color: _getSubCategoryColor(subCategory).withOpacity(0.1),
+                    //             borderRadius: BorderRadius.circular(8),
+                    //             border: Border.all(
+                    //               color: _getSubCategoryColor(subCategory).withOpacity(0.3),
+                    //             ),
+                    //           ),
+                    //           child: Column(
+                    //             children: [
+                    //               Icon(
+                    //                 _getSubCategoryIcon(subCategory),
+                    //                 color: _getSubCategoryColor(subCategory),
+                    //                 size: 20,
+                    //               ),
+                    //               const SizedBox(height: 4),
+                    //               // Text(
+                    //               //   '$servicesInCategory',
+                    //               //   style: TextStyle(
+                    //               //     fontSize: 18,
+                    //               //     fontWeight: FontWeight.bold,
+                    //               //     color: _getSubCategoryColor(subCategory),
+                    //               //   ),
+                    //               // ),
+                    //               Text(
+                    //                 '$activeServices active',
+                    //                 style: TextStyle(
+                    //                   fontSize: 10,
+                    //                   color: Colors.grey[600],
+                    //                 ),
+                    //               ),
+                    //             ],
+                    //           ),
+                    //         ),
+                    //       );
+                    //     }).toList(),
+                    //   ),
+                    // ),
+                    // Tab Bar
+                    TabBar(
+                      controller: _tabController,
+                      isScrollable: false,
+                      labelColor: const Color(0xFF0F3057),
+                      unselectedLabelColor: Colors.grey[600],
+                      indicatorColor: const Color(0xFF0F3057),
+                      indicatorWeight: 3,
+                      indicatorPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      labelStyle: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontWeight: FontWeight.normal,
+                        fontSize: 14,
+                      ),
+                      tabs: _subCategories.map((subCategory) {
+                        return Tab(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _getSubCategoryIcon(subCategory),
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  _getShortName(subCategory),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ),
               ),
 
@@ -171,76 +258,128 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
           );
         },
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AddAlliedServiceScreen()),
+            );
+          }
+        },
+        backgroundColor: const Color(0xFF0F3057),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Service'),
+      ),
     );
+  }
+
+  String _getShortName(String subCategory) {
+    switch (subCategory.toLowerCase()) {
+      case 'allied services':
+        return 'Allied';
+      case 'laundry':
+        return 'Laundry';
+      case 'special services':
+        return 'Special';
+      default:
+        return subCategory;
+    }
   }
 
   Widget _buildTabContent(String subCategory, List<AlliedServiceModel> services, AlliedServiceProvider provider) {
     if (services.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _getSubCategoryIcon(subCategory),
-              size: 64,
-              color: Colors.grey,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No $subCategory services found',
-              style: const TextStyle(fontSize: 18, color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add your first $subCategory service to get started',
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AddAlliedServiceScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add),
-              label: Text('Add $subCategory Service'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _getSubCategoryColor(subCategory),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      return Container(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: _getSubCategoryColor(subCategory).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _getSubCategoryIcon(subCategory),
+                  size: 64,
+                  color: _getSubCategoryColor(subCategory),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+              Text(
+                'No $subCategory Found',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Add your first $subCategory service to get started',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AddAlliedServiceScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.add),
+                label: Text('Add $subCategory Service'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _getSubCategoryColor(subCategory),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: services.length,
-      itemBuilder: (context, index) {
-        final service = services[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _buildServiceCard(service, provider),
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        await provider.loadAlliedServices();
       },
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: services.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final service = services[index];
+          return _buildServiceCard(service, provider);
+        },
+      ),
     );
   }
 
   Color _getSubCategoryColor(String subCategory) {
     switch (subCategory.toLowerCase()) {
       case 'allied services':
-        return Colors.blue;
+        return const Color(0xFF2196F3);
       case 'laundry':
-        return Colors.green;
+        return const Color(0xFF4CAF50);
       case 'special services':
-        return Colors.purple;
+        return const Color(0xFF9C27B0);
       default:
-        return Colors.orange;
+        return const Color(0xFFFF9800);
     }
   }
 
@@ -259,193 +398,273 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
 
   Widget _buildServiceCard(AlliedServiceModel service, AlliedServiceProvider provider) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
+      elevation: 3,
+      shadowColor: Colors.grey.withOpacity(0.2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Service Image
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.grey[200],
-                  ),
-                  child: service.imageUrl != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: CachedNetworkImage(
-                            imageUrl: service.imageUrl!,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                            errorWidget: (context, url, error) => const Icon(
-                              Icons.local_laundry_service,
-                              size: 40,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        )
-                      : const Icon(
-                          Icons.local_laundry_service,
-                          size: 40,
-                          color: Colors.grey,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              Colors.grey[50]!,
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Row
+              Row(
+                children: [
+                  // Service Image
+                  Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.grey[200],
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 1,
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
                         ),
-                ),
-                const SizedBox(width: 16),
-
-                // Service Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              service.name,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                      ],
+                    ),
+                    child: service.imageUrl != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedNetworkImage(
+                              imageUrl: service.imageUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: Colors.grey[100],
+                                ),
+                                child: const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
                               ),
-                            ),
-                          ),
-                          // Active/Inactive Toggle
-                          Switch(
-                            value: service.isActive,
-                            onChanged: (value) {
-                              provider.toggleServiceStatus(service.id, value);
-                            },
-                            activeColor: Colors.green,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        service.description,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _getSubCategoryColor(service.subCategory).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: _getSubCategoryColor(service.subCategory).withOpacity(0.3)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
+                              errorWidget: (context, url, error) => Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: Colors.grey[200],
+                                ),
+                                child: Icon(
                                   _getSubCategoryIcon(service.subCategory),
-                                  size: 12,
+                                  size: 32,
                                   color: _getSubCategoryColor(service.subCategory),
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  service.subCategory,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: _getSubCategoryColor(service.subCategory),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          )
+                        : Container(
                             decoration: BoxDecoration(
-                              color: service.hasPrice ? Colors.green[50] : Colors.orange[50],
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(
-                                color: service.hasPrice ? Colors.green[200]! : Colors.orange[200]!,
-                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              color: _getSubCategoryColor(service.subCategory).withOpacity(0.1),
                             ),
-                            child: Text(
-                              service.hasPrice 
-                                  ? '₹${service.price.toStringAsFixed(0)}/${service.unit}'
-                                  : 'Price on inspection',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: service.hasPrice ? Colors.green[700] : Colors.orange[700],
-                                fontWeight: FontWeight.w500,
-                              ),
+                            child: Icon(
+                              _getSubCategoryIcon(service.subCategory),
+                              size: 32,
+                              color: _getSubCategoryColor(service.subCategory),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'Order: ${service.sortOrder}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+                  const SizedBox(width: 16),
 
-            // Action Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AddAlliedServiceScreen(service: service),
+                  // Service Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                service.name,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: service.isActive ? Colors.green : Colors.grey,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Switch(
+                                value: service.isActive,
+                                onChanged: (value) {
+                                  provider.toggleServiceStatus(service.id, value);
+                                },
+                                activeColor: Colors.white,
+                                activeTrackColor: Colors.green,
+                                inactiveThumbColor: Colors.white,
+                                inactiveTrackColor: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          service.description,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Tags and Price Row
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _getSubCategoryColor(service.subCategory).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _getSubCategoryColor(service.subCategory).withOpacity(0.3),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.edit, size: 18),
-                  label: const Text('Edit'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.blue,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getSubCategoryIcon(service.subCategory),
+                          size: 14,
+                          color: _getSubCategoryColor(service.subCategory),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          service.subCategory,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _getSubCategoryColor(service.subCategory),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed: () => _showDeleteDialog(service, provider),
-                  icon: const Icon(Icons.delete, size: 18),
-                  label: const Text('Delete'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.red,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: service.hasPrice ? Colors.green[50] : Colors.orange[50],
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: service.hasPrice ? Colors.green[300]! : Colors.orange[300]!,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          service.hasPrice ? Icons.currency_rupee : Icons.visibility,
+                          size: 14,
+                          color: service.hasPrice ? Colors.green[700] : Colors.orange[700],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          service.hasPrice 
+                              ? '₹${service.price.toStringAsFixed(0)}/${service.unit}'
+                              : 'Price on inspection',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: service.hasPrice ? Colors.green[700] : Colors.orange[700],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Text(
+                      'Order: ${service.sortOrder}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddAlliedServiceScreen(service: service),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: const Text('Edit'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.blue[700],
+                        side: BorderSide(color: Colors.blue[300]!),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showDeleteDialog(service, provider),
+                      icon: const Icon(Icons.delete, size: 18),
+                      label: const Text('Delete'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red[700],
+                        side: BorderSide(color: Colors.red[300]!),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -455,29 +674,66 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Service'),
-        content: Text('Are you sure you want to delete "${service.name}"?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red[600], size: 28),
+            const SizedBox(width: 12),
+            const Text('Delete Service'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to delete "${service.name}"?'),
+            const SizedBox(height: 8),
+            Text(
+              'This action cannot be undone.',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
               final success = await provider.deleteAlliedService(service.id, service.imageUrl);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(success 
-                        ? 'Service deleted successfully' 
-                        : 'Failed to delete service'),
+                    content: Row(
+                      children: [
+                        Icon(
+                          success ? Icons.check_circle : Icons.error,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(success 
+                            ? 'Service deleted successfully' 
+                            : 'Failed to delete service'),
+                      ],
+                    ),
                     backgroundColor: success ? Colors.green : Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 );
               }
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[600],
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Delete'),
           ),
         ],

@@ -637,6 +637,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     final type = serviceType.toLowerCase();
     if (type.contains('ironing')) {
       return Icons.iron;
+    } else if (type.contains('allied')) {
+      return Icons.cleaning_services;
     } else if (type.contains('mixed')) {
       return Icons.miscellaneous_services;
     } else {

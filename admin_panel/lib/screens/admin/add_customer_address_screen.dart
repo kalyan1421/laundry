@@ -152,13 +152,16 @@ class _AddCustomerAddressScreenState extends State<AddCustomerAddressScreen> {
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+      body: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
               // Customer Info Header
               Card(
                 child: Padding(
@@ -205,338 +208,268 @@ class _AddCustomerAddressScreenState extends State<AddCustomerAddressScreen> {
 
               const SizedBox(height: 24),
 
-              // Address Type
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Address Type *',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _addressType,
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.location_on_rounded),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        items: _addressTypes.map((type) {
-                          return DropdownMenuItem(
-                            value: type,
-                            child: Text(type.toUpperCase()),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() => _addressType = value!);
-                        },
-                      ),
-                    ],
-                  ),
+              // Address Type Selection
+              const Text(
+                'Address Type',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
                 ),
               ),
-
-              const SizedBox(height: 16),
-
-              // Door Number & Floor Number
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Building Details',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _doorNumberController,
-                              decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.door_front_door),
-                                labelText: 'Door Number',
-                                hintText: 'e.g., 101, A-2',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Door number is required';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _floorNumberController,
-                              decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.stairs),
-                                labelText: 'Floor Number',
-                                hintText: 'e.g., Ground, 2nd',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _apartmentNameController,
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.apartment),
-                          labelText: 'Building/Apartment Name',
-                          hintText: 'e.g., Green Valley Apartments',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Address Lines
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Street Address *',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _addressLine1Controller,
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.home_rounded),
-                          labelText: 'Street Address',
-                          hintText: 'Enter street name and area',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Street address is required';
+              const SizedBox(height: 8),
+              Row(
+                children: _addressTypes.map((type) {
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(type.toUpperCase()),
+                        selected: _addressType == type,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() {
+                              _addressType = type;
+                            });
                           }
-                          return null;
                         },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _addressLine2Controller,
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.add_location),
-                          labelText: 'Additional Address Info (Optional)',
-                          hintText: 'Near landmark, cross street, etc.',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                        selectedColor: Colors.blue.shade100,
+                        labelStyle: TextStyle(
+                          color: _addressType == type 
+                              ? Colors.blue.shade700
+                              : Colors.grey[600],
+                          fontWeight: _addressType == type 
+                              ? FontWeight.w600 
+                              : FontWeight.normal,
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                }).toList(),
               ),
 
               const SizedBox(height: 16),
-
-              // City, State, Pincode
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Location Details *',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: TextFormField(
-                              controller: _cityController,
-                              textCapitalization: TextCapitalization.words,
-                              decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.location_city),
-                                labelText: 'City',
-                                hintText: 'e.g., Hyderabad',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'City is required';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _pincodeController,
-                              keyboardType: TextInputType.number,
-                              maxLength: 6,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                              decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.pin_drop),
-                                labelText: 'Pincode',
-                                hintText: '500001',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                counterText: '',
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Pincode is required';
-                                }
-                                if (value.length != 6) {
-                                  return 'Invalid pincode';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _stateController,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.map),
-                          labelText: 'State',
-                          hintText: 'e.g., Telangana',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'State is required';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Landmark
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Nearby Landmark (Optional)',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _landmarkController,
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.place),
-                          labelText: 'Nearby Landmark',
-                          hintText: 'e.g., Near Metro Station, Shopping Mall',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Primary Address Checkbox
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: CheckboxListTile(
-                    title: const Text('Set as Primary Address'),
-                    subtitle: const Text('This will be the default address for deliveries'),
-                    value: _isPrimary,
-                    onChanged: (value) {
-                      setState(() => _isPrimary = value ?? false);
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                ),
-              ),
 
               const SizedBox(height: 24),
+              
+              // Building Details
+              const Text(
+                'Building Details',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _doorNumberController,
+                      decoration: const InputDecoration(
+                        labelText: 'Door Number',
+                        hintText: 'e.g., 101, A-12',
+                        prefixIcon: Icon(Icons.door_front_door),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _floorNumberController,
+                      decoration: const InputDecoration(
+                        labelText: 'Floor Number',
+                        hintText: 'e.g., Ground, 2nd',
+                        prefixIcon: Icon(Icons.layers),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Address Details
+              const Text(
+                'Address Details',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              
+              const SizedBox(height: 16),
 
-              // Create Customer Button
-              SizedBox(
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _createCustomer,
-                  icon: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              TextFormField(
+                controller: _addressLine1Controller,
+                decoration: const InputDecoration(
+                  labelText: 'Address Line 1 *',
+                  hintText: 'Building, Street name, Area',
+                  prefixIcon: Icon(Icons.home),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Address is required';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _addressLine2Controller,
+                decoration: const InputDecoration(
+                  labelText: 'Address Line 2',
+                  hintText: 'Colony, Sector (Optional)',
+                  prefixIcon: Icon(Icons.location_on),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Landmark
+              TextFormField(
+                controller: _landmarkController,
+                decoration: const InputDecoration(
+                  labelText: 'Landmark',
+                  hintText: 'e.g., Near Metro Station, Opposite Mall',
+                  prefixIcon: Icon(Icons.place),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Location Details
+              const Text(
+                'Location Details',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: _cityController,
+                decoration: const InputDecoration(
+                  labelText: 'City *',
+                  prefixIcon: Icon(Icons.location_city),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'City is required';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _stateController,
+                decoration: const InputDecoration(
+                  labelText: 'State *',
+                  prefixIcon: Icon(Icons.map),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'State is required';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _pincodeController,
+                decoration: const InputDecoration(
+                  labelText: 'Pin Code *',
+                  prefixIcon: Icon(Icons.pin_drop),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Pin code is required';
+                  }
+                  if (value.length != 6) {
+                    return 'Pin code must be 6 digits';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Primary address option
+              Card(
+                elevation: 1,
+                child: CheckboxListTile(
+                  title: const Text(
+                    'Set as Primary Address',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  subtitle: const Text('This will be used as default for the customer'),
+                  value: _isPrimary,
+                  onChanged: (value) {
+                    setState(() {
+                      _isPrimary = value ?? false;
+                    });
+                  },
+                  activeColor: Colors.blue.shade700,
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+              ),
+
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16 * 3), 
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 1,
+                      blurRadius: 4,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _createCustomer,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade700,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Create Customer',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                           ),
-                        )
-                      : const Icon(Icons.person_add_rounded),
-                  label: Text(_isLoading ? 'Creating Customer...' : 'Create Customer'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

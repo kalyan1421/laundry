@@ -14,6 +14,13 @@ class DeliveryAddress {
   final double? latitude;
   final double? longitude;
   final Timestamp? createdAt;
+  final String? doorNumber;
+  final String? floorNumber;
+  final String? apartmentName;
+  final String? country;
+  final String? type;
+  final String? addressType;
+  final bool? isPrimary;
 
   DeliveryAddress({
     this.addressId,
@@ -27,6 +34,13 @@ class DeliveryAddress {
     this.latitude,
     this.longitude,
     this.createdAt,
+    this.doorNumber,
+    this.floorNumber,
+    this.apartmentName,
+    this.country,
+    this.type,
+    this.addressType,
+    this.isPrimary,
   });
 
   factory DeliveryAddress.fromMap(Map<String, dynamic> data) {
@@ -45,6 +59,13 @@ class DeliveryAddress {
       latitude: details['latitude'] is num ? details['latitude'].toDouble() : null,
       longitude: details['longitude'] is num ? details['longitude'].toDouble() : null,
       createdAt: details['createdAt'] != null ? _parseTimestamp(details['createdAt']) : null,
+      doorNumber: details['doorNumber']?.toString(),
+      floorNumber: details['floorNumber']?.toString(),
+      apartmentName: details['apartmentName']?.toString(),
+      country: details['country']?.toString(),
+      type: details['type']?.toString(),
+      addressType: details['addressType']?.toString(),
+      isPrimary: details['isPrimary'] == true,
     );
   }
 
@@ -74,6 +95,13 @@ class DeliveryAddress {
         if (latitude != null) 'latitude': latitude,
         if (longitude != null) 'longitude': longitude,
         if (createdAt != null) 'createdAt': createdAt,
+        if (doorNumber != null) 'doorNumber': doorNumber,
+        if (floorNumber != null) 'floorNumber': floorNumber,
+        if (apartmentName != null) 'apartmentName': apartmentName,
+        if (country != null) 'country': country,
+        if (type != null) 'type': type,
+        if (addressType != null) 'addressType': addressType,
+        if (isPrimary != null) 'isPrimary': isPrimary,
       }
     };
   }
@@ -105,6 +133,7 @@ class OrderModel {
   final String? deliveryAddress; // Legacy string field
   final DeliveryAddress? deliveryAddressDetails; // New structured field
   final String pickupAddress;
+  final DeliveryAddress? pickupAddressDetails; // New structured field for pickup
   final double? deliveryLatitude; // Direct coordinate fields for compatibility
   final double? deliveryLongitude;
   final Timestamp orderTimestamp;
@@ -148,6 +177,7 @@ class OrderModel {
     this.deliveryAddress,
     this.deliveryAddressDetails,
     required this.pickupAddress,
+    this.pickupAddressDetails,
     this.deliveryLatitude,
     this.deliveryLongitude,
     required this.orderTimestamp,
@@ -258,8 +288,9 @@ class OrderModel {
       status: safeExtract<String>('status', 'Unknown') ?? 'Unknown',
       paymentMethod: safeExtract<String>('paymentMethod', null),
       deliveryAddress: safeExtract<String>('deliveryAddress', null),
-      deliveryAddressDetails: parseDeliveryAddress(data['deliveryAddress']),
+      deliveryAddressDetails: parseDeliveryAddress(data['deliveryAddressDetails']),
       pickupAddress: safeExtract<String>('pickupAddress', null) ?? '',
+      pickupAddressDetails: parseDeliveryAddress(data['pickupAddressDetails']),
       deliveryLatitude: safeExtract<double>('latitude', null) ?? safeExtract<double>('deliveryLatitude', null),
       deliveryLongitude: safeExtract<double>('longitude', null) ?? safeExtract<double>('deliveryLongitude', null),
       orderTimestamp: _parseTimestamp(data['orderTimestamp'] ?? data['createdAt']),
@@ -341,6 +372,7 @@ class OrderModel {
       deliveryAddress: deliveryAddress,
       deliveryAddressDetails: deliveryAddressDetails,
       pickupAddress: pickupAddress,
+      pickupAddressDetails: pickupAddressDetails,
       deliveryLatitude: deliveryLatitude,
       deliveryLongitude: deliveryLongitude,
       orderTimestamp: orderTimestamp,
@@ -379,8 +411,9 @@ class OrderModel {
       'status': status,
       'paymentMethod': paymentMethod,
       'deliveryAddress': deliveryAddress,
-      if (deliveryAddressDetails != null) 'deliveryAddress': deliveryAddressDetails!.toMap(),
+      if (deliveryAddressDetails != null) 'deliveryAddressDetails': deliveryAddressDetails!.toMap(),
       'pickupAddress': pickupAddress,
+      if (pickupAddressDetails != null) 'pickupAddressDetails': pickupAddressDetails!.toMap(),
       'orderTimestamp': orderTimestamp,
       if (createdAt != null) 'createdAt': createdAt,
       'serviceType': serviceType,

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:lottie/lottie.dart'; // For Lottie animations
 // Import for OrderDetailsScreen and OrderTrackingScreen
 import 'package:customer_app/presentation/screens/orders/order_details_screen.dart';
 import 'package:customer_app/presentation/screens/orders/order_tracking_screen.dart';
@@ -21,11 +22,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Stream<List<OrderModel>>? _ordersStream;
-  String _selectedFilter = 'All'; // All, Ironing, Allied, Laundry, Mixed
+    String _selectedFilter = 'All'; // All, Ironing, Allied Service
 
   @override
   void initState() {
-    super.initState();
+    super.initState();  
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
       // Query to get ALL orders for the current user
@@ -152,8 +153,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Widget _buildFilterChips() {
-    final filters = ['All', 'Ironing', 'Laundry'];
-    
+    final filters = ['All', 'Ironing', 'Allied Service'];
+  
     return Container(
       height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -192,18 +193,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
     if (_selectedFilter == 'All') return orders;
     
     return orders.where((order) {
+      final serviceType = order.serviceType.toLowerCase();
+      
       switch (_selectedFilter) {
         case 'Ironing':
-          return order.serviceType.toLowerCase().contains('ironing') && 
-                 !order.serviceType.toLowerCase().contains('mixed');
-        case 'Allied':
-          return order.serviceType.toLowerCase().contains('allied') && 
-                 !order.serviceType.toLowerCase().contains('mixed');
-        case 'Laundry':
-          return order.serviceType.toLowerCase().contains('laundry') && 
-                 !order.serviceType.toLowerCase().contains('mixed');
-        case 'Mixed':
-          return order.serviceType.toLowerCase().contains('mixed');
+          // Match "Ironing Service" and similar variations
+          return serviceType.contains('ironing');
+        case 'Allied Service':
+          // Match "Allied Service" and similar variations
+          return serviceType.contains('allied');
         default:
           return true;
       }
@@ -359,47 +357,63 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.receipt_long_outlined,
-                        size: 100, color: Colors.grey[400]),
+                    // Lottie animation
+                    SizedBox(
+                      height: 200,
+                      width: 200,
+                      child: Lottie.asset(
+                        'assets/empty.json',
+                        repeat: true,
+                        reverse: false,
+                        animate: true,
+                      ),
+                    ),
                     const SizedBox(height: 20),
                     const Text(
-                      'No active orders',
+                      'No orders yet',
                       style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
                           color: Color(0xFF0F3057)),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Your orders will appear here.',
+                      'Your orders will appear here once you place them.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 30),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            const Color(0xFF0F3057), // Primary color
+                        backgroundColor: const Color(0xFF0F3057),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 40, vertical: 15),
+                            horizontal: 40, vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),
                         ),
+                        elevation: 4,
                       ),
                       onPressed: () {
-                        // Navigate to home or new order screen
-                        // Assuming you have a main navigation handler that can switch tabs
-                        // For simplicity, directly popping or navigating to a known route like '/home'
-                        // If you have a BottomNavigationBar managed by a parent, you might call a method to switch tabs.
-                        // Example: Provider.of<AppStateManager>(context, listen: false).goToTab(AppTab.home);
-                        Navigator.of(context).popUntil((route) => route
-                            .isFirst); // Go to the very first screen (usually home)
-
-                        // If your HomeScreen is a specific route and you are not using a tab manager:
-                        // Navigator.pushNamedAndRemoveUntil(context, '/home_screen_route_name', (route) => false);
+                        // Navigate to home screen to place an order
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                              '/home',
+                              (route) => false,
+                            );
                       },
-                      child: const Text('Place New Order',
-                          style: TextStyle(fontSize: 16, color: Colors.white)),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_shopping_cart, color: Colors.white),
+                          SizedBox(width: 8),
+                          Text(
+                            'Place New Order',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -421,21 +435,64 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.filter_list_off,
-                                  size: 100, color: Colors.grey[400]),
+                              // Lottie animation
+                              SizedBox(
+                      height: 200,
+                      width: 200,
+                      child: Lottie.asset(
+                        'assets/Empty box by partho.json',
+                        repeat: true,
+                        reverse: false,
+                        animate: true,
+                      ),
+                    ),
                               const SizedBox(height: 20),
                               Text(
-                                'No ${_selectedFilter.toLowerCase()} orders',
+                                _getEmptyFilterTitle(),
                                 style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
                                     color: Color(0xFF0F3057)),
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Try selecting a different filter or place a new order.',
+                                _getEmptyFilterMessage(),
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                              ),
+                              const SizedBox(height: 30),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0F3057),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 40, vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  elevation: 4,
+                                ),
+                                onPressed: () {
+                                  // Navigate to home screen to place an order
+                                  Navigator.of(context).pushNamedAndRemoveUntil(
+                                    '/home',
+                                    (route) => false,
+                                  );
+                                },
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(_getServiceIcon(_selectedFilter == 'All' ? 'Ironing Service' : _selectedFilter), 
+                                         color: Colors.white),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _getEmptyFilterButtonText(),
+                                      style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -453,5 +510,39 @@ class _OrdersScreenState extends State<OrdersScreen> {
         },
       ),
     );
+  }
+
+  // Helper methods for empty filter states
+  String _getEmptyFilterTitle() {
+    switch (_selectedFilter) {
+      case 'Ironing':
+        return 'No ironing orders yet';
+      case 'Allied Service':
+        return 'No allied service orders yet';
+      default:
+        return 'No orders yet';
+    }
+  }
+
+  String _getEmptyFilterMessage() {
+    switch (_selectedFilter) {
+      case 'Ironing':
+        return 'You haven\'t placed any ironing orders yet. Start with your first ironing service!';
+      case 'Allied Service':
+        return 'You haven\'t used any allied services yet. Explore our cleaning and other services!';
+      default:
+        return 'You haven\'t placed any orders yet. Start with your first order!';
+    }
+  }
+
+  String _getEmptyFilterButtonText() {
+    switch (_selectedFilter) {
+      case 'Ironing':
+        return 'Book Ironing Service';
+      case 'Allied Service':
+        return 'Explore Allied Services';
+      default:
+        return 'Place Your First Order';
+    }
   }
 }

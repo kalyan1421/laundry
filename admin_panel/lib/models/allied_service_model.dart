@@ -4,7 +4,6 @@ class AlliedServiceModel {
   final String name;
   final String description;
   final double price;
-  final double? originalPrice; // Optional original price
   final double? offerPrice; // Optional offer price
   final String category; // Main category: "Allied Services"
   final String subCategory; // Subcategory: "Allied Services", "Laundry", "Special Services"
@@ -21,7 +20,6 @@ class AlliedServiceModel {
     required this.name,
     required this.description,
     required this.price,
-    this.originalPrice,
     this.offerPrice,
     required this.category,
     required this.subCategory,
@@ -41,7 +39,6 @@ class AlliedServiceModel {
       name: map['name'] ?? '',
       description: map['description'] ?? '',
       price: (map['price'] ?? 0.0).toDouble(),
-      originalPrice: map['originalPrice'] != null ? (map['originalPrice'] as num).toDouble() : null,
       offerPrice: map['offerPrice'] != null ? (map['offerPrice'] as num).toDouble() : null,
       category: map['category'] ?? 'Allied Services',
       subCategory: map['subCategory'] ?? 'Allied Services',
@@ -61,7 +58,6 @@ class AlliedServiceModel {
       'name': name,
       'description': description,
       'price': price,
-      if (originalPrice != null) 'originalPrice': originalPrice,
       if (offerPrice != null) 'offerPrice': offerPrice,
       'category': category,
       'subCategory': subCategory,
@@ -81,7 +77,6 @@ class AlliedServiceModel {
     String? name,
     String? description,
     double? price,
-    double? originalPrice,
     double? offerPrice,
     String? category,
     String? subCategory,
@@ -98,7 +93,6 @@ class AlliedServiceModel {
       name: name ?? this.name,
       description: description ?? this.description,
       price: price ?? this.price,
-      originalPrice: originalPrice ?? this.originalPrice,
       offerPrice: offerPrice ?? this.offerPrice,
       category: category ?? this.category,
       subCategory: subCategory ?? this.subCategory,

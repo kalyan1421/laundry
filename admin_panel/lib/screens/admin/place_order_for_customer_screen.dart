@@ -464,7 +464,6 @@ class _PlaceOrderForCustomerScreenState extends State<PlaceOrderForCustomerScree
           'itemId': item.id,
           'name': item.name,
           'pricePerPiece': effectivePrice,
-          'originalPrice': item.originalPrice ?? item.price,
           'offerPrice': item.offerPrice,
           'quantity': entry.value,
           'category': item.category,
@@ -1208,7 +1207,6 @@ class _PlaceOrderForCustomerScreenState extends State<PlaceOrderForCustomerScree
           updatedAt: service.updatedAt ?? DateTime.now(),
           imageUrl: service.imageUrl,
           offerPrice: service.offerPrice,
-          originalPrice: service.originalPrice,
         );
       }
     }).toList();
@@ -1299,21 +1297,6 @@ class _PlaceOrderForCustomerScreenState extends State<PlaceOrderForCustomerScree
                 // Price display with original and offer prices - exact same as customer app
                 Row(
                   children: [
-                    // Original Price (strikethrough) - Show first if there's an offer
-                    if (item.originalPrice != null &&
-                        item.originalPrice! > (item.offerPrice ?? item.price))
-                    Text(
-                        '₹${item.originalPrice!.toInt()}',
-                        style: TextStyle(
-                          decoration: TextDecoration.lineThrough,
-                          color: context.onSurfaceVariant,
-                          fontSize: 12,
-                        ),
-                      ),
-                    // Add spacing between original and offer price
-                    if (item.originalPrice != null &&
-                        item.originalPrice! > (item.offerPrice ?? item.price))
-                      const SizedBox(width: 8),
                     // Current/Offer Price
                     Text(
                       '₹${(item.offerPrice ?? item.price).toInt()} per piece',

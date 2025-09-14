@@ -43,7 +43,7 @@ enum TimeSlot {
   String get timeRange {
     switch (this) {
       case TimeSlot.morning:
-        return '7 to 11 AM';
+        return '8 to 11 AM';
       case TimeSlot.noon:
         return '11 AM to 4 PM';
       case TimeSlot.evening:
@@ -54,7 +54,7 @@ enum TimeSlot {
   int get startHour {
     switch (this) {
       case TimeSlot.morning:
-        return 7;
+        return 8;
       case TimeSlot.noon:
         return 11;
       case TimeSlot.evening:
@@ -1157,8 +1157,6 @@ class _SchedulePickupDeliveryScreenState
           'itemId': itemModel.id,
           'name': itemModel.name,
           'pricePerPiece': effectivePrice,
-          'originalPrice':
-              itemModel.originalPrice, // Store original price for reference
           'offerPrice': itemModel.offerPrice, // Store offer price if exists
           'quantity': quantity,
           'category': itemModel.category,
@@ -2160,11 +2158,9 @@ class _SchedulePickupDeliveryScreenState
                         Row(
                           children: [
                             // Original Price (strikethrough) - Show first if there's an offer
-                            if (item.originalPrice != null &&
-                                item.originalPrice! >
-                                    (item.offerPrice ?? item.pricePerPiece))
+                            if (item.offerPrice != null && item.offerPrice! < item.pricePerPiece)
                               Text(
-                                '₹${item.originalPrice!.toInt()}',
+                                '₹${item.pricePerPiece.toInt()}',
                                 style: const TextStyle(
                                   decoration: TextDecoration.lineThrough,
                                   color: Colors.grey,
@@ -2172,9 +2168,7 @@ class _SchedulePickupDeliveryScreenState
                                 ),
                               ),
                             // Add spacing between original and offer price
-                            if (item.originalPrice != null &&
-                                item.originalPrice! >
-                                    (item.offerPrice ?? item.pricePerPiece))
+                            if (item.offerPrice != null && item.offerPrice! < item.pricePerPiece)
                               const SizedBox(width: 8),
                             // Current/Offer Price
                             Text(

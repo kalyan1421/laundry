@@ -4,7 +4,6 @@ class AlliedServiceModel {
   final String name;
   final String description;
   final double price;
-  final double? originalPrice;
   final double? offerPrice;
   final String category;
   final String unit;
@@ -20,7 +19,6 @@ class AlliedServiceModel {
     required this.name,
     required this.description,
     required this.price,
-    this.originalPrice,
     this.offerPrice,
     required this.category,
     required this.unit,
@@ -39,7 +37,6 @@ class AlliedServiceModel {
       name: map['name'] ?? '',
       description: map['description'] ?? '',
       price: (map['price'] ?? 0.0).toDouble(),
-      originalPrice: map['originalPrice'] != null ? (map['originalPrice'] as num).toDouble() : null,
       offerPrice: map['offerPrice'] != null ? (map['offerPrice'] as num).toDouble() : null,
       category: map['category'] ?? 'Allied Services',
       unit: map['unit'] ?? 'piece',
@@ -58,7 +55,6 @@ class AlliedServiceModel {
       'name': name,
       'description': description,
       'price': price,
-      if (originalPrice != null) 'originalPrice': originalPrice,
       if (offerPrice != null) 'offerPrice': offerPrice,
       'category': category,
       'unit': unit,

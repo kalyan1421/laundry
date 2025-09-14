@@ -401,18 +401,6 @@ class _ManageItemsState extends State<ManageItems> {
                         ),
                       ),
                       // Original Price (strikethrough)
-                      if (item.originalPrice != null && item.originalPrice! > item.price)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Text(
-                            '₹${item.originalPrice!.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              decoration: TextDecoration.lineThrough,
-                              color: Colors.grey,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
                       // Offer Price
                       if (item.offerPrice != null)
                         Container(

@@ -1202,11 +1202,9 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                             Row(
                               children: [
                                 // Original Price (strikethrough) - Show first if there's an offer
-                                if (item.originalPrice != null &&
-                                    item.originalPrice! >
-                                        (item.offerPrice ?? item.pricePerPiece))
+                                if (item.offerPrice != null && item.offerPrice! < item.pricePerPiece)
                                   Text(
-                                    '₹${item.originalPrice!.toInt()}',
+                                    '₹${item.pricePerPiece.toInt()}',
                                     style: TextStyle(
                                       decoration: TextDecoration.lineThrough,
                                       color: context.onSurfaceVariant,
@@ -1214,9 +1212,7 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                                     ),
                                   ),
                                 // Add spacing between original and offer price
-                                if (item.originalPrice != null &&
-                                    item.originalPrice! >
-                                        (item.offerPrice ?? item.pricePerPiece))
+                                if (item.offerPrice != null && item.offerPrice! < item.pricePerPiece)
                                   const SizedBox(width: 8),
                                 // Current/Offer Price
                                 Text(
@@ -1231,26 +1227,26 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                                         : FontWeight.normal,
                                   ),
                                 ),
-                                // Offer badge
-                                // if (item.offerPrice != null && item.originalPrice != null && item.originalPrice! > item.offerPrice!)
-                                //   Container(
-                                //     margin: const EdgeInsets.only(left: 8),
-                                //     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                //     decoration: BoxDecoration(
-                                //       color: Colors.red,
-                                //       borderRadius: BorderRadius.circular(4),
-                                //     ),
-                                //     child: Text(
-                                //       '${(((item.originalPrice! - item.offerPrice!) / item.originalPrice!) * 100).toInt()}% OFF',
-                                //       style: const TextStyle(
-                                //         color: Colors.white,
-                                //         fontSize: 10,
-                                //         fontWeight: FontWeight.bold,
-                                //       ),
-                                //     ),
-                                //   ),
                               ],
                             ),
+                            // Offer badge - show discount percentage
+                            // if (item.offerPrice != null && item.offerPrice! < item.pricePerPiece)
+                            //   Container(
+                            //     margin: const EdgeInsets.only(top: 4),
+                            //     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            //     decoration: BoxDecoration(
+                            //       color: Colors.red.shade100,
+                            //       borderRadius: BorderRadius.circular(4),
+                            //     ),
+                            //     child: Text(
+                            //       '${(((item.pricePerPiece - item.offerPrice!) / item.pricePerPiece) * 100).toInt()}% OFF',
+                            //       style: TextStyle(
+                            //         color: Colors.red.shade700,
+                            //         fontSize: 10,
+                            //         fontWeight: FontWeight.bold,
+                            //       ),
+                            //     ),
+                            //   ),
                             // Position indicator (if needed)
                             // if (item.order > 0)
                             //   Text(

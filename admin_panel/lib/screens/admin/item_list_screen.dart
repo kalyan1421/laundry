@@ -758,8 +758,6 @@ class _ItemListScreenState extends State<ItemListScreen> {
                 // Item Info
                 _buildDetailRow('Name', item.name),
                 _buildDetailRow('Price', '₹${item.price.toStringAsFixed(2)} per ${item.unit}'),
-                if (item.originalPrice != null)
-                  _buildDetailRow('Original Price', '₹${item.originalPrice!.toStringAsFixed(2)} per ${item.unit}'),
                 if (item.offerPrice != null)
                   _buildDetailRow('Offer Price', '₹${item.offerPrice!.toStringAsFixed(2)} per ${item.unit}'),
                 _buildDetailRow('Category', item.category),

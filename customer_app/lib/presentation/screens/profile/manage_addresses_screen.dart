@@ -17,44 +17,28 @@ class ManageAddressesScreen extends StatefulWidget {
 }
 
 class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
-  List<DocumentSnapshot> _addresses = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadAddresses();
+    _startListeningToAddresses();
   }
 
-  Future<void> _loadAddresses() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      if (authProvider.userModel != null) {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('customer')
-            .doc(authProvider.userModel!.uid)
-            .collection('addresses')
-            .orderBy('createdAt', descending: true)
-            .get();
-
-        setState(() {
-          _addresses = snapshot.docs;
-        });
-      }
-    } catch (e) {
-      print('Error loading addresses: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading addresses: $e')),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+  void _startListeningToAddresses() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    
+    if (authProvider.userModel != null) {
+      // Start listening to real-time address updates
+      addressProvider.startListeningToAddresses(authProvider.userModel!.uid);
     }
+  }
+
+  @override
+  void dispose() {
+    // Stop listening when screen is disposed
+    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    addressProvider.stopListeningToAddresses();
+    super.dispose();
   }
 
   Future<void> _testCoordinateSaving() async {
@@ -121,7 +105,7 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
       }
 
       // Refresh the address list
-      _loadAddresses();
+      _startListeningToAddresses();
 
     } catch (e) {
       print('🧪 TEST: ERROR - Exception: $e');
@@ -144,34 +128,58 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
           // ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadAddresses,
+            onPressed: _startListeningToAddresses,
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _addresses.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.location_off, size: 64, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No addresses found',
-                        style: TextStyle(fontSize: 18, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
+      body: Consumer<AddressProvider>(
+        builder: (context, addressProvider, child) {
+          if (addressProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (addressProvider.error != null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error: ${addressProvider.error}',
+                    style: const TextStyle(fontSize: 16, color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _startListeningToAddresses,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (addressProvider.addresses.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.location_off, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No addresses found',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
                         'Add your first address to get started',
                         style: TextStyle(color: Colors.grey),
                       ),
                       const SizedBox(height: 24),
                       ElevatedButton.icon(
                         onPressed: () {
-                          Navigator.pushNamed(context, '/add-address-screen').then((_) {
-                            _loadAddresses();
-                          });
+                          Navigator.pushNamed(context, '/add-address-screen');
                         },
                         icon: const Icon(Icons.add_location, color: Colors.white),
                         label: const Text('Add Address', style: TextStyle(color: Colors.white)),
@@ -181,21 +189,22 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
                       ),
                     ],
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _addresses.length,
-                  itemBuilder: (context, index) {
-                    final addressDoc = _addresses[index];
-                    final addressData = addressDoc.data() as Map<String, dynamic>;
-                    return _buildAddressCard(addressData, addressDoc.id);
-                  },
-                ),
+                );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: addressProvider.addresses.length,
+            itemBuilder: (context, index) {
+              final address = addressProvider.addresses[index];
+              return _buildAddressCard(address);
+            },
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.pushNamed(context, '/add-address-screen').then((_) {
-            _loadAddresses();
-          });
+          Navigator.pushNamed(context, '/add-address-screen');
         },
         // FAB theme is handled by the theme system
         child: const Icon(Icons.add, color: Colors.white),
@@ -203,10 +212,8 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
     );
   }
 
-  Widget _buildAddressCard(Map<String, dynamic> addressData, String addressId) {
-    final latitude = addressData['latitude'];
-    final longitude = addressData['longitude'];
-    final hasCoordinates = latitude != null && longitude != null;
+  Widget _buildAddressCard(AddressModel address) {
+    final hasCoordinates = address.latitude != null && address.longitude != null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -214,6 +221,7 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          // mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Address Type and Primary Status
@@ -226,14 +234,14 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    addressData['type']?.toString().toUpperCase() ?? 'HOME',
+                    address.type.toUpperCase(),
                     style: AppTextTheme.bodySmall.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                if (addressData['isPrimary'] == true) ...[
+                if (address.isPrimary) ...[
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -250,35 +258,20 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
                     ),
                   ),
                 ],
-                if (addressData['isTestData'] == true) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'TEST',
-                      style: AppTextTheme.bodySmall.copyWith(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
+                // Remove test data check since it's not in AddressModel
               ],
             ),
             const SizedBox(height: 12),
 
             // Formatted Address Display (Door Number, Floor Number, Full Address)
             Text(
-              AddressFormatter.formatAddressLayout(addressData),
+              address.fullAddress,
               style: AppTextTheme.bodyMedium.copyWith(
                 fontWeight: FontWeight.w500,
                 height: 1.4,
               ),
             ),
+            
 
             // Coordinates Debug Info
             // const SizedBox(height: 12),
@@ -342,7 +335,7 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Primary badge (if applicable)
-                if (addressData['isPrimary'] == true)
+                if (address.isPrimary)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -372,18 +365,18 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
                   onSelected: (value) {
                     switch (value) {
                       case 'set_primary':
-                        _setPrimaryAddress(addressId);
+                        _setPrimaryAddress(address.id);
                         break;
                       case 'edit':
-                        _editAddress(addressId, addressData);
+                        _editAddress(address);
                         break;
                       case 'delete':
-                        _deleteAddress(addressId);
+                        _deleteAddress(address.id);
                         break;
                     }
                   },
                   itemBuilder: (context) => [
-                    if (addressData['isPrimary'] != true)
+                    if (!address.isPrimary)
                       const PopupMenuItem<String>(
                         value: 'set_primary',
                         child: Row(
@@ -427,20 +420,23 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
                 Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
                 const SizedBox(width: 4),
                 Text(
-                  'Created: ${_formatTimestamp(addressData['createdAt'])}',
+                  'Created: ${_formatTimestamp(address.createdAt)}',
                   style: AppTextTheme.bodySmall.copyWith(color: Colors.grey[600]),
                 ),
-              ],
+                ],
+              // ),
             ),
           ],
-        ),
-      ),
+        ),)
+      // ),
     );
   }
 
   Future<void> _setPrimaryAddress(String addressId) async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+      
       if (authProvider.userModel == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('User not authenticated')),
@@ -455,8 +451,8 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
           .doc(authProvider.userModel!.uid)
           .collection('addresses');
 
-      for (var addressDoc in _addresses) {
-        batch.update(addressDoc.reference, {'isPrimary': false});
+      for (var address in addressProvider.addresses) {
+        batch.update(addressesRef.doc(address.id), {'isPrimary': false});
       }
 
       // Then set the selected address as primary
@@ -466,7 +462,6 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
       });
 
       await batch.commit();
-      await _loadAddresses();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Primary address updated successfully')),
@@ -478,18 +473,16 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
     }
   }
 
-  Future<void> _editAddress(String addressId, Map<String, dynamic> addressData) async {
+  Future<void> _editAddress(AddressModel address) async {
     // Navigate to edit address screen
     Navigator.pushNamed(
       context,
       '/edit-address',
       arguments: {
-        'addressId': addressId,
-        'addressData': addressData,
+        'addressId': address.id,
+        'addressData': address.toMap(),
       },
-    ).then((_) {
-      _loadAddresses();
-    });
+    );
   }
 
   Future<void> _deleteAddress(String addressId) async {
@@ -516,6 +509,8 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
     if (confirmed == true) {
       try {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+        
         if (authProvider.userModel == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('User not authenticated')),
@@ -523,18 +518,17 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
           return;
         }
 
-        await FirebaseFirestore.instance
-            .collection('customer')
-            .doc(authProvider.userModel!.uid)
-            .collection('addresses')
-            .doc(addressId)
-            .delete();
-
-        await _loadAddresses();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Address deleted successfully')),
-        );
+        final success = await addressProvider.deleteAddress(authProvider.userModel!.uid, addressId);
+        
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Address deleted successfully')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting address: ${addressProvider.error ?? 'Unknown error'}')),
+          );
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error deleting address: $e')),

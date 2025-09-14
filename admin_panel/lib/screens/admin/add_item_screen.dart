@@ -20,7 +20,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
-  final _originalPriceController = TextEditingController();
   final _offerPriceController = TextEditingController();
   final _positionController = TextEditingController();
   
@@ -54,14 +53,12 @@ class _AddItemScreenState extends State<AddItemScreen> {
       // Pre-fill form for editing
       _nameController.text = widget.item!.name;
       _priceController.text = widget.item!.price.toString();
-      _originalPriceController.text = widget.item!.originalPrice?.toString() ?? '';
       _offerPriceController.text = widget.item!.offerPrice?.toString() ?? '';
       _positionController.text = widget.item!.sortOrder.toString();
       _isActive = widget.item!.isActive;
     }
     
     // Add listeners to update the calculator when prices change
-    _originalPriceController.addListener(() => setState(() {}));
     _offerPriceController.addListener(() => setState(() {}));
   }
 
@@ -69,7 +66,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
-    _originalPriceController.dispose();
     _offerPriceController.dispose();
     _positionController.dispose();
     super.dispose();
@@ -178,7 +174,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
           id: '', // Will be set by Firestore
           name: _nameController.text.trim(),
           price: double.parse(_priceController.text),
-          originalPrice: _originalPriceController.text.isNotEmpty ? double.parse(_originalPriceController.text) : null,
           offerPrice: _offerPriceController.text.isNotEmpty ? double.parse(_offerPriceController.text) : null,
           category: 'Ironing', // Fixed category for ironing service
           unit: 'piece', // Fixed unit for ironing items
@@ -205,7 +200,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
         final updateData = {
           'name': _nameController.text.trim(),
           'price': double.parse(_priceController.text),
-          'originalPrice': _originalPriceController.text.isNotEmpty ? double.parse(_originalPriceController.text) : null,
           'offerPrice': _offerPriceController.text.isNotEmpty ? double.parse(_offerPriceController.text) : null,
           'sortOrder': _positionController.text.isNotEmpty ? int.parse(_positionController.text) : 0,
           'isActive': _isActive,
@@ -245,26 +239,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
     }
   }
 
-  String _calculateSavings() {
-    if (_originalPriceController.text.isNotEmpty && _offerPriceController.text.isNotEmpty) {
-      final originalPrice = double.tryParse(_originalPriceController.text) ?? 0;
-      final offerPrice = double.tryParse(_offerPriceController.text) ?? 0;
-      return (originalPrice - offerPrice).toStringAsFixed(2);
-    }
-    return '0.00';
-  }
-
-  String _calculateDiscountPercentage() {
-    if (_originalPriceController.text.isNotEmpty && _offerPriceController.text.isNotEmpty) {
-      final originalPrice = double.tryParse(_originalPriceController.text) ?? 0;
-      final offerPrice = double.tryParse(_offerPriceController.text) ?? 0;
-      if (originalPrice > 0) {
-        final discount = ((originalPrice - offerPrice) / originalPrice) * 100;
-        return discount.toStringAsFixed(1);
-      }
-    }
-    return '0.0';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -441,32 +415,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
 
                       const SizedBox(height: 16),
 
-                      // Original Price Field
-                      TextFormField(
-                        controller: _originalPriceController,
-                        decoration: InputDecoration(
-                          labelText: 'Original Price (₹) - Optional',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          prefixIcon: const Icon(Icons.money, color: Colors.orange),
-                          helperText: 'Enter original price for discount display',
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value != null && value.trim().isNotEmpty) {
-                            if (double.tryParse(value) == null) {
-                              return 'Please enter valid price';
-                            }
-                            if (double.parse(value) <= 0) {
-                              return 'Original price must be greater than 0';
-                            }
-                          }
-                          return null;
-                        },
-                      ),
-
-                      const SizedBox(height: 16),
 
                       // Offer Price Field
                       TextFormField(
@@ -519,38 +467,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
 
                       const SizedBox(height: 16),
 
-                      // Calculate Available Price Button
-                      if (_originalPriceController.text.isNotEmpty && _offerPriceController.text.isNotEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green.shade300),
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.calculate, color: Colors.green),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Savings: ₹${_calculateSavings()}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green,
-                                ),
-                              ),
-                              Text(
-                                '${_calculateDiscountPercentage()}% OFF',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.green,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
 
                       const SizedBox(height: 16),
 

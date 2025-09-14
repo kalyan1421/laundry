@@ -6,22 +6,20 @@ class OrderNumberService {
   static final Random _random = Random();
 
   /// Generates a unique sequential order number based on service type
-  /// Format: CI000001 for Ironing, CL000001 for Allied services, C000001 for others
+  /// Format: CI000001 for Ironing and normal/other orders, CL000001 for Allied services
   static Future<String> generateUniqueOrderNumber({String? serviceType}) async {
     try {
       // Determine the counter collection and prefix based on service type
-      String prefix = 'C';
-      String counterDocId = 'order_counter';
+      String prefix = 'CI';  // Default to CI for normal/other orders
+      String counterDocId = 'ironing_order_counter';  // Use ironing counter for all CI orders
       
       if (serviceType != null) {
         final lowerServiceType = serviceType.toLowerCase();
-        if (lowerServiceType.contains('ironing')) {
-          prefix = 'CI';
-          counterDocId = 'ironing_order_counter';
-        } else if (lowerServiceType.contains('allied')) {
+        if (lowerServiceType.contains('allied')) {
           prefix = 'CL';
           counterDocId = 'allied_order_counter';
         }
+        // All other services (including ironing, laundry, mixed, etc.) use CI prefix
       }
       
       print('🔢 ORDER NUMBER: Generating ${prefix}XXXXXX for service: $serviceType using counter: $counterDocId');
@@ -111,14 +109,13 @@ class OrderNumberService {
     final finalOrderNumber = orderNumber == 0 ? 1 : orderNumber;
     
     // Determine prefix based on service type
-    String prefix = 'C';
+    String prefix = 'CI';  // Default to CI for normal/other orders
     if (serviceType != null) {
       final lowerServiceType = serviceType.toLowerCase();
-      if (lowerServiceType.contains('ironing')) {
-        prefix = 'CI';
-      } else if (lowerServiceType.contains('allied')) {
+      if (lowerServiceType.contains('allied')) {
         prefix = 'CL';
       }
+      // All other services (including ironing, laundry, mixed, etc.) use CI prefix
     }
     
     print('🔢 FALLBACK CALC: timestamp=$timestamp, lastFour=$lastFourDigits, random=$randomTwoDigits');
@@ -131,15 +128,15 @@ class OrderNumberService {
     return result;
   }
 
-  /// Validate if a string is a valid order number (C000001, CI000001, or CL000001 format)
+  /// Validate if a string is a valid order number (CI000001 or CL000001 format)
   static bool isValidOrderNumber(String orderNumber) {
-    if (orderNumber.length < 7 || orderNumber.length > 8) return false;
+    if (orderNumber.length != 8) return false;
     
-    // Check if format is C, CI, or CL followed by 6 digits
-    return RegExp(r'^(C|CI|CL)\d{6}$').hasMatch(orderNumber);
+    // Check if format is CI or CL followed by 6 digits
+    return RegExp(r'^(CI|CL)\d{6}$').hasMatch(orderNumber);
   }
 
-  /// Generate a formatted order number with prefix (e.g., "ORD-C000001")
+  /// Generate a formatted order number with prefix (e.g., "ORD-CI000001")
   static String generateFormattedOrderNumber(String orderNumber) {
     return 'ORD-$orderNumber';
   }

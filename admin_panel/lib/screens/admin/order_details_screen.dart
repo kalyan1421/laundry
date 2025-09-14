@@ -11,6 +11,7 @@ import '../../services/database_service.dart';
 import '../../utils/phone_formatter.dart';
 import 'edit_order_screen.dart';
 import 'manage_customer_address_screen.dart';
+import 'edit_order_address_screen.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final String orderId;
@@ -1076,22 +1077,23 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ),
                 ElevatedButton.icon(
                   onPressed: () async {
-                    if (_order?.customerId != null) {
+                    if (_order?.customerId != null && 
+                        _order?.deliveryAddressDetails?.addressId != null) {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder:
-                              (context) => ManageCustomerAddressScreen(
-                                customerId: _order!.customerId!,
-                                customerName:
-                                    _customerDetails?['name'] ?? 'Customer',
-                              ),
+                          builder: (context) => EditOrderAddressScreen(
+                            orderId: _order!.id,
+                            customerId: _order!.customerId!,
+                            addressId: _order!.deliveryAddressDetails!.addressId!,
+                            initialAddressData: _order!.deliveryAddressDetails?.toMap(),
+                          ),
                         ),
                       );
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Customer information not available'),
+                          content: Text('Address information not available for editing'),
                           backgroundColor: Colors.red,
                         ),
                       );
@@ -1136,7 +1138,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _formatAddress(_order!.pickupAddress)!,
+                          _getDetailedPickupAddress(),
                           style: const TextStyle(height: 1.4),
                         ),
                       ],
@@ -1171,7 +1173,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _formatAddress(_order!.deliveryAddress)!,
+                          _getDetailedDeliveryAddress(),
                           style: const TextStyle(height: 1.4),
                         ),
                       ],
@@ -2169,6 +2171,31 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
+  // Helper method to get detailed pickup address string
+  String _getDetailedPickupAddress() {
+    try {
+      // First try to get from structured pickupAddressDetails
+      if (_order?.pickupAddressDetails != null) {
+        final addressMap = _order!.pickupAddressDetails!.toMap();
+        final details = addressMap['details'] as Map<String, dynamic>?;
+        final detailedAddress = _formatAddressFromDetails(details);
+        if (detailedAddress != null && detailedAddress.isNotEmpty) {
+          return detailedAddress;
+        }
+      }
+      
+      // Fall back to simple pickup address string
+      if (_order?.pickupAddress != null && _order!.pickupAddress.isNotEmpty) {
+        return _formatAddress(_order!.pickupAddress) ?? 'Pickup address not available';
+      }
+      
+      return 'Pickup address not available';
+    } catch (e) {
+      print('Error getting detailed pickup address: $e');
+      return _order?.pickupAddress ?? 'Pickup address not available';
+    }
+  }
+
   // Helper method to format address from details
   String? _formatAddressFromDetails(Map<String, dynamic>? details) {
     if (details == null) return null;
@@ -2187,6 +2214,31 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     if (details['pincode'] != null) parts.add(details['pincode']);
     
     return parts.isNotEmpty ? parts.join(', ') : null;
+  }
+
+  // Helper method to get detailed delivery address string
+  String _getDetailedDeliveryAddress() {
+    try {
+      // First try to get from structured deliveryAddressDetails
+      if (_order?.deliveryAddressDetails != null) {
+        final addressMap = _order!.deliveryAddressDetails!.toMap();
+        final details = addressMap['details'] as Map<String, dynamic>?;
+        final detailedAddress = _formatAddressFromDetails(details);
+        if (detailedAddress != null && detailedAddress.isNotEmpty) {
+          return detailedAddress;
+        }
+      }
+      
+      // Fall back to simple delivery address string
+      if (_order?.deliveryAddress != null && _order!.deliveryAddress!.isNotEmpty) {
+        return _formatAddress(_order!.deliveryAddress) ?? 'Delivery address not available';
+      }
+      
+      return 'Delivery address not available';
+    } catch (e) {
+      print('Error getting detailed delivery address: $e');
+      return _order?.deliveryAddress ?? 'Delivery address not available';
+    }
   }
 
   void _showStatusHistoryDialog() {

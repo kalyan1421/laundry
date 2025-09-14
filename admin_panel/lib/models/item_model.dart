@@ -3,7 +3,6 @@ class ItemModel {
   final String id;
   final String name;
   final double price;
-  final double? originalPrice; // Added original price field
   final double? offerPrice; // Added offer price field
   final String category;
   final String unit;
@@ -16,7 +15,6 @@ class ItemModel {
     required this.id,
     required this.name,
     required this.price,
-    this.originalPrice, // Optional original price
     this.offerPrice, // Optional offer price
     required this.category,
     required this.unit,
@@ -32,7 +30,6 @@ class ItemModel {
       id: id,
       name: map['name'] ?? '',
       price: (map['price'] ?? 0.0).toDouble(),
-      originalPrice: map['originalPrice'] != null ? (map['originalPrice'] as num).toDouble() : null,
       offerPrice: map['offerPrice'] != null ? (map['offerPrice'] as num).toDouble() : null,
       category: map['category'] ?? '',
       unit: map['unit'] ?? 'piece',
@@ -48,7 +45,6 @@ class ItemModel {
     return {
       'name': name,
       'price': price,
-      if (originalPrice != null) 'originalPrice': originalPrice,
       if (offerPrice != null) 'offerPrice': offerPrice,
       'category': category,
       'unit': unit,
@@ -64,7 +60,6 @@ class ItemModel {
     String? id,
     String? name,
     double? price,
-    double? originalPrice,
     double? offerPrice,
     String? category,
     String? unit,
@@ -77,7 +72,6 @@ class ItemModel {
       id: id ?? this.id,
       name: name ?? this.name,
       price: price ?? this.price,
-      originalPrice: originalPrice ?? this.originalPrice,
       offerPrice: offerPrice ?? this.offerPrice,
       category: category ?? this.category,
       unit: unit ?? this.unit,
@@ -90,6 +84,6 @@ class ItemModel {
 
   @override
   String toString() {
-    return 'ItemModel(id: $id, name: $name, price: $price, originalPrice: $originalPrice, offerPrice: $offerPrice, category: $category, unit: $unit, isActive: $isActive, imageUrl: $imageUrl, sortOrder: $sortOrder)';
+    return 'ItemModel(id: $id, name: $name, price: $price, offerPrice: $offerPrice, category: $category, unit: $unit, isActive: $isActive, imageUrl: $imageUrl, sortOrder: $sortOrder)';
   }
 }

@@ -78,7 +78,6 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
           sortOrder: data['sortOrder'] ?? 0,
           updatedAt: DateTime.now(),
           imageUrl: data['imageUrl'],
-          originalPrice: data['originalPrice']?.toDouble(),
           offerPrice: data['offerPrice']?.toDouble(),
         );
       }).toList();
@@ -214,7 +213,6 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
           'name': item.name,
           'quantity': quantity,
           'pricePerPiece': item.offerPrice ?? item.price,
-          'originalPrice': item.originalPrice,
           'offerPrice': item.offerPrice,
           'category': item.category,
           'unit': item.unit,
@@ -547,19 +545,6 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
                                   // Price Display with original and offer prices
                                   Row(
                                     children: [
-                                      // Original Price (strikethrough) - Show first if there's an offer
-                                      if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.price))
-                                        Text(
-                                          '₹${item.originalPrice!.toInt()}',
-                                          style: const TextStyle(
-                                            decoration: TextDecoration.lineThrough,
-                                            color: Colors.grey,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      // Add spacing between original and offer price
-                                      if (item.originalPrice != null && item.originalPrice! > (item.offerPrice ?? item.price))
-                                        const SizedBox(width: 8),
                                       // Current/Offer Price
                                       Text(
                                         '₹${(item.offerPrice ?? item.price).toInt()} per ${item.unit}',

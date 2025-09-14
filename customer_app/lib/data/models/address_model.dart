@@ -15,6 +15,11 @@ class AddressModel {
   final bool isPrimary;
   final DateTime? createdAt; // Set by Firestore server timestamp
   final DateTime? updatedAt; // Set by Firestore server timestamp
+  final String? doorNumber; // New field
+  final String? floorNumber; // New field
+  final String? apartmentName; // New field
+  final String? country; // New field
+  final String? addressType; // New field
 
   AddressModel({
     required this.id,
@@ -30,6 +35,11 @@ class AddressModel {
     this.isPrimary = false, // Default to false if not provided
     this.createdAt,
     this.updatedAt,
+    this.doorNumber,
+    this.floorNumber,
+    this.apartmentName,
+    this.country,
+    this.addressType,
   });
 
   // Corrected factory method to be used by AddressProvider
@@ -48,6 +58,11 @@ class AddressModel {
       isPrimary: data['isPrimary'] as bool? ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      doorNumber: data['doorNumber'] as String?,
+      floorNumber: data['floorNumber'] as String?,
+      apartmentName: data['apartmentName'] as String?,
+      country: data['country'] as String?,
+      addressType: data['addressType'] as String?,
     );
   }
 
@@ -65,6 +80,11 @@ class AddressModel {
       'latitude': latitude,
       'longitude': longitude,
       'isPrimary': isPrimary,
+      'doorNumber': doorNumber,
+      'floorNumber': floorNumber,
+      'apartmentName': apartmentName,
+      'country': country,
+      'addressType': addressType,
       // 'createdAt' and 'updatedAt' are set using FieldValue.serverTimestamp() in the provider.
       // 'id' is the document ID and not stored as a field within the document.
     };
@@ -72,7 +92,8 @@ class AddressModel {
 
   String get fullAddress {
     List<String> parts = [];
-    
+    if (doorNumber != null && doorNumber!.isNotEmpty) parts.add(doorNumber!);
+    if (floorNumber != null && floorNumber!.isNotEmpty) parts.add(floorNumber!);
     if (addressLine1.isNotEmpty) parts.add(addressLine1);
     if (addressLine2 != null && addressLine2!.isNotEmpty) parts.add(addressLine2!);
     if (landmark != null && landmark!.isNotEmpty) parts.add('Near $landmark');
@@ -120,6 +141,11 @@ class AddressModel {
     bool? isPrimary,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? doorNumber,
+    String? floorNumber,
+    String? apartmentName,
+    String? country,
+    String? addressType,
   }) {
     return AddressModel(
       id: id ?? this.id,
@@ -135,6 +161,11 @@ class AddressModel {
       isPrimary: isPrimary ?? this.isPrimary,
       createdAt: createdAt ?? this.createdAt, // Keep existing if not provided
       updatedAt: updatedAt ?? this.updatedAt, // Keep existing if not provided
+      doorNumber: doorNumber ?? this.doorNumber,
+      floorNumber: floorNumber ?? this.floorNumber,
+      apartmentName: apartmentName ?? this.apartmentName,
+      country: country ?? this.country,
+      addressType: addressType ?? this.addressType,
     );
   }
 }

@@ -86,7 +86,6 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
               isActive: data['isActive'] ?? true,
               order: data['sortOrder'] ?? 0,
               imageUrl: data['imageUrl'], // Add image URL field
-              originalPrice: data['originalPrice']?.toDouble(),
               offerPrice: data['offerPrice']?.toDouble(),
             );
           }).toList();
@@ -520,20 +519,16 @@ Widget _buildItemsSection() {
                       Row(
                         children: [
                           // Original Price (strikethrough) - Show first if there's an offer
-                          if (item.originalPrice != null &&
-                              item.originalPrice! >
-                                  (item.offerPrice ?? item.pricePerPiece))
+                          if (item.offerPrice != null && item.offerPrice! < item.pricePerPiece)
                             Text(
-                              '₹${item.originalPrice!.toInt()}',
+                              '₹${item.pricePerPiece.toInt()}',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 decoration: TextDecoration.lineThrough,
                                 color: context.onSurfaceVariant,
                               ),
                             ),
                           // Add spacing between original and offer price
-                          if (item.originalPrice != null &&
-                              item.originalPrice! >
-                                  (item.offerPrice ?? item.pricePerPiece))
+                          if (item.offerPrice != null && item.offerPrice! < item.pricePerPiece)
                             const SizedBox(width: 8),
                           // Current/Offer Price
                           Text(

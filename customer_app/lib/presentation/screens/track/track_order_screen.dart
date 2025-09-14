@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:lottie/lottie.dart'; // For Lottie animations
 import 'package:customer_app/data/models/order_model.dart';
 import 'package:customer_app/presentation/screens/orders/edit_order_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1172,17 +1173,23 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.track_changes_outlined,
-                        size: 100,
-                        color: Colors.grey[400],
+                      // Lottie animation
+                      SizedBox(
+                        height: 200,
+                        width: 200,
+                        child: Lottie.asset(
+                          'assets/empty.json',
+                          repeat: true,
+                          reverse: false,
+                          animate: true,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       const Text(
                         'No orders to track',
                         style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
                           color: Color(0xFF0F3057),
                         ),
                       ),
@@ -1190,7 +1197,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                       Text(
                         'Place an order to track its progress here.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 32),
                       SizedBox(

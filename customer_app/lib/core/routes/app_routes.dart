@@ -16,6 +16,7 @@ import 'package:customer_app/presentation/screens/profile/saved_items_screen.dar
 import 'package:customer_app/presentation/screens/splash/splash_screen.dart';
 import 'package:customer_app/presentation/screens/profile/add_address_screen.dart';
 import 'package:customer_app/presentation/screens/home/allied_services_screen.dart';
+import 'package:customer_app/data/models/address_model.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -38,6 +39,7 @@ class AppRoutes {
   static const String editProfile = '/edit-profile';
   static const String manageAddresses = '/manage-addresses';
   static const String addAddressScreen = '/add-address-screen';
+  static const String editAddress = '/edit-address';
   static const String alliedServices = '/allied-services';
   static const String paymentMethods = '/payment-methods';
   static const String notificationPreferences = '/notification-preferences';
@@ -90,6 +92,18 @@ class AppRoutes {
 
       case addAddressScreen:
         return MaterialPageRoute(builder: (_) => const AddAddressScreen());
+      
+      case editAddress:
+        final arguments = settings.arguments as Map<String, dynamic>?;
+        if (arguments != null && arguments.containsKey('addressData')) {
+          final addressData = arguments['addressData'] as Map<String, dynamic>;
+          final addressModel = AddressModel.fromFirestore(addressData, arguments['addressId'] as String);
+          return MaterialPageRoute(
+            builder: (_) => AddAddressScreen(address: addressModel),
+          );
+        }
+        return MaterialPageRoute(builder: (_) => const AddAddressScreen());
+        
       case manageAddresses:
         return MaterialPageRoute(builder: (_) => const ManageAddressesScreen());
       

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:customer_app/data/models/address_model.dart';
 import 'package:customer_app/core/utils/address_utils.dart';
@@ -16,6 +17,9 @@ class AddressProvider with ChangeNotifier {
 
   List<AddressModel> _addresses = [];
   List<AddressModel> get addresses => _addresses;
+
+  StreamSubscription<QuerySnapshot>? _addressesSubscription;
+  String? _currentUserId;
 
   // Add a new address using standardized format
   Future<bool> addAddress(String userId, String phoneNumber, Map<String, dynamic> addressData) async {
@@ -49,8 +53,9 @@ class AddressProvider with ChangeNotifier {
 
       if (documentId != null) {
         print('🏠 ADDRESS PROVIDER: Address saved with ID: $documentId');
-        await getAddresses(userId);
+        // No need to call getAddresses - the stream will automatically update
         _isLoading = false;
+        notifyListeners();
         return true;
       } else {
         throw Exception('Failed to save address');
@@ -64,7 +69,61 @@ class AddressProvider with ChangeNotifier {
     }
   }
 
-  // Fetch addresses from the user's 'addresses' subcollection
+  // Start listening to real-time address updates
+  void startListeningToAddresses(String userId) {
+    if (userId.isEmpty) {
+      _addresses = [];
+      notifyListeners();
+      return;
+    }
+
+    // Cancel previous subscription if exists
+    _addressesSubscription?.cancel();
+    
+    _currentUserId = userId;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      print('🏠 ADDRESS PROVIDER: Starting real-time listener for user: $userId');
+      
+      _addressesSubscription = _firestore
+          .collection(_usersCollection)
+          .doc(userId)
+          .collection(_addressesSubcollection)
+          .orderBy('createdAt', descending: true)
+          .snapshots()
+          .listen(
+        (QuerySnapshot snapshot) {
+          print('🏠 ADDRESS PROVIDER: Real-time update - Found ${snapshot.docs.length} addresses');
+          
+          _addresses = snapshot.docs
+              .map((doc) => AddressModel.fromFirestore(doc.data() as Map<String, dynamic>, doc.id))
+              .toList();
+          
+          _isLoading = false;
+          _error = null;
+          notifyListeners();
+        },
+        onError: (error) {
+          _error = "Failed to listen to addresses: ${error.toString()}";
+          print('🏠 ADDRESS PROVIDER: Error listening to addresses: $_error');
+          _addresses = [];
+          _isLoading = false;
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      _error = "Failed to start listening to addresses: ${e.toString()}";
+      print('🏠 ADDRESS PROVIDER: Error starting listener: $_error');
+      _addresses = [];
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Fetch addresses from the user's 'addresses' subcollection (kept for backward compatibility)
   Future<void> getAddresses(String userId) async {
     if (userId.isEmpty) {
       _addresses = [];
@@ -130,8 +189,9 @@ class AddressProvider with ChangeNotifier {
 
       if (success) {
         print('🏠 ADDRESS PROVIDER: Address updated successfully');
-        await getAddresses(userId);
+        // No need to call getAddresses - the stream will automatically update
         _isLoading = false;
+        notifyListeners();
         return true;
       } else {
         throw Exception('Failed to update address');
@@ -162,9 +222,9 @@ class AddressProvider with ChangeNotifier {
           .delete();
 
       print('🏠 ADDRESS PROVIDER: Address deleted successfully');
-      await getAddresses(userId);
-
+      // No need to call getAddresses - the stream will automatically update
       _isLoading = false;
+      notifyListeners();
       return true;
     } catch (e) {
       _error = "Failed to delete address: ${e.toString()}";
@@ -175,11 +235,26 @@ class AddressProvider with ChangeNotifier {
     }
   }
 
+  // Stop listening to address updates
+  void stopListeningToAddresses() {
+    _addressesSubscription?.cancel();
+    _addressesSubscription = null;
+    _currentUserId = null;
+    print('🏠 ADDRESS PROVIDER: Stopped listening to addresses');
+  }
+
   // Clear addresses (useful for logout)
   void clearAddresses() {
+    stopListeningToAddresses();
     _addresses = [];
     _error = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    stopListeningToAddresses();
+    super.dispose();
   }
 
   // Get primary address
