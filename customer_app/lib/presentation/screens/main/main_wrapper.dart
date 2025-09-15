@@ -3,7 +3,7 @@ import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:customer_app/presentation/providers/auth_provider.dart';
 import 'package:customer_app/presentation/screens/home/home_screen.dart';
 import 'package:customer_app/presentation/screens/orders/orders_screen.dart';
-import 'package:customer_app/presentation/screens/track/track_order_screen.dart';
+import 'package:customer_app/presentation/screens/orders/track_order_screen.dart';
 import 'package:customer_app/presentation/screens/profile/profile_screen.dart';
 import 'package:flutter/material.dart';
 

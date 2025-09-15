@@ -328,11 +328,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               itemBuilder: (context, index) {
                 final item = widget.order.items[index];
                 return ListTile(
-                  title: Text(item['name']),
-                  subtitle:
-                      Text('${item['quantity']} x ₹${item['pricePerPiece']}'),
+                  title: Text(item['name'] ?? 'Unknown Item'),
+                  subtitle: Text('${_getItemQuantity(item)} x ₹${_getItemPrice(item).toStringAsFixed(2)}'),
                   trailing: Text(
-                    '₹${(item['quantity'] * item['pricePerPiece']).toStringAsFixed(2)}',
+                    '₹${(_getItemQuantity(item) * _getItemPrice(item)).toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 );
@@ -342,7 +341,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: Text(
-                'Total: ₹${widget.order.totalAmount.toStringAsFixed(2)}',
+                'Total: ₹${(widget.order.totalAmount ?? 0.0).toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -449,5 +448,30 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       default:
         return Colors.grey;
     }
+  }
+
+  int _getItemQuantity(Map<String, dynamic> item) {
+    // Handle different possible field names and types
+    final quantity = item['quantity'];
+    if (quantity == null) return 0;
+    if (quantity is int) return quantity;
+    if (quantity is double) return quantity.toInt();
+    if (quantity is String) return int.tryParse(quantity) ?? 0;
+    return 0;
+  }
+
+  double _getItemPrice(Map<String, dynamic> item) {
+    // Handle different possible field names and types for price
+    double price = 0.0;
+    
+    // Try different field names for price
+    final priceValue = item['price'] ?? item['pricePerPiece'] ?? item['unitPrice'] ?? 0;
+    
+    if (priceValue == null) return 0.0;
+    if (priceValue is double) return priceValue;
+    if (priceValue is int) return priceValue.toDouble();
+    if (priceValue is String) return double.tryParse(priceValue) ?? 0.0;
+    
+    return price;
   }
 }

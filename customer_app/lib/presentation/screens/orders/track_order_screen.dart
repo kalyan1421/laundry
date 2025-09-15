@@ -1282,15 +1282,53 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            'Order #${snapshot.data!.orderNumber}',
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).brightness ==
-                                        Brightness.light
-                                    ? Color(0xFF0F3057)
-                                    : context.onBackgroundColor),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Order #${snapshot.data!.orderNumber}',
+                                style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(context).brightness ==
+                                            Brightness.light
+                                        ? Color(0xFF0F3057)
+                                        : context.onBackgroundColor),
+                              ),
+                              // Service Type Display
+                              if (snapshot.data!.serviceType != null && snapshot.data!.serviceType.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _getServiceTypeIcon(snapshot.data!.serviceType),
+                                      size: 16,
+                                      color: _getServiceTypeColor(snapshot.data!.serviceType),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: _getServiceTypeColor(snapshot.data!.serviceType).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: _getServiceTypeColor(snapshot.data!.serviceType).withOpacity(0.3),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        _getDisplayServiceType(snapshot.data!.serviceType),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: _getServiceTypeColor(snapshot.data!.serviceType),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                         IconButton(
@@ -1329,5 +1367,44 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         ),
       ),
     );
+  }
+
+  /// Get appropriate icon for service type
+  IconData _getServiceTypeIcon(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('ironing')) {
+      return Icons.iron;
+    } else if (type.contains('allied')) {
+      return Icons.cleaning_services;
+    } else if (type.contains('laundry')) {
+      return Icons.local_laundry_service;
+    }
+    return Icons.miscellaneous_services;
+  }
+
+  /// Get appropriate color for service type
+  Color _getServiceTypeColor(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('ironing')) {
+      return Colors.orange[600]!;
+    } else if (type.contains('allied')) {
+      return Colors.purple[600]!;
+    } else if (type.contains('laundry')) {
+      return Colors.blue[600]!;
+    }
+    return Colors.grey[600]!;
+  }
+
+  /// Get display-friendly service type name
+  String _getDisplayServiceType(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('ironing')) {
+      return 'IRONING SERVICE';
+    } else if (type.contains('allied')) {
+      return 'ALLIED SERVICE';
+    } else if (type.contains('laundry')) {
+      return 'LAUNDRY SERVICE';
+    }
+    return serviceType.toUpperCase();
   }
 }

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/order_model.dart';
 import '../../models/item_model.dart';
+import '../../models/allied_service_model.dart';
 
 class AdminEditOrderScreen extends StatefulWidget {
   final OrderModel order;
@@ -18,12 +20,21 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   
+  // For ironing services
   Map<String, int> _selectedItems = {};
   List<ItemModel> _availableItems = [];
+  
+  // For allied services  
+  Map<String, int> _selectedAlliedServices = {};
+  List<AlliedServiceModel> _availableAlliedServices = [];
+  
   bool _isLoading = true;
   bool _isSaving = false;
   double _totalAmount = 0.0;
   String? _specialInstructions;
+  
+  // Determine if this is an allied service or ironing service
+  bool get _isAlliedService => widget.order.serviceType?.toLowerCase().contains('allied') ?? false;
 
   @override
   void initState() {
@@ -38,7 +49,11 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
       String itemName = item['name'] ?? '';
       int quantity = item['quantity'] ?? 0;
       if (itemName.isNotEmpty && quantity > 0) {
-        _selectedItems[itemName] = quantity;
+        if (_isAlliedService) {
+          _selectedAlliedServices[itemName] = quantity;
+        } else {
+          _selectedItems[itemName] = quantity;
+        }
       }
     }
     _specialInstructions = widget.order.specialInstructions;
@@ -47,46 +62,30 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
 
   Future<void> _fetchAvailableItems() async {
     try {
-      // Fetch regular items
-      QuerySnapshot itemsSnapshot = await _firestore
-          .collection('items')
-          .where('isActive', isEqualTo: true)
-          .orderBy('sortOrder')
-          .get();
+      if (_isAlliedService) {
+        // Fetch allied services only
+        QuerySnapshot alliedSnapshot = await _firestore
+            .collection('allied_services')
+            .where('isActive', isEqualTo: true)
+            .orderBy('sortOrder')
+            .get();
 
-      List<ItemModel> items = itemsSnapshot.docs
-          .map((doc) => ItemModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
-          .toList();
+        _availableAlliedServices = alliedSnapshot.docs
+            .map((doc) => AlliedServiceModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+            .toList();
+      } else {
+        // Fetch regular ironing items only
+        QuerySnapshot itemsSnapshot = await _firestore
+            .collection('items')
+            .where('isActive', isEqualTo: true)
+            .orderBy('sortOrder')
+            .get();
 
-      // Fetch allied services
-      QuerySnapshot alliedSnapshot = await _firestore
-          .collection('allied_services')
-          .where('isActive', isEqualTo: true)
-          .orderBy('sortOrder')
-          .get();
-
-      // Convert allied services to ItemModel format
-      List<ItemModel> alliedServices = alliedSnapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return ItemModel(
-          id: doc.id,
-          name: data['name'] ?? '',
-          category: 'Allied Service',
-          price: (data['offerPrice'] ?? data['price'] ?? 0.0).toDouble(),
-          unit: data['unit'] ?? 'service',
-          isActive: data['isActive'] ?? true,
-          sortOrder: data['sortOrder'] ?? 0,
-          updatedAt: DateTime.now(),
-          imageUrl: data['imageUrl'],
-          offerPrice: data['offerPrice']?.toDouble(),
-        );
-      }).toList();
-
-      // Combine all items
-      _availableItems = [...items, ...alliedServices];
-
-      // Filter items based on order service type
-      _availableItems = _filterItemsByServiceType(_availableItems);
+        _availableItems = itemsSnapshot.docs
+            .map((doc) => ItemModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+            .where((item) => item.category.toLowerCase().contains('iron') || item.category.toLowerCase() == 'ironing')
+            .toList();
+      }
 
       setState(() {
         _isLoading = false;
@@ -100,103 +99,37 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
     }
   }
 
-  List<ItemModel> _filterItemsByServiceType(List<ItemModel> allItems) {
-    final serviceType = widget.order.serviceType?.toLowerCase() ?? '';
-    
-    print('Admin Edit Order - Filtering for service type: "$serviceType"');
-    print('Total items available: ${allItems.length}');
-    
-    List<ItemModel> filteredItems;
-    
-    if (serviceType.contains('mixed')) {
-      // For mixed services, show all items
-      filteredItems = allItems;
-      print('Mixed service - showing all items');
-    } else if (serviceType.contains('ironing')) {
-      // For ironing services, show only ironing items
-      filteredItems = allItems.where((item) => 
-        item.category.toLowerCase().contains('iron') || 
-        item.category.toLowerCase() == 'ironing'
-      ).toList();
-      print('Ironing service - showing ${filteredItems.length} ironing items');
-    } else if (serviceType.contains('laundry')) {
-      // For laundry services, show only allied services
-      filteredItems = allItems.where((item) => 
-        item.category.toLowerCase() == 'allied service' ||
-        item.category.toLowerCase() == 'allied services'
-      ).toList();
-      print('Laundry service - showing ${filteredItems.length} allied service items');
-      for (var item in filteredItems) {
-        print('  - ${item.name} (${item.category})');
-      }
-    } else if (serviceType.contains('alien')) {
-      // For alien services, show only alien items
-      filteredItems = allItems.where((item) => 
-        item.category.toLowerCase().contains('alien') || 
-        item.category.toLowerCase() == 'alien'
-      ).toList();
-      print('Alien service - showing ${filteredItems.length} alien items');
-    } else {
-      // Default: show all items
-      filteredItems = allItems;
-      print('Default - showing all ${filteredItems.length} items');
-    }
-    
-    return filteredItems;
-  }
 
   void _calculateTotal() {
     double total = 0.0;
-    for (String itemName in _selectedItems.keys) {
-      int quantity = _selectedItems[itemName] ?? 0;
-      ItemModel? item = _availableItems.firstWhere(
-        (item) => item.name == itemName,
-        orElse: () => ItemModel(
-          id: '',
-          name: itemName,
-          category: '',
-          price: 0.0,
-          unit: 'piece',
-          isActive: true,
-          updatedAt: DateTime.now(),
-        ),
-      );
-      // Use offer price if available, otherwise use regular price
-      final effectivePrice = item.offerPrice ?? item.price;
-      total += effectivePrice * quantity;
-    }
-    setState(() {
-      _totalAmount = total;
-    });
-  }
-
-  void _updateItemQuantity(String itemName, int newQuantity) {
-    setState(() {
-      if (newQuantity <= 0) {
-        _selectedItems.remove(itemName);
-      } else {
-        _selectedItems[itemName] = newQuantity;
+    
+    if (_isAlliedService) {
+      // Calculate total for allied services
+      for (String serviceName in _selectedAlliedServices.keys) {
+        int quantity = _selectedAlliedServices[serviceName] ?? 0;
+        AlliedServiceModel? service = _availableAlliedServices.firstWhere(
+          (service) => service.name == serviceName,
+          orElse: () => AlliedServiceModel(
+            id: '',
+            name: serviceName,
+            description: '',
+            price: 0.0,
+            category: 'Allied Services',
+            subCategory: 'Allied Services',
+            unit: 'piece',
+            isActive: true,
+            hasPrice: true,
+            updatedAt: DateTime.now(),
+          ),
+        );
+        final effectivePrice = service.offerPrice ?? service.price;
+        total += effectivePrice * quantity;
       }
-    });
-    _calculateTotal();
-  }
-
-  Future<void> _saveChanges() async {
-    if (_selectedItems.isEmpty) {
-      _showErrorSnackBar('Please select at least one item');
-      return;
-    }
-
-    setState(() {
-      _isSaving = true;
-    });
-
-    try {
-      // Prepare updated items list
-      List<Map<String, dynamic>> updatedItems = [];
+    } else {
+      // Calculate total for ironing items
       for (String itemName in _selectedItems.keys) {
         int quantity = _selectedItems[itemName] ?? 0;
-        ItemModel item = _availableItems.firstWhere(
+        ItemModel? item = _availableItems.firstWhere(
           (item) => item.name == itemName,
           orElse: () => ItemModel(
             id: '',
@@ -208,15 +141,130 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
             updatedAt: DateTime.now(),
           ),
         );
-        
-        updatedItems.add({
-          'name': item.name,
-          'quantity': quantity,
-          'pricePerPiece': item.offerPrice ?? item.price,
-          'offerPrice': item.offerPrice,
-          'category': item.category,
-          'unit': item.unit,
-        });
+        final effectivePrice = item.offerPrice ?? item.price;
+        total += effectivePrice * quantity;
+      }
+    }
+    
+    setState(() {
+      _totalAmount = total;
+    });
+  }
+
+  void _updateItemQuantity(String itemName, int newQuantity) {
+    setState(() {
+      if (_isAlliedService) {
+        if (newQuantity <= 0) {
+          _selectedAlliedServices.remove(itemName);
+        } else {
+          _selectedAlliedServices[itemName] = newQuantity;
+        }
+      } else {
+        if (newQuantity <= 0) {
+          _selectedItems.remove(itemName);
+        } else {
+          _selectedItems[itemName] = newQuantity;
+        }
+      }
+    });
+    _calculateTotal();
+  }
+
+  int _getCurrentQuantity(String itemName) {
+    if (_isAlliedService) {
+      return _selectedAlliedServices[itemName] ?? 0;
+    } else {
+      return _selectedItems[itemName] ?? 0;
+    }
+  }
+
+  int get _totalSelectedItems {
+    if (_isAlliedService) {
+      return _selectedAlliedServices.values.fold(0, (sum, quantity) => sum + quantity);
+    } else {
+      return _selectedItems.values.fold(0, (sum, quantity) => sum + quantity);
+    }
+  }
+
+  bool get _hasSelectedItems {
+    if (_isAlliedService) {
+      return _selectedAlliedServices.isNotEmpty;
+    } else {
+      return _selectedItems.isNotEmpty;
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    if (!_hasSelectedItems) {
+      _showErrorSnackBar('Please select at least one item');
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      // Prepare updated items list
+      List<Map<String, dynamic>> updatedItems = [];
+      
+      if (_isAlliedService) {
+        // Handle allied services
+        for (String serviceName in _selectedAlliedServices.keys) {
+          int quantity = _selectedAlliedServices[serviceName] ?? 0;
+          AlliedServiceModel service = _availableAlliedServices.firstWhere(
+            (service) => service.name == serviceName,
+            orElse: () => AlliedServiceModel(
+              id: '',
+              name: serviceName,
+              description: '',
+              price: 0.0,
+              category: 'Allied Services',
+              subCategory: 'Allied Services',
+              unit: 'piece',
+              isActive: true,
+              hasPrice: true,
+              updatedAt: DateTime.now(),
+            ),
+          );
+          
+          updatedItems.add({
+            'itemId': service.id,
+            'name': service.name,
+            'quantity': quantity,
+            'pricePerPiece': service.offerPrice ?? service.price,
+            'offerPrice': service.offerPrice,
+            'category': service.category,
+            'unit': service.unit,
+          });
+        }
+      } else {
+        // Handle ironing items
+        for (String itemName in _selectedItems.keys) {
+          int quantity = _selectedItems[itemName] ?? 0;
+          ItemModel item = _availableItems.firstWhere(
+            (item) => item.name == itemName,
+            orElse: () => ItemModel(
+              id: '',
+              name: itemName,
+              category: '',
+              price: 0.0,
+              unit: 'piece',
+              isActive: true,
+              updatedAt: DateTime.now(),
+            ),
+          );
+          
+          updatedItems.add({
+            'itemId': item.id,
+            'name': item.name,
+            'quantity': quantity,
+            'pricePerPiece': item.offerPrice ?? item.price,
+            'offerPrice': item.offerPrice,
+            'category': item.category,
+            'unit': item.unit,
+          });
+        }
       }
 
       // Update order in Firestore with admin tracking
@@ -292,18 +340,35 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Edit Order'),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 0,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Edit Order (Admin)'),
+        foregroundColor: Colors.black,
         backgroundColor: Colors.white,
-        foregroundColor: Colors.blue[700],
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          _isAlliedService ? 'Allied Services (Wash & Iron)' : 'Ironing Services',
+          style: const TextStyle(
+            color: Colors.black,
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -327,369 +392,540 @@ class _AdminEditOrderScreenState extends State<AdminEditOrderScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Order Information Header
-          Container(
-            width: double.infinity,
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Order Number and Service Type
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Order #${widget.order.orderNumber ?? widget.order.id.substring(0, 8)}',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    if (widget.order.serviceType != null && widget.order.serviceType!.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _getServiceTypeColor(widget.order.serviceType!).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: _getServiceTypeColor(widget.order.serviceType!),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _getServiceTypeIcon(widget.order.serviceType!),
-                              size: 16,
-                              color: _getServiceTypeColor(widget.order.serviceType!),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              widget.order.serviceType!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: _getServiceTypeColor(widget.order.serviceType!),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Editing items for ${widget.order.serviceType ?? 'Mixed Service'} order',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                
-                // Customer Information
-                Row(
-                  children: [
-                    Icon(Icons.person, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Customer: ${widget.order.customer?.name ?? 'Unknown'}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                
-                // Pickup Information
-                Row(
-                  children: [
-                    Icon(Icons.schedule, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Pickup: ${widget.order.pickupDate != null ? _formatDate(widget.order.pickupDate!.toDate()) : 'TBD'} • ${widget.order.pickupTimeSlot ?? 'TBD'}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                
-                // Status
-                Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Status: ${widget.order.status.toUpperCase()}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          // Special Instructions Section
-          Container(
-            width: double.infinity,
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Special Instructions',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  initialValue: _specialInstructions,
-                  decoration: const InputDecoration(
-                    hintText: 'Add special instructions...',
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.all(12),
-                  ),
-                  maxLines: 2,
-                  onChanged: (value) {
-                    _specialInstructions = value;
-                  },
-                ),
-              ],
-            ),
-          ),
-          
-          // Items Section Header
-          Container(
-            width: double.infinity,
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: const Text(
-              'Edit Order Items',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Order Information Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade100),
               ),
-            ),
-          ),
-          
-          // Items List
-          Expanded(
-            child: _availableItems.isEmpty
-                ? const Center(child: Text('No items available'))
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _availableItems.length,
-                    itemBuilder: (context, index) {
-                      ItemModel item = _availableItems[index];
-                      int currentQuantity = _selectedItems[item.name] ?? 0;
-                      
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: currentQuantity > 0 ? Colors.blue[200]! : Colors.grey[200]!,
-                            width: currentQuantity > 0 ? 2 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            // Item Image/Icon
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: currentQuantity > 0 ? Colors.blue[50] : Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                _getItemIcon(item.name), 
-                                color: currentQuantity > 0 ? Colors.blue[600] : Colors.grey[400],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            
-                            // Item Details
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Item Name
-                                  Text(
-                                    item.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  
-                                  // Price Display with original and offer prices
-                                  Row(
-                                    children: [
-                                      // Current/Offer Price
-                                      Text(
-                                        '₹${(item.offerPrice ?? item.price).toInt()} per ${item.unit}',
-                                        style: TextStyle(
-                                          color: item.offerPrice != null ? Colors.green[700] : Colors.grey[600],
-                                          fontSize: 14,
-                                          fontWeight: item.offerPrice != null ? FontWeight.w600 : FontWeight.normal,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            
-                            // Quantity Controls
-                            Row(
-                              children: [
-                                IconButton(
-                                  onPressed: currentQuantity > 0
-                                      ? () => _updateItemQuantity(item.name, currentQuantity - 1)
-                                      : null,
-                                  icon: Icon(
-                                    Icons.remove,
-                                    color: currentQuantity > 0 ? Colors.grey[600] : Colors.grey[300],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: currentQuantity > 0 ? Colors.blue[50] : Colors.grey[50],
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    '$currentQuantity',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16,
-                                      color: currentQuantity > 0 ? Colors.blue[700] : Colors.grey[600],
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () => _updateItemQuantity(item.name, currentQuantity + 1),
-                                  icon: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.blue,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.add,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-      
-      // Bottom Sheet with Total and Update Button
-      bottomSheet: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 8,
-              offset: Offset(0, -2),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Total Amount Display
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
                     children: [
+                      Icon(Icons.edit, color: Colors.blue.shade600, size: 20),
+                      const SizedBox(width: 8),
                       Text(
-                        'Total Items: ${_selectedItems.values.fold(0, (sum, quantity) => sum + quantity)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
+                        'Editing Order #${widget.order.orderNumber ?? widget.order.id.substring(0, 8)}',
+                        style: TextStyle(
                           fontSize: 16,
-                        ),
-                      ),
-                      Text(
-                        'Total Amount: ₹${_totalAmount.toInt()}',
-                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: Colors.blue,
+                          color: Colors.blue.shade800,
                         ),
                       ),
                     ],
                   ),
-                  
-                  // Update Button
-                  SizedBox(
-                    width: 140,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _selectedItems.isEmpty || _isSaving ? null : _saveChanges,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue[700],
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Service Type: ${widget.order.serviceType ?? 'Unknown'}',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Items List
+            _isAlliedService ? _buildAlliedServicesList() : _buildIroningItemsList(),
+
+            const SizedBox(height: 24),
+
+            // Space for bottom sheet
+            if (_hasSelectedItems) const SizedBox(height: 120),
+          ],
+        ),
+      ),
+      bottomSheet: _hasSelectedItems ? _buildStickyCartSummary() : null,
+    );
+  }
+
+  Widget _buildIroningItemsList() {
+    if (_availableItems.isEmpty) {
+      return const Center(
+        child: Column(
+          children: [
+            Icon(Icons.iron, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'No ironing items available',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      itemCount: _availableItems.length,
+      itemBuilder: (context, index) {
+        final item = _availableItems[index];
+        final quantity = _getCurrentQuantity(item.name);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Item Image/Icon
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: item.imageUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: CachedNetworkImage(
+                          imageUrl: item.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorWidget: (context, url, error) => Icon(
+                            _getItemIcon(item.name),
+                            color: Colors.grey.shade400,
+                          ),
                         ),
+                      )
+                    : Icon(
+                        _getItemIcon(item.name),
+                        color: Colors.grey.shade400,
                       ),
-                      child: _isSaving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Text(
-                              'Update Order',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
+              ),
+              const SizedBox(width: 16),
+              
+              // Item Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        if (item.offerPrice != null && item.offerPrice! < item.price)
+                          Text(
+                            '₹${item.price.toInt()}',
+                            style: TextStyle(
+                              decoration: TextDecoration.lineThrough,
+                              color: Colors.grey.shade500,
+                              fontSize: 12,
                             ),
+                          ),
+                        if (item.offerPrice != null && item.offerPrice! < item.price)
+                          const SizedBox(width: 8),
+                        Text(
+                          '₹${(item.offerPrice ?? item.price).toInt()} per ${item.unit}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Quantity Controls
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: quantity > 0
+                        ? () => _updateItemQuantity(item.name, quantity - 1)
+                        : null,
+                    icon: Icon(
+                      Icons.remove,
+                      color: quantity > 0 ? Colors.grey.shade600 : Colors.grey.shade300,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    child: Text(
+                      '$quantity',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => _updateItemQuantity(item.name, quantity + 1),
+                    icon: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
                   ),
                 ],
               ),
             ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAlliedServicesList() {
+    if (_availableAlliedServices.isEmpty) {
+      return const Center(
+        child: Column(
+          children: [
+            Icon(Icons.local_laundry_service, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'No allied services available',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      itemCount: _availableAlliedServices.length,
+      itemBuilder: (context, index) {
+        final service = _availableAlliedServices[index];
+        final quantity = _getCurrentQuantity(service.name);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Service Image/Icon
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: service.imageUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: CachedNetworkImage(
+                          imageUrl: service.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.local_laundry_service,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.local_laundry_service,
+                        color: Colors.grey,
+                      ),
+              ),
+              const SizedBox(width: 16),
+              
+              // Service Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      service.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      service.description,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        if (service.hasPrice && service.offerPrice != null && service.offerPrice! < service.price)
+                          Text(
+                            '₹${service.price.toInt()}',
+                            style: TextStyle(
+                              decoration: TextDecoration.lineThrough,
+                              color: Colors.grey.shade500,
+                              fontSize: 12,
+                            ),
+                          ),
+                        if (service.hasPrice && service.offerPrice != null && service.offerPrice! < service.price)
+                          const SizedBox(width: 8),
+                        if (service.hasPrice)
+                          Text(
+                            '₹${(service.offerPrice ?? service.price).toInt()} per ${service.unit}',
+                            style: TextStyle(
+                              color: service.offerPrice != null
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.primary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        else
+                          Text(
+                            'Quote after inspection',
+                            style: TextStyle(
+                              color: Colors.orange[700],
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Quantity Controls
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: quantity > 0
+                        ? () => _updateItemQuantity(service.name, quantity - 1)
+                        : null,
+                    icon: Icon(
+                      Icons.remove,
+                      color: quantity > 0 ? Colors.grey.shade600 : Colors.grey.shade300,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    child: Text(
+                      '$quantity',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => _updateItemQuantity(service.name, quantity + 1),
+                    icon: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStickyCartSummary() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 50),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 0,
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Cart Summary Row
+                Row(
+                  children: [
+                    // Cart Icon with Badge
+                    Stack(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F3057).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.shopping_cart,
+                            color: Color(0xFF0F3057),
+                            size: 24,
+                          ),
+                        ),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '$_totalSelectedItems',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 16),
+
+                    // Amount Details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$_totalSelectedItems item${_totalSelectedItems > 1 ? 's' : ''} selected',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          if (_totalAmount > 0)
+                            Text(
+                              '₹${_totalAmount.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            )
+                          else
+                            const Text(
+                              'Quote on inspection',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.orange,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    // Update Button
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: ElevatedButton(
+                        onPressed: !_hasSelectedItems || _isSaving ? null : _saveChanges,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F3057),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.update, size: 18),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Update',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(Icons.arrow_forward_ios, size: 14),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

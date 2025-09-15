@@ -771,15 +771,92 @@ class _PlaceOrderForCustomerScreenState extends State<PlaceOrderForCustomerScree
             const SizedBox(height: 24),
 
             // Place Order Button
-            _buildPlaceOrderButton(),
-            
+          
+            Consumer2<ItemProvider, AlliedServiceProvider>(
+      builder: (context, itemProvider, alliedServiceProvider, child) {
+        final allItems = _getFilteredItems(itemProvider.items, alliedServiceProvider.alliedServices.cast<dynamic>());
+        final totalAmount = _calculateTotalAmount(allItems);
+        
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(context).colorScheme.shadow.withOpacity(0.12),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Total Items: $_totalItems',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        'Total Amount: ₹${totalAmount.toInt()}',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // SizedBox(
+                //   width: 120,
+                //   child: ElevatedButton(
+                //     onPressed: () {
+                //       // Scroll to address selection
+                //       // This is just to show the continue button functionality
+                //       ScaffoldMessenger.of(context).showSnackBar(
+                //         const SnackBar(
+                //           content: Text('Please fill in the address and schedule details above'),
+                //         ),
+                //       );
+                //     },
+                //     style: ElevatedButton.styleFrom(
+                //       backgroundColor: Theme.of(context).colorScheme.primary,
+                //       foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                //       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                //     ),
+                //     child: Text(
+                //       'Continue',
+                //       style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                //             color: Theme.of(context).colorScheme.onPrimary,
+                //             fontWeight: FontWeight.w600,
+                //           ),
+                //     ),
+                //   ),
+                // ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),SizedBox(height: 16),
+      _buildPlaceOrderButton(),
+             
             // Add space for bottom sheet if items are selected
             const SizedBox(height: 100),
           ],
         ),
       ),
       // Show bottom sheet when items are selected, just like customer app
-      bottomSheet: _totalItems > 0 ? _buildBottomSheet() : null,
+      // bottomSheet: _totalItems > 0 ? _buildBottomSheet() : null,
     );
   }
   
@@ -829,32 +906,32 @@ class _PlaceOrderForCustomerScreenState extends State<PlaceOrderForCustomerScree
                   ),
                 ),
                 const SizedBox(width: 16),
-                SizedBox(
-                  width: 120,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Scroll to address selection
-                      // This is just to show the continue button functionality
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please fill in the address and schedule details above'),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    child: Text(
-                      'Continue',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: Theme.of(context).colorScheme.onPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                ),
+                // SizedBox(
+                //   width: 120,
+                //   child: ElevatedButton(
+                //     onPressed: () {
+                //       // Scroll to address selection
+                //       // This is just to show the continue button functionality
+                //       ScaffoldMessenger.of(context).showSnackBar(
+                //         const SnackBar(
+                //           content: Text('Please fill in the address and schedule details above'),
+                //         ),
+                //       );
+                //     },
+                //     style: ElevatedButton.styleFrom(
+                //       backgroundColor: Theme.of(context).colorScheme.primary,
+                //       foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                //       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                //     ),
+                //     child: Text(
+                //       'Continue',
+                //       style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                //             color: Theme.of(context).colorScheme.onPrimary,
+                //             fontWeight: FontWeight.w600,
+                //           ),
+                //     ),
+                //   ),
+                // ),
               ],
             ),
           ),
@@ -1138,7 +1215,7 @@ class _PlaceOrderForCustomerScreenState extends State<PlaceOrderForCustomerScree
   Widget _buildItemsSelectionCard() {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(5.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

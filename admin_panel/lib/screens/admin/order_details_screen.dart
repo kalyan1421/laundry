@@ -414,6 +414,36 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               style: TextStyle(color: Colors.grey[600]),
             ),
             const SizedBox(height: 8),
+            // Service Type Display
+            if (_order!.serviceType != null && _order!.serviceType!.isNotEmpty) ...[
+              Row(
+                children: [
+                  Icon(
+                    _getServiceTypeIcon(_order!.serviceType!), 
+                    size: 20, 
+                    color: _getServiceTypeColor(_order!.serviceType!)
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _getServiceTypeColor(_order!.serviceType!).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _getServiceTypeColor(_order!.serviceType!)),
+                    ),
+                    child: Text(
+                      _getDisplayServiceType(_order!.serviceType!),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _getServiceTypeColor(_order!.serviceType!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
             Row(
               children: [
                 Icon(Icons.currency_rupee, size: 20, color: Colors.green[600]),
@@ -1092,9 +1122,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       );
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Address information not available for editing'),
+                        SnackBar(
+                          content: Text('Address information not available for editing. CustomerId: ${_order?.customerId}, AddressId: ${_order?.deliveryAddressDetails?.addressId}'),
                           backgroundColor: Colors.red,
+                          duration: const Duration(seconds: 5),
                         ),
                       );
                     }
@@ -2494,6 +2525,45 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     } catch (e) {
       return address; // fallback
     }
+  }
+
+  /// Get appropriate icon for service type
+  IconData _getServiceTypeIcon(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('ironing')) {
+      return Icons.iron;
+    } else if (type.contains('allied')) {
+      return Icons.cleaning_services;
+    } else if (type.contains('laundry')) {
+      return Icons.local_laundry_service;
+    }
+    return Icons.miscellaneous_services;
+  }
+
+  /// Get appropriate color for service type
+  Color _getServiceTypeColor(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('ironing')) {
+      return Colors.orange[600]!;
+    } else if (type.contains('allied')) {
+      return Colors.purple[600]!;
+    } else if (type.contains('laundry')) {
+      return Colors.blue[600]!;
+    }
+    return Colors.grey[600]!;
+  }
+
+  /// Get display-friendly service type name
+  String _getDisplayServiceType(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('ironing')) {
+      return 'IRONING SERVICE';
+    } else if (type.contains('allied')) {
+      return 'ALLIED SERVICE';
+    } else if (type.contains('laundry')) {
+      return 'LAUNDRY SERVICE';
+    }
+    return serviceType.toUpperCase();
   }
 }
 
