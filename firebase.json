@@ -20,6 +20,7 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
+    "site": "admincloudironing",
     "public": "admin_panel/build/web",
     "ignore": [
       "firebase.json",

@@ -7,6 +7,9 @@
       "hosting": {
         "website": [
           "laundry-management-57453"
+        ],
+        "admin": [
+          "admincloudironing"
         ]
       }
     }

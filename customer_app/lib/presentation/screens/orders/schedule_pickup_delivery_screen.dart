@@ -165,10 +165,9 @@ class _SchedulePickupDeliveryScreenState
       selectedPickupDate = _getDateFromOption(DateOption.today);
     }
 
-    // Initialize delivery date to 2 days from pickup by default
-    selectedDeliveryDateOption = DateOption.custom;
-    selectedDeliveryDate =
-        _getMinimumDeliveryDate().add(const Duration(days: 1));
+    // Initialize delivery date to minimum required (20 hours from pickup)
+    selectedDeliveryDateOption = DateOption.today;
+    selectedDeliveryDate = _getDateFromDeliveryOption(selectedDeliveryDateOption);
 
     // Allow Sunday scheduling - no restrictions on any day
 
