@@ -48,7 +48,7 @@ class _DesktopHomeViewState extends State<DesktopHomeView> {
                 const DesktopHeroSection(),
                  const SizedBox(height: 40),
                 const DesktopAboutSection(),
-                const DesktopAboutSection2(),
+                // const DesktopAboutSection2(),
                 const DesktopWhyChooseUsSection(),
                 const DesktopServicesSection(),
                 const DesktopSpecialServicesSection(),

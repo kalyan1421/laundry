@@ -47,7 +47,7 @@ class _MobileHomeViewState extends State<MobileHomeView> {
                 SizedBox(height: 80), // Space for fixed header
                 MobileHeroSection(),
                 MobileAboutSection(),
-                MobileAboutSection2(),
+                // MobileAboutSection2(),
                 MobileWhyChooseUsSection(),
                 MobileServicesSection(),
                 MobileSpecialServicesSection(),
