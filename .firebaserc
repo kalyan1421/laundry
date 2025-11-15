@@ -1,6 +1,6 @@
 {
   "projects": {
-    "default": "laundry-management-57453"
+    "default": "laundry-management-admin"
   },
   "targets": {
     "laundry-management-57453": {
