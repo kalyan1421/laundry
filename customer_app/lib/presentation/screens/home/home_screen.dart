@@ -460,7 +460,8 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              user.primaryAddress!.apartmentName,
+                              user.primaryAddress?.apartmentName ??
+                                  'Set your address',
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 16),
@@ -474,9 +475,7 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                           ],
                         ),
                       ),
-                      const SizedBox(
-                        width: 8,
-                      ),
+                      const Spacer(),
                       const Icon(
                         Icons.arrow_drop_down_rounded,
                         size: 24,

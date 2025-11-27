@@ -1,15 +1,19 @@
-
 // lib/screens/profile/add_address_screen.dart
 import 'package:customer_app/core/constants/app_constants.dart';
 import 'package:customer_app/data/models/address_model.dart';
 import 'package:customer_app/services/location_service.dart';
 import 'package:customer_app/presentation/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/common/custom_button.dart';
 import 'package:customer_app/core/utils/address_utils.dart';
+
+import 'map_picker_screen.dart';
 
 class AddAddressScreen extends StatefulWidget {
   final AddressModel? address; // For editing existing address
@@ -22,7 +26,7 @@ class AddAddressScreen extends StatefulWidget {
 
 class _AddAddressScreenState extends State<AddAddressScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+
   // Controllers in the order specified by user
   final _doorNumberController = TextEditingController();
   final _floorNumberController = TextEditingController();
@@ -63,7 +67,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     _landmarkController.text = address.landmark ?? '';
     selectedAddressType = address.type;
     isPrimary = address.isPrimary;
-    
+
     if (address.latitude != null && address.longitude != null) {
       currentLocation = Position(
         latitude: address.latitude!,
@@ -95,7 +99,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Location fetched successfully! You can now manually fill your address.'),
+          content: Text(
+              'Location fetched successfully! You can now manually fill your address.'),
           backgroundColor: Colors.green,
         ),
       );
@@ -112,7 +117,55 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     }
   }
 
+  Future<void> _openMapPicker() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MapPickerScreen(
+          initialPosition: currentLocation,
+        ),
+      ),
+    );
 
+    if (result != null &&
+        result.containsKey('placemark') &&
+        result.containsKey('position')) {
+      final Placemark placemark = result['placemark'];
+      final LatLng position = result['position'] as LatLng;
+
+      setState(() {
+        // Update location data
+        currentLocation = Position(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          timestamp: DateTime.now(),
+          accuracy: 10,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          headingAccuracy: 0,
+          speed: 0,
+          speedAccuracy: 0,
+        );
+
+        // Populate fields
+        _addressLine1Controller.text = '${placemark.name}, ${placemark.street}';
+        _addressLine2Controller.text = placemark.subLocality ?? '';
+        _cityController.text = placemark.locality ?? '';
+        _stateController.text = placemark.administrativeArea ?? '';
+        _pincodeController.text = placemark.postalCode ?? '';
+        _landmarkController.text =
+            placemark.subThoroughfare ?? ''; // Or other relevant field
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Address details filled from map selection.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
 
   Future<void> _saveAddress() async {
     if (!_formKey.currentState!.validate()) return;
@@ -139,7 +192,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
       final userId = authProvider.userModel!.uid;
       final phoneNumber = authProvider.userModel!.phoneNumber;
-      
+
       print('🏠 ADD ADDRESS: Starting address save process');
       print('🏠 ADD ADDRESS: User ID: $userId');
       print('🏠 ADD ADDRESS: Phone Number: $phoneNumber');
@@ -148,12 +201,12 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       if (widget.address == null) {
         // Adding new address using standardized format
         print('🏠 ADD ADDRESS: Creating new address with standardized format');
-        
+
         // If setting as primary, remove primary from other addresses first
         if (isPrimary) {
           await _removePrimaryFromOtherAddresses(userId);
         }
-        
+
         final documentId = await AddressUtils.saveAddressWithStandardFormat(
           userId: userId,
           phoneNumber: phoneNumber,
@@ -178,13 +231,15 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         }
       } else {
         // Updating existing address using standardized format
-        print('🏠 ADD ADDRESS: Updating existing address with ID: ${widget.address!.id}');
-        
+        print(
+            '🏠 ADD ADDRESS: Updating existing address with ID: ${widget.address!.id}');
+
         // If setting as primary, remove primary from other addresses first
         if (isPrimary) {
-          await _removePrimaryFromOtherAddresses(userId, excludeId: widget.address!.id);
+          await _removePrimaryFromOtherAddresses(userId,
+              excludeId: widget.address!.id);
         }
-        
+
         final success = await AddressUtils.updateAddressWithStandardFormat(
           userId: userId,
           documentId: widget.address!.id,
@@ -210,10 +265,12 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       }
 
       Navigator.pop(context, true); // Return true to indicate success
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(widget.address == null ? 'Address added successfully!' : 'Address updated successfully!'),
+          content: Text(widget.address == null
+              ? 'Address added successfully!'
+              : 'Address updated successfully!'),
           backgroundColor: Colors.green,
         ),
       );
@@ -233,7 +290,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   }
 
   // Helper method to remove primary status from other addresses
-  Future<void> _removePrimaryFromOtherAddresses(String userId, {String? excludeId}) async {
+  Future<void> _removePrimaryFromOtherAddresses(String userId,
+      {String? excludeId}) async {
     try {
       print('🏠 ADD ADDRESS: Removing primary status from other addresses');
       final existingAddresses = await FirebaseFirestore.instance
@@ -241,15 +299,15 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           .doc(userId)
           .collection('addresses')
           .get();
-      
+
       final batch = FirebaseFirestore.instance.batch();
-      
+
       for (var doc in existingAddresses.docs) {
         if (excludeId == null || doc.id != excludeId) {
           batch.update(doc.reference, {'isPrimary': false});
         }
       }
-      
+
       await batch.commit();
       print('🏠 ADD ADDRESS: Primary status removed from other addresses');
     } catch (e) {
@@ -260,11 +318,10 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
         title: Text(widget.address == null ? 'Add Address' : 'Edit Address'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(AppConstants.primaryColorValue),
-        elevation: 0,
+        elevation: 1,
       ),
       body: Form(
         key: _formKey,
@@ -277,75 +334,125 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Current Location Section
-                    Card(
-                      elevation: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.my_location,
-                                  color: currentLocation != null ? Colors.green : Colors.grey,
-                                ),
-                                const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                          border: currentLocation != null
+                              ? Border.all(color: Colors.green)
+                              : Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(24)),
+                      child: Card(
+                        borderOnForeground: currentLocation != null,
+                        color: context.surfaceColor,
+                        elevation: 0,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.my_location,
+                                    color: currentLocation != null
+                                        ? Colors.green
+                                        : context.onSurfaceColor
+                                            .withOpacity(0.6),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Current Location',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight
+                                          .w600, // color will be inherited
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (isLocationLoading)
+                                    const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  else
+                                    TextButton(
+                                      onPressed: _getCurrentLocation,
+                                      child: Text(
+                                        'Refresh',
+                                        style: TextStyle(
+                                            color:
+                                                Theme.of(context).brightness ==
+                                                        Brightness.dark
+                                                    ? context.secondaryColor
+                                                    : context.primaryColor),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (currentLocation != null) ...[
+                                const SizedBox(height: 8),
                                 Text(
-                                  'Current Location',
+                                  'Location detected successfully',
                                   style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: currentLocation != null ? Colors.green : Colors.grey,
+                                    color:
+                                        context.onSurfaceColor.withOpacity(0.8),
+                                    fontSize: 14,
                                   ),
                                 ),
-                                const Spacer(),
-                                if (isLocationLoading)
-                                  const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                else
-                                  TextButton(
-                                    onPressed: _getCurrentLocation,
-                                    child: const Text('Refresh'),
+                              ] else if (!isLocationLoading) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tap refresh to get your current location',
+                                  style: TextStyle(
+                                    color:
+                                        context.onSurfaceColor.withOpacity(0.8),
+                                    fontSize: 14,
                                   ),
+                                ),
                               ],
-                            ),
-                            if (currentLocation != null) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Location detected successfully',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ] else if (!isLocationLoading) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Tap refresh to get your current location',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 14,
-                                ),
-                              ),
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                    
+
+                    const SizedBox(height: 12),
+                    // Map Picker Section
+                    Card(
+                      color: context.surfaceColor,
+                      elevation: 1,
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.map_outlined,
+                          color: context.primaryColor,
+                        ),
+                        title: const Text(
+                          'Select Location on Map',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: const Text(
+                            'Pinpoint your address for better accuracy'),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: _openMapPicker,
+                      ),
+                    ),
+
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Center(
+                          child: Text("OR",
+                              style: TextStyle(fontWeight: FontWeight.bold))),
+                    ),
+
                     const SizedBox(height: 24),
-                    
+
                     // Address Type Selection
                     const Text(
                       'Address Type',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Color(AppConstants.textPrimaryValue),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -364,13 +471,15 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                   });
                                 }
                               },
-                              selectedColor: const Color(AppConstants.primaryColorValue).withOpacity(0.2),
+                              selectedColor:
+                                  // context.primaryColor.withOpacity(0.2),se
+                                  context.secondaryColor,
                               labelStyle: TextStyle(
-                                color: selectedAddressType == type 
-                                    ? const Color(AppConstants.primaryColorValue)
-                                    : Colors.grey[600],
-                                fontWeight: selectedAddressType == type 
-                                    ? FontWeight.w600 
+                                color: selectedAddressType == type
+                                    ? context.primaryColor
+                                    : context.onSurfaceColor.withOpacity(0.7),
+                                fontWeight: selectedAddressType == type
+                                    ? FontWeight.w600
                                     : FontWeight.normal,
                               ),
                             ),
@@ -378,16 +487,15 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         );
                       }).toList(),
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Door Number and Floor Number (User's requested order)
                     const Text(
                       'Building Details',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Color(AppConstants.textPrimaryValue),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -418,16 +526,15 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Address Details (User's requested order)
                     const Text(
                       'Address Details',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Color(AppConstants.textPrimaryValue),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -446,7 +553,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         return null;
                       },
                     ),
-                    
+
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _addressLine2Controller,
@@ -457,9 +564,9 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Landmark (User's requested order)
                     TextFormField(
                       controller: _landmarkController,
@@ -470,16 +577,15 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // City, State, Pin Code (User's requested order)
                     const Text(
                       'Location Details',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Color(AppConstants.textPrimaryValue),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -497,7 +603,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         return null;
                       },
                     ),
-                    
+
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _stateController,
@@ -513,7 +619,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         return null;
                       },
                     ),
-                    
+
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _pincodeController,
@@ -533,25 +639,27 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         return null;
                       },
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Primary address option (User's requested feature)
                     Card(
+                      color: context.surfaceColor,
                       elevation: 1,
                       child: CheckboxListTile(
                         title: const Text(
                           'Set as Primary Address',
                           style: TextStyle(fontWeight: FontWeight.w500),
                         ),
-                        subtitle: const Text('This will be used as default for orders'),
+                        subtitle: const Text(
+                            'This will be used as default for orders'),
                         value: isPrimary,
                         onChanged: (value) {
                           setState(() {
                             isPrimary = value ?? false;
                           });
                         },
-                        activeColor: const Color(AppConstants.primaryColorValue),
+                        activeColor: context.primaryColor,
                         controlAffinity: ListTileControlAffinity.leading,
                       ),
                     ),
@@ -559,27 +667,24 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 ),
               ),
             ),
-            Padding(padding: const EdgeInsets.only(bottom: AppConstants.spacingM*3), child:  
-            
-            Container(
-              padding: const EdgeInsets.all(AppConstants.spacingM),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    spreadRadius: 1,
-                    blurRadius: 4,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppConstants.spacingM),
+              child: Container(
+                padding: const EdgeInsets.all(AppConstants.spacingM),
+                decoration: BoxDecoration(
+                  // Use surface color for dark mode
+                  color: Colors.transparent,
+                ),
+                child: CustomButton(
+                  elevation: 0,
+                  text: widget.address == null
+                      ? 'Save Address'
+                      : 'Update Address',
+                  onPressed: isLoading ? null : _saveAddress,
+                  isLoading: isLoading,
+                ),
               ),
-              child: CustomButton(
-                text: widget.address == null ? 'Save Address' : 'Update Address',
-                onPressed: isLoading ? null : _saveAddress,
-                isLoading: isLoading,
-              ),
-            ),),
+            ),
           ],
         ),
       ),

@@ -18,6 +18,10 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
+        <!-- Google Maps API Key -->
+        <meta-data android:name="com.google.android.geo.API_KEY"
+               android:value="AIzaSyAhBJZg1aLgab5m1yjP47HrBbQpKWVb2lg"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

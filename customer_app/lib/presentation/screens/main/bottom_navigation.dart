@@ -70,34 +70,9 @@ class BottomNavigation extends StatelessWidget {
   }) {
     return BottomNavigationBarItem(
       icon: Icon(icon),
-      activeIcon: isDark ? _glowIcon(primary, activeIcon) : Icon(activeIcon),
+      activeIcon: Icon(activeIcon),
       label: label,
     );
   }
 
-  Widget _glowIcon(Color primary, IconData iconData) {
-    // Light (bright) glow effect for selected item in dark mode
-    final Color glow = Colors.white.withOpacity(0.55);
-    final Color glowBg = Colors.white.withOpacity(0.0);
-    return Container(
-      width: 36,
-      height: 36,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: glowBg, // subtle light background
-        boxShadow: [
-          BoxShadow(
-            color: glow,
-            blurRadius: 18,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: Icon(
-        iconData,
-        color: primary, // keep brand color for the glyph
-      ),
-    );
-  }
 }
