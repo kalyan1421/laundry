@@ -17,27 +17,28 @@ class ManageAddressesScreen extends StatefulWidget {
 }
 
 class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
+  late final AddressProvider _addressProvider;
+
   @override
   void initState() {
     super.initState();
+    _addressProvider = Provider.of<AddressProvider>(context, listen: false);
     _startListeningToAddresses();
   }
 
   void _startListeningToAddresses() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
     
     if (authProvider.userModel != null) {
       // Start listening to real-time address updates
-      addressProvider.startListeningToAddresses(authProvider.userModel!.uid);
+      _addressProvider.startListeningToAddresses(authProvider.userModel!.uid);
     }
   }
 
   @override
   void dispose() {
     // Stop listening when screen is disposed
-    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
-    addressProvider.stopListeningToAddresses();
+    _addressProvider.stopListeningToAddresses();
     super.dispose();
   }
 

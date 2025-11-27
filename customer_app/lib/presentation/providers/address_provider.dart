@@ -22,7 +22,8 @@ class AddressProvider with ChangeNotifier {
   String? _currentUserId;
 
   // Add a new address using standardized format
-  Future<bool> addAddress(String userId, String phoneNumber, Map<String, dynamic> addressData) async {
+  Future<bool> addAddress(String userId, String phoneNumber,
+      Map<String, dynamic> addressData) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -31,7 +32,7 @@ class AddressProvider with ChangeNotifier {
       print('🏠 ADDRESS PROVIDER: Adding address with standardized format');
       print('🏠 ADDRESS PROVIDER: User ID: $userId');
       print('🏠 ADDRESS PROVIDER: Phone Number: $phoneNumber');
-      
+
       // Use AddressUtils to save with standardized format
       final documentId = await AddressUtils.saveAddressWithStandardFormat(
         userId: userId,
@@ -46,8 +47,11 @@ class AddressProvider with ChangeNotifier {
         addressLine2: addressData['addressLine2'],
         apartmentName: addressData['apartmentName'],
         addressType: addressData['addressType'] ?? 'home',
-        latitude: addressData['latitude'] is double ? addressData['latitude'] : null,
-        longitude: addressData['longitude'] is double ? addressData['longitude'] : null,
+        latitude:
+            addressData['latitude'] is double ? addressData['latitude'] : null,
+        longitude: addressData['longitude'] is double
+            ? addressData['longitude']
+            : null,
         isPrimary: addressData['isPrimary'] ?? false,
       );
 
@@ -79,15 +83,18 @@ class AddressProvider with ChangeNotifier {
 
     // Cancel previous subscription if exists
     _addressesSubscription?.cancel();
-    
-    _currentUserId = userId;
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
 
+    _currentUserId = userId;
+
+    Future.microtask(() {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+    });
     try {
-      print('🏠 ADDRESS PROVIDER: Starting real-time listener for user: $userId');
-      
+      print(
+          '🏠 ADDRESS PROVIDER: Starting real-time listener for user: $userId');
+
       _addressesSubscription = _firestore
           .collection(_usersCollection)
           .doc(userId)
@@ -96,12 +103,14 @@ class AddressProvider with ChangeNotifier {
           .snapshots()
           .listen(
         (QuerySnapshot snapshot) {
-          print('🏠 ADDRESS PROVIDER: Real-time update - Found ${snapshot.docs.length} addresses');
-          
+          print(
+              '🏠 ADDRESS PROVIDER: Real-time update - Found ${snapshot.docs.length} addresses');
+
           _addresses = snapshot.docs
-              .map((doc) => AddressModel.fromFirestore(doc.data() as Map<String, dynamic>, doc.id))
+              .map((doc) => AddressModel.fromFirestore(
+                  doc.data() as Map<String, dynamic>, doc.id))
               .toList();
-          
+
           _isLoading = false;
           _error = null;
           notifyListeners();
@@ -143,11 +152,12 @@ class AddressProvider with ChangeNotifier {
           .get();
 
       print('🏠 ADDRESS PROVIDER: Found ${snapshot.docs.length} addresses');
-      
+
       _addresses = snapshot.docs
-          .map((doc) => AddressModel.fromFirestore(doc.data() as Map<String, dynamic>, doc.id))
+          .map((doc) => AddressModel.fromFirestore(
+              doc.data() as Map<String, dynamic>, doc.id))
           .toList();
-      
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -160,14 +170,15 @@ class AddressProvider with ChangeNotifier {
   }
 
   // Update an existing address using standardized format
-  Future<bool> updateAddress(String userId, String addressId, Map<String, dynamic> updatedAddressData) async {
+  Future<bool> updateAddress(String userId, String addressId,
+      Map<String, dynamic> updatedAddressData) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       print('🏠 ADDRESS PROVIDER: Updating address with ID: $addressId');
-      
+
       // Use AddressUtils to update with standardized format
       final success = await AddressUtils.updateAddressWithStandardFormat(
         userId: userId,
@@ -182,8 +193,12 @@ class AddressProvider with ChangeNotifier {
         addressLine2: updatedAddressData['addressLine2'],
         apartmentName: updatedAddressData['apartmentName'],
         addressType: updatedAddressData['addressType'] ?? 'home',
-        latitude: updatedAddressData['latitude'] is double ? updatedAddressData['latitude'] : null,
-        longitude: updatedAddressData['longitude'] is double ? updatedAddressData['longitude'] : null,
+        latitude: updatedAddressData['latitude'] is double
+            ? updatedAddressData['latitude']
+            : null,
+        longitude: updatedAddressData['longitude'] is double
+            ? updatedAddressData['longitude']
+            : null,
         isPrimary: updatedAddressData['isPrimary'] ?? false,
       );
 
@@ -213,7 +228,7 @@ class AddressProvider with ChangeNotifier {
 
     try {
       print('🏠 ADDRESS PROVIDER: Deleting address with ID: $addressId');
-      
+
       await _firestore
           .collection(_usersCollection)
           .doc(userId)
@@ -265,4 +280,4 @@ class AddressProvider with ChangeNotifier {
       return _addresses.isNotEmpty ? _addresses.first : null;
     }
   }
-} 
+}

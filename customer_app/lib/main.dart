@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/routes/app_routes.dart';
 import 'core/theme/app_theme.dart';
+import 'package:customer_app/presentation/screens/home/home_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:customer_app/services/notification_service.dart';
@@ -64,7 +65,9 @@ class MyApp extends StatelessWidget {
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
             navigatorKey: navigatorKey, // Set the navigator key
-            home: const ThemeInitializer(), // Initialize theme before showing main app
+            // home: const MainWrapper(),
+            home:
+                const ThemeInitializer(), // Initialize theme before showing main app
             onGenerateRoute: AppRoutes.generateRoute,
           );
         },
@@ -162,8 +165,6 @@ class _AppUpdateWrapperState extends State<AppUpdateWrapper> {
       },
     );
   }
-
-
 }
 
 // Helper methods for showing snackbars (optional, can be moved to a utility file)

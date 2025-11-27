@@ -70,7 +70,7 @@ class _MainWrapperState extends State<MainWrapper> with AuthValidationMixin {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: _currentIndex!=0? AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: context.backgroundColor, centerTitle: true,
         // AppBar theme is now handled by the theme system
@@ -82,7 +82,7 @@ class _MainWrapperState extends State<MainWrapper> with AuthValidationMixin {
               color: theme.colorScheme.onSurface, fontWeight: FontWeight.w700),
         ),
         // All other AppBar properties are handled by theme
-      ),
+      ):null,
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigation(
         selectedIndex: _currentIndex,

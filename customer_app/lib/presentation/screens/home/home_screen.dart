@@ -1,6 +1,7 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:customer_app/data/models/item_model.dart';
 import 'package:customer_app/data/models/offer_model.dart';
+import 'package:customer_app/data/models/user_model.dart';
 import 'package:customer_app/presentation/providers/auth_provider.dart';
 import 'package:customer_app/presentation/providers/banner_provider.dart';
 import 'package:customer_app/presentation/providers/home_provider.dart';
@@ -8,6 +9,7 @@ import 'package:customer_app/presentation/providers/item_provider.dart';
 import 'package:customer_app/presentation/providers/special_offer_provider.dart';
 import 'package:customer_app/presentation/screens/orders/schedule_pickup_delivery_screen.dart';
 import 'package:customer_app/presentation/screens/home/allied_services_screen.dart';
+import 'package:customer_app/presentation/screens/profile/manage_addresses_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -388,10 +390,13 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final UserModel? user = authProvider.userModel;
+
     return Scaffold(
       backgroundColor: context.backgroundColor,
       // appBar: _buildAppBar(),
-      body: _buildBody(),
+      body: SafeArea(child: _buildBody(user!)),
       bottomSheet: totalItems > 0 ? _buildBottomSheet() : null,
       //   bottomNavigationBar: _buildBottomNavigationBar(),
     );
@@ -413,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(UserModel user) {
     return RefreshIndicator(
       onRefresh: () async => _fetchInitialData(),
       child: SingleChildScrollView(
@@ -422,6 +427,90 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // _buildSearchBar(),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const ManageAddressesScreen()));
+              },
+              child: Row(
+                children: [
+                  Container(
+                    // height: 80,
+                    margin: const EdgeInsets.all(16),
+                    width: MediaQuery.of(context).size.width * 0.7,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: context.surfaceVariant,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: context.outlineVariant),
+                    ),
+                    child: Row(children: [
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 24,
+                      ),
+                      const SizedBox(
+                        width: 8,
+                      ),
+                      SizedBox(
+                        width: MediaQuery.of(context).size.width * 0.4,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user.primaryAddress!.apartmentName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            Text(
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              "${user.primaryAddress!.apartmentName},${user.primaryAddress!.city},${user.primaryAddress!.state}",
+                              style: const TextStyle(fontSize: 12),
+                            )
+                          ],
+                        ),
+                      ),
+                      const SizedBox(
+                        width: 8,
+                      ),
+                      const Icon(
+                        Icons.arrow_drop_down_rounded,
+                        size: 24,
+                      )
+                    ]),
+                  ),
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.fromLTRB(0, 16, 16, 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: context.surfaceVariant,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: context.outlineVariant),
+                      ),
+                      child: (user.profileImageUrl != null &&
+                              user.profileImageUrl!.isNotEmpty)
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                user.profileImageUrl!,
+                                fit: BoxFit.cover,
+                                width: 40,
+                                height: 40,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(Icons.person),
+                              ),
+                            )
+                          : const Icon(Icons.person, size: 40),
+                    ),
+                  )
+                ],
+              ),
+            ),
             _buildBanners(),
             _buildQuickActions(),
             _buildCallChatToPlaceOrder(),
@@ -1002,16 +1091,15 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
 
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Special Offers',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                 
                 ],
               ),
             ),
@@ -1131,16 +1219,15 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
 
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Select Items for Ironing',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  
                 ],
               ),
             ),
@@ -1202,7 +1289,8 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                             Row(
                               children: [
                                 // Original Price (strikethrough) - Show first if there's an offer
-                                if (item.offerPrice != null && item.offerPrice! < item.pricePerPiece)
+                                if (item.offerPrice != null &&
+                                    item.offerPrice! < item.pricePerPiece)
                                   Text(
                                     '₹${item.pricePerPiece.toInt()}',
                                     style: TextStyle(
@@ -1212,7 +1300,8 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                                     ),
                                   ),
                                 // Add spacing between original and offer price
-                                if (item.offerPrice != null && item.offerPrice! < item.pricePerPiece)
+                                if (item.offerPrice != null &&
+                                    item.offerPrice! < item.pricePerPiece)
                                   const SizedBox(width: 8),
                                 // Current/Offer Price
                                 Text(
