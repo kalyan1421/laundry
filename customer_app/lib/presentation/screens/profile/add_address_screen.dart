@@ -50,9 +50,12 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   void initState() {
     super.initState();
     if (widget.address != null) {
+      // If editing an existing address, populate fields from it
       _populateFields();
+    } else {
+      // If adding a new address, fetch current location and populate
+      _fetchAndPopulateCurrentAddress();
     }
-    // Removed automatic location fetching - users can manually get location if needed
   }
 
   void _populateFields() {
@@ -114,6 +117,54 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _fetchAndPopulateCurrentAddress() async {
+    setState(() {
+      isLocationLoading = true;
+    });
+
+    try {
+      // 1. Get current position
+      Position position = await LocationService.getCurrentLocation();
+
+      // 2. Get placemark from coordinates
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        final Placemark placemark = placemarks.first;
+
+        // 3. Update state and populate fields
+        setState(() {
+          currentLocation = position;
+
+          // _addressLine1Controller.text =
+          //     '${placemark.name}, ${placemark.street}';
+          // _addressLine2Controller.text = placemark.subLocality ?? '';
+          _cityController.text = placemark.locality ?? '';
+          _stateController.text = placemark.administrativeArea ?? '';
+          _pincodeController.text = placemark.postalCode ?? '';
+          _landmarkController.text = placemark.subThoroughfare ?? '';
+
+          isLocationLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Current address auto-filled.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        isLocationLoading = false;
+      });
+      // Error is handled by the UI showing the refresh button
     }
   }
 
@@ -377,7 +428,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                     )
                                   else
                                     TextButton(
-                                      onPressed: _getCurrentLocation,
+                                      onPressed:
+                                          _fetchAndPopulateCurrentAddress,
                                       child: Text(
                                         'Refresh',
                                         style: TextStyle(
@@ -676,6 +728,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                   color: Colors.transparent,
                 ),
                 child: CustomButton(
+                  textStyle: TextStyle(fontWeight: FontWeight.bold,fontSize: 20),
                   elevation: 0,
                   text: widget.address == null
                       ? 'Save Address'

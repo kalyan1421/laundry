@@ -1,8 +1,11 @@
 // lib/screens/splash/splash_screen.dart
 import 'package:flutter/material.dart';
 import 'package:customer_app/core/theme/theme_extensions.dart';
-import 'dart:async';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:logger/logger.dart';
+import 'package:customer_app/services/location_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -12,6 +15,35 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  final Logger _logger = Logger();
+
+  @override
+  void initState() {
+    super.initState();
+    // Request location permission when the splash screen is shown
+    _requestInitialPermissions();
+  }
+
+  Future<void> _requestInitialPermissions() async {
+    try {
+      _logger.i("Requesting location permission from splash screen...");
+
+      // Request location permission
+      final locationStatus = await Permission.location.request();
+      _logger.i("Location permission status: $locationStatus");
+
+      if (locationStatus.isGranted) {
+        _logger.i("Location permission granted. App can now fetch location.");
+        // You can optionally pre-fetch the location here if needed
+        // await LocationService.getCurrentLocation();
+      } else {
+        _logger
+            .w("Location permission was not granted. Status: $locationStatus");
+      }
+    } catch (e) {
+      _logger.e("Error requesting initial permissions: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,17 +68,17 @@ class _SplashScreenState extends State<SplashScreen> {
             Text(
               'CLOUD IRONING FACTORY',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                letterSpacing: 1.5,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
+                    letterSpacing: 1.5,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
             ),
-           
+
             const SizedBox(height: 8),
             Text(
               'Ironing & Laundry Service',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
             ),
           ],
         ),
@@ -56,7 +88,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Widget _buildThemeLogo() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = isDark ? 'assets/icons/logo_dark.svg' : 'assets/icons/logo_light.svg';
+    final asset =
+        isDark ? 'assets/icons/logo_dark.svg' : 'assets/icons/logo_light.svg';
     return SvgPicture.asset(
       asset,
       fit: BoxFit.contain,

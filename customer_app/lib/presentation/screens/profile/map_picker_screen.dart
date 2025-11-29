@@ -164,11 +164,14 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             myLocationButtonEnabled: false, // We use our own button
             zoomControlsEnabled: false,
           ),
-          const Center(
-            child: Icon(
-              Icons.location_pin,
-              size: 50,
-              color: Colors.red,
+          Center(
+            child: Transform.translate(
+              offset: const Offset(0, -25), // Move icon up by half its height
+              child: const Icon(
+                Icons.location_pin,
+                size: 50,
+                color: Colors.red,
+              ),
             ),
           ),
           Positioned(

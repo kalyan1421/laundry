@@ -427,87 +427,85 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // _buildSearchBar(),
-            GestureDetector(
-              onTap: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const ManageAddressesScreen()));
-              },
-              child: Row(
-                children: [
-                  Container(
-                    // height: 80,
-                    margin: const EdgeInsets.all(16),
-                    width: MediaQuery.of(context).size.width * 0.7,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.surfaceVariant,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: context.outlineVariant),
-                    ),
-                    child: Row(children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 24,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const ManageAddressesScreen()));
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                      // color: context.surfaceVariant,
+                      // borderRadius: BorderRadius.circular(120),
+                      // border: Border.all(color: context.outlineVariant),
                       ),
-                      const SizedBox(
-                        width: 8,
-                      ),
-                      SizedBox(
-                        width: MediaQuery.of(context).size.width * 0.4,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on_outlined, size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              user.primaryAddress?.apartmentName ??
+                              user.primaryAddress?.typeDisplayName ??
                                   'Set your address',
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16),
+                              style: context.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
+                            const SizedBox(height: 2),
                             Text(
+                              user.primaryAddress?.shortAddress ??
+                                  'Tap to select an address',
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
-                              "${user.primaryAddress!.apartmentName},${user.primaryAddress!.city},${user.primaryAddress!.state}",
-                              style: const TextStyle(fontSize: 12),
-                            )
+                              style: context.bodySmall
+                                  ?.copyWith(color: context.onSurfaceVariant),
+                            ),
                           ],
                         ),
                       ),
-                      const Spacer(),
-                      const Icon(
-                        Icons.arrow_drop_down_rounded,
-                        size: 24,
-                      )
-                    ]),
-                  ),
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.fromLTRB(0, 16, 16, 16),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: context.surfaceVariant,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: context.outlineVariant),
+                      // const Spacer(),
+                      const Icon(Icons.arrow_drop_down_rounded, size: 24),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: (user.profileImageUrl != null &&
+                                  user.profileImageUrl!.isNotEmpty)
+                              ? CachedNetworkImage(
+                                  imageUrl: user.profileImageUrl!,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => Container(
+                                    color:
+                                        context.outlineVariant.withOpacity(0.2),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      Container(
+                                    color:
+                                        context.outlineVariant.withOpacity(0.2),
+                                    child:
+                                        const Icon(Icons.notifications_active),
+                                  ),
+                                )
+                              : Container(
+                                  // color:
+                                  //     context.outlineVariant.withOpacity(0.2),
+                                  child: const Icon(Icons.notifications_active),
+                                ),
+                        ),
                       ),
-                      child: (user.profileImageUrl != null &&
-                              user.profileImageUrl!.isNotEmpty)
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                user.profileImageUrl!,
-                                fit: BoxFit.cover,
-                                width: 40,
-                                height: 40,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const Icon(Icons.person),
-                              ),
-                            )
-                          : const Icon(Icons.person, size: 40),
-                    ),
-                  )
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
             _buildBanners(),

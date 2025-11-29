@@ -1,4 +1,5 @@
 // screens/main/bottom_navigation.dart
+import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:flutter/material.dart';
 
 class BottomNavigation extends StatelessWidget {
@@ -24,7 +25,7 @@ class BottomNavigation extends StatelessWidget {
         activeIcon: Icons.home,
         label: 'Home',
         isDark: isDark,
-        primary: primary,
+        primary: isDark ? theme.colorScheme.secondary : primary,
       ),
       _buildItem(
         context,
@@ -53,6 +54,10 @@ class BottomNavigation extends StatelessWidget {
     ];
 
     return BottomNavigationBar(
+      selectedItemColor: isDark ? context.secondaryColor : primary,
+      selectedIconTheme: IconThemeData(
+        color: isDark ? context.secondaryColor : primary,
+      ),
       items: items,
       currentIndex: selectedIndex,
       onTap: onItemTapped,
@@ -74,5 +79,4 @@ class BottomNavigation extends StatelessWidget {
       label: label,
     );
   }
-
 }

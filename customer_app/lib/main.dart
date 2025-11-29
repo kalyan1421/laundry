@@ -6,6 +6,7 @@ import 'package:customer_app/presentation/screens/auth/merged_registration_scree
 import 'package:customer_app/presentation/screens/main/main_wrapper.dart';
 import 'package:customer_app/presentation/screens/splash/splash_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'core/routes/app_routes.dart';
 import 'core/theme/app_theme.dart';
@@ -34,6 +35,24 @@ void main() async {
   );
   // Initialize Notification Service
   await NotificationService.initialize();
+  try {
+    // _logger.i("Requesting location permission from splash screen...");
+
+    // Request location permission
+    final locationStatus = await Permission.location.request();
+    // _logger.i("Location permission status: $locationStatus");
+
+    if (locationStatus.isGranted) {
+      // _logger.i("Location permission granted. App can now fetch location.");
+      // You can optionally pre-fetch the location here if needed
+      // await LocationService.getCurrentLocation();
+    } else {
+      // _logger
+      //     .w("Location permission was not granted. Status: $locationStatus");
+    }
+  } catch (e) {
+    // _logger.e("Error requesting initial permissions: $e");
+  }
 
   runApp(const MyApp());
 }
