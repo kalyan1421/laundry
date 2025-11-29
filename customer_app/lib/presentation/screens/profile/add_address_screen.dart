@@ -728,7 +728,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                   color: Colors.transparent,
                 ),
                 child: CustomButton(
-                  textStyle: TextStyle(fontWeight: FontWeight.bold,fontSize: 20),
+                  textStyle: TextStyle(fontWeight: FontWeight.bold,fontSize: 16),
                   elevation: 0,
                   text: widget.address == null
                       ? 'Save Address'
