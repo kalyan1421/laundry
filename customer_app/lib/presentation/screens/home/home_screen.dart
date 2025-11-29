@@ -439,9 +439,9 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                      // color: context.surfaceVariant,
-                      // borderRadius: BorderRadius.circular(120),
-                      // border: Border.all(color: context.outlineVariant),
+                      color: context.surfaceVariant,
+                      borderRadius: BorderRadius.circular(120),
+                      border: Border.all(color: context.outlineVariant),
                       ),
                   child: Row(
                     children: [
