@@ -19,6 +19,7 @@ class MapPickerScreen extends StatefulWidget {
 class _MapPickerScreenState extends State<MapPickerScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   late GoogleMapController _mapController;
+  final TextEditingController _searchController = TextEditingController();
 
   late LatLng _centerPosition;
   bool _isLoading = false;
@@ -129,6 +130,96 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     }
   }
 
+  Future<void> _showLocationSelection(List<Location> locations) async {
+    final List<Placemark> placemarks = [];
+    for (final location in locations) {
+      try {
+        final p = await placemarkFromCoordinates(
+            location.latitude, location.longitude);
+        if (p.isNotEmpty) {
+          placemarks.add(p.first);
+        }
+      } catch (e) {
+        print('Error reverse geocoding: $e');
+      }
+    }
+
+    if (!mounted || placemarks.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return ListView.builder(
+          itemCount: placemarks.length,
+          itemBuilder: (context, index) {
+            final placemark = placemarks[index];
+            final address =
+                '${placemark.name}, ${placemark.street}, ${placemark.locality}, ${placemark.postalCode}';
+            return ListTile(
+              title: Text(placemark.name ?? 'Unknown Location'),
+              subtitle: Text(address),
+              onTap: () {
+                Navigator.pop(context);
+                _animateToLocation(
+                  LatLng(locations[index].latitude, locations[index].longitude),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _animateToLocation(LatLng latLng) {
+    _mapController.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: latLng,
+          zoom: 17.0,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _searchLocation(String address) async {
+    if (address.isEmpty) return;
+
+    FocusScope.of(context).unfocus(); // Hide keyboard
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      List<Location> locations = await locationFromAddress(address);
+      if (locations.isNotEmpty && mounted) {
+        if (locations.length == 1) {
+          _animateToLocation(
+              LatLng(locations.first.latitude, locations.first.longitude));
+        } else {
+          _showLocationSelection(locations);
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location not found.')),
+          );
+        }
+      }
+    } catch (e) {
+      print("Error searching location: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error searching for location: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -171,6 +262,42 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 Icons.location_pin,
                 size: 50,
                 color: Colors.red,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Material(
+              borderRadius: BorderRadius.circular(30),
+              elevation: 4,
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search for a location...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _searchController.clear();
+                      FocusScope.of(context).unfocus();
+                    },
+                  ),
+                  filled: true,
+                  fillColor: context.surfaceColor,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 15),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide(color: context.primaryColor),
+                  ),
+                ),
+                onSubmitted: _searchLocation,
+                textInputAction: TextInputAction.search,
               ),
             ),
           ),
