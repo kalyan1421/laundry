@@ -315,7 +315,7 @@ exports.processFcmNotifications = onDocumentCreated(
           failedAt: new Date(),
         });
       }
-     },
+    },
 );
 
 // Cloud Function to send notification when a new order is created

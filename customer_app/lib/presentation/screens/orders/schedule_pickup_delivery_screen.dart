@@ -1178,6 +1178,18 @@ class _SchedulePickupDeliveryScreenState
           ? pickupAddressData
           : (_selectedDeliveryAddress!.data() as Map<String, dynamic>);
 
+      // Extract latitude and longitude from pickup address for driver assignment
+      final double? pickupLatitude = pickupAddressData['latitude'] is num 
+          ? (pickupAddressData['latitude'] as num).toDouble() 
+          : null;
+      final double? pickupLongitude = pickupAddressData['longitude'] is num 
+          ? (pickupAddressData['longitude'] as num).toDouble() 
+          : null;
+      
+      print('🔥 ORDER PLACEMENT: 📍 Pickup address latitude: $pickupLatitude');
+      print('🔥 ORDER PLACEMENT: 📍 Pickup address longitude: $pickupLongitude');
+      print('🔥 ORDER PLACEMENT: 📍 Address data keys: ${pickupAddressData.keys.toList()}');
+
       Map<String, dynamic> orderData = {
         'customerId': userId,
         'orderNumber': orderNumber,
@@ -1218,6 +1230,12 @@ class _SchedulePickupDeliveryScreenState
             'description': 'Your order has been placed successfully',
           }
         ],
+        // Automation fields for driver assignment (Cloud Function)
+        'assignmentStatus': 'searching', // Triggers Cloud Function to find nearby driver
+        'rejectedByDrivers': [], // Tracks drivers who rejected this order
+        // Location fields for proximity-based assignment
+        if (pickupLatitude != null) 'latitude': pickupLatitude,
+        if (pickupLongitude != null) 'longitude': pickupLongitude,
       };
 
       if (transactionId != null) {

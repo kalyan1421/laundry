@@ -45,5 +45,16 @@
     <true/>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
+    <!-- Location Permissions for GPS tracking -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Cloud Ironing Factory needs your location to assign nearby pickup orders and show your position to customers.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Cloud Ironing Factory needs your location to assign nearby orders even when the app is in the background.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>Cloud Ironing Factory needs your location to assign nearby orders even when the app is in the background.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>location</string>
+    </array>
   </dict>
 </plist>

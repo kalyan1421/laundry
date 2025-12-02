@@ -305,16 +305,20 @@ class DeliveryPartnerService {
   }
 
   /// Respond to an order offer using a Firestore transaction
+  /// This prevents race conditions when multiple drivers respond simultaneously
   Future<void> respondToOrderOffer({
     required String driverId,
     required String orderId,
     required bool accepted,
+    String? driverName,
   }) async {
     final orderRef = _firestore.collection('orders').doc(orderId);
     final driverRef = _firestore.collection('delivery').doc(driverId);
 
     return _firestore.runTransaction((transaction) async {
+      // Read both documents atomically
       final orderSnapshot = await transaction.get(orderRef);
+      final driverSnapshot = await transaction.get(driverRef);
 
       if (!orderSnapshot.exists) {
         throw Exception('Order no longer exists');
@@ -323,34 +327,60 @@ class DeliveryPartnerService {
       final orderData = orderSnapshot.data() as Map<String, dynamic>;
       final offeredDriver = orderData['currentOfferedDriver'];
 
-      // Ensure the offer is still valid for this driver
+      // Verify the offer is still valid for THIS driver
       if (offeredDriver == null || offeredDriver['id'] != driverId) {
         throw Exception('Offer expired or assigned to another driver');
       }
 
+      // Get driver name from snapshot if not provided
+      String deliveryPersonName = driverName ?? 'Driver';
+      if (driverSnapshot.exists) {
+        final driverData = driverSnapshot.data() as Map<String, dynamic>;
+        deliveryPersonName = driverData['name'] ?? deliveryPersonName;
+      }
+
       if (accepted) {
+        // ACCEPT FLOW: Assign order to this driver
         transaction.update(orderRef, {
-          'status': 'Confirmed',
+          'status': 'confirmed',
           'assignmentStatus': 'assigned',
           'assignedDeliveryPerson': driverId,
+          'assignedDeliveryPersonName': deliveryPersonName,
           'currentOfferedDriver': FieldValue.delete(),
+          'assignedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+          'statusHistory': FieldValue.arrayUnion([
+            {
+              'status': 'confirmed',
+              'timestamp': Timestamp.now(),
+              'title': 'Order Confirmed',
+              'description': 'Delivery partner $deliveryPersonName has accepted the order',
+            }
+          ]),
         });
 
         transaction.update(driverRef, {
           'currentOrders': FieldValue.arrayUnion([orderId]),
-          'isAvailable': false,
+          'isAvailable': false, // Mark driver as busy
           'currentOffer': FieldValue.delete(),
+          'lastOrderAcceptedAt': FieldValue.serverTimestamp(),
         });
+
+        print('✅ Order $orderId accepted by driver $driverId');
       } else {
+        // REJECT FLOW: Mark rejected and trigger search for next driver
         transaction.update(orderRef, {
-          'assignmentStatus': 'searching',
+          'assignmentStatus': 'searching', // Cloud Function will find next driver
           'rejectedByDrivers': FieldValue.arrayUnion([driverId]),
           'currentOfferedDriver': FieldValue.delete(),
+          'updatedAt': FieldValue.serverTimestamp(),
         });
 
         transaction.update(driverRef, {
           'currentOffer': FieldValue.delete(),
         });
+
+        print('❌ Order $orderId rejected by driver $driverId');
       }
     });
   }

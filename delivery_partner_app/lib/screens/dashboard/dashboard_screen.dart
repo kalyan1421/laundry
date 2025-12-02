@@ -11,6 +11,7 @@ import '../../providers/order_provider.dart';
 import '../tasks/task_detail_screen.dart';
 import '../../widgets/custom_bottom_navigation.dart';
 import '../../services/delivery_partner_service.dart';
+import '../../services/location_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   final DeliveryPartnerModel deliveryPartner;
@@ -30,6 +31,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
       _offerSubscription;
   String? _activeOfferId;
+  
+  // Location tracking service
+  final LocationService _locationService = LocationService();
+  bool _locationTrackingEnabled = false;
 
   @override
   void initState() {
@@ -38,6 +43,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
     print('🚚 🎯 Dashboard: Delivery partner name: ${widget.deliveryPartner.name}');
     _loadStats();
     _listenForOffers();
+    _startLocationTracking();
+  }
+
+  /// Initialize location tracking for the delivery partner
+  Future<void> _startLocationTracking() async {
+    final success = await _locationService.startLocationTracking(widget.deliveryPartner.id);
+    if (mounted) {
+      setState(() {
+        _locationTrackingEnabled = success;
+      });
+      if (!success) {
+        // Show a message that location tracking couldn't be started
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.location_off, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Location tracking disabled. Enable location for order assignments.'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Settings',
+              textColor: Colors.white,
+              onPressed: () async {
+                await _locationService.openAppSettings();
+              },
+            ),
+          ),
+        );
+      } else {
+        print('🚚 📍 Dashboard: Location tracking started successfully');
+      }
+    }
   }
 
   Future<void> _loadStats() async {
@@ -225,8 +268,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('New Order Request'),
-        content: Text('Order #$orderId is available nearby.'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.local_shipping, color: Color(0xFF1E3A8A)),
+            ),
+            const SizedBox(width: 12),
+            const Text('New Order Request'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Order #$orderId is available nearby.'),
+            const SizedBox(height: 8),
+            Text(
+              'Would you like to accept this pickup?',
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () async {
@@ -239,17 +306,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   driverId: widget.deliveryPartner.id,
                   orderId: orderId,
                   accepted: false,
+                  driverName: widget.deliveryPartner.name,
                 );
               } catch (e) {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to reject offer: $e')),
+                  SnackBar(
+                    content: Text('Failed to reject offer: $e'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
               }
             },
             child: const Text('Reject'),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E3A8A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             onPressed: () async {
               Navigator.pop(ctx);
               setState(() {
@@ -260,15 +335,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   driverId: widget.deliveryPartner.id,
                   orderId: orderId,
                   accepted: true,
+                  driverName: widget.deliveryPartner.name,
+                );
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text('Order accepted! Check your tasks.'),
+                      ],
+                    ),
+                    backgroundColor: Colors.green,
+                    behavior: SnackBarBehavior.floating,
+                    margin: EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 );
               } catch (e) {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to accept offer: $e')),
+                  SnackBar(
+                    content: Text('Failed to accept offer: $e'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
               }
             },
-            child: const Text('Accept'),
+            child: const Text('Accept', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -278,6 +373,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _offerSubscription?.cancel();
+    // Stop location tracking and mark driver as offline
+    _locationService.stopLocationTracking();
+    _locationService.markDriverOffline(widget.deliveryPartner.id);
     super.dispose();
   }
 
@@ -320,17 +418,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ],
               ),
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.notifications_outlined,
-                  color: Color(0xFF1E3A8A),
-                  size: 20,
-                ),
+              Row(
+                children: [
+                  // Online Status Indicator
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _locationTrackingEnabled 
+                          ? Colors.green.withOpacity(0.2)
+                          : Colors.red.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _locationTrackingEnabled ? Colors.green : Colors.red,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _locationTrackingEnabled ? Colors.green : Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          _locationTrackingEnabled ? 'Online' : 'Offline',
+                          style: TextStyle(
+                            color: _locationTrackingEnabled ? Colors.green[800] : Colors.red[800],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'SFProDisplay',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.notifications_outlined,
+                      color: Color(0xFF1E3A8A),
+                      size: 20,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -355,14 +495,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               SizedBox(width: 20),
               Expanded(
-                child: Text(
-                  widget.deliveryPartner.name,
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'SFProDisplay',
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.deliveryPartner.name,
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'SFProDisplay',
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      _locationTrackingEnabled 
+                          ? '📍 Ready to receive orders'
+                          : '⚠️ Enable location to receive orders',
+                      style: TextStyle(
+                        color: _locationTrackingEnabled ? Colors.green[800] : Colors.orange[800],
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'SFProDisplay',
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
