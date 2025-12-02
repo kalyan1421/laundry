@@ -32,9 +32,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _offerSubscription;
   String? _activeOfferId;
   
-  // Location tracking service
+  // Location tracking service & Online/Offline state
   final LocationService _locationService = LocationService();
-  bool _locationTrackingEnabled = false;
+  bool _isOnline = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -43,42 +44,103 @@ class _DashboardScreenState extends State<DashboardScreen> {
     print('🚚 🎯 Dashboard: Delivery partner name: ${widget.deliveryPartner.name}');
     _loadStats();
     _listenForOffers();
-    _startLocationTracking();
+    _loadCurrentStatus();
   }
 
-  /// Initialize location tracking for the delivery partner
-  Future<void> _startLocationTracking() async {
-    final success = await _locationService.startLocationTracking(widget.deliveryPartner.id);
-    if (mounted) {
+  /// Check Firebase for current status on load
+  Future<void> _loadCurrentStatus() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('delivery')
+        .doc(widget.deliveryPartner.id)
+        .get();
+    
+    if (doc.exists && mounted) {
       setState(() {
-        _locationTrackingEnabled = success;
+        _isOnline = doc.data()?['isOnline'] ?? false;
       });
-      if (!success) {
-        // Show a message that location tracking couldn't be started
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.location_off, color: Colors.white),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text('Location tracking disabled. Enable location for order assignments.'),
+      // If database says we are online, restart tracking automatically
+      if (_isOnline) {
+        _locationService.initialize().then((_) => 
+            _locationService.goOnline(widget.deliveryPartner.id));
+        print('🚚 📍 Dashboard: Restored online status from database');
+      }
+    }
+  }
+
+  /// Toggle Work Status (Online/Offline)
+  Future<void> _toggleWorkStatus(bool value) async {
+    setState(() => _isLoading = true);
+    
+    try {
+      if (value) {
+        // Turning ON
+        bool hasPermission = await _locationService.initialize();
+        if (hasPermission) {
+          await _locationService.goOnline(widget.deliveryPartner.id);
+          setState(() => _isOnline = true);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text("🟢 You are ONLINE. Expect orders!"),
+                  ],
                 ),
-              ],
-            ),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 5),
-            action: SnackBarAction(
-              label: 'Settings',
-              textColor: Colors.white,
-              onPressed: () async {
-                await _locationService.openAppSettings();
-              },
-            ),
-          ),
-        );
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+                margin: EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.location_off, color: Colors.white),
+                    SizedBox(width: 8),
+                    Expanded(child: Text("Location permission required to work.")),
+                  ],
+                ),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+                margin: EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            );
+          }
+        }
       } else {
-        print('🚚 📍 Dashboard: Location tracking started successfully');
+        // Turning OFF
+        await _locationService.goOffline(widget.deliveryPartner.id);
+        setState(() => _isOnline = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.power_settings_new, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text("You are now Offline."),
+                ],
+              ),
+              backgroundColor: Colors.grey[700],
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.all(16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('🚚 ❌ Dashboard: Error toggling work status: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -168,11 +230,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
                   children: [
+                    // Online/Offline Toggle Button
+                    _buildOnlineToggle(),
+                    
                     // Today's stats cards
                     _buildTodayStats(),
                     
                     // Today's schedule section
                     _buildTodaysSchedule(),
+                    
                     
                     const SizedBox(height: 20),
                   ],
@@ -373,9 +439,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _offerSubscription?.cancel();
-    // Stop location tracking and mark driver as offline
-    _locationService.stopLocationTracking();
-    _locationService.markDriverOffline(widget.deliveryPartner.id);
+    // Dispose location service (don't auto-offline on dispose, let user control it)
+    _locationService.dispose();
     super.dispose();
   }
 
@@ -424,12 +489,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _locationTrackingEnabled 
+                      color: _isOnline 
                           ? Colors.green.withOpacity(0.2)
                           : Colors.red.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: _locationTrackingEnabled ? Colors.green : Colors.red,
+                        color: _isOnline ? Colors.green : Colors.red,
                         width: 1.5,
                       ),
                     ),
@@ -440,15 +505,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: _locationTrackingEnabled ? Colors.green : Colors.red,
+                            color: _isOnline ? Colors.green : Colors.red,
                             shape: BoxShape.circle,
                           ),
                         ),
                         SizedBox(width: 6),
                         Text(
-                          _locationTrackingEnabled ? 'Online' : 'Offline',
+                          _isOnline ? 'Online' : 'Offline',
                           style: TextStyle(
-                            color: _locationTrackingEnabled ? Colors.green[800] : Colors.red[800],
+                            color: _isOnline ? Colors.green[800] : Colors.red[800],
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             fontFamily: 'SFProDisplay',
@@ -509,11 +574,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      _locationTrackingEnabled 
+                      _isOnline 
                           ? '📍 Ready to receive orders'
-                          : '⚠️ Enable location to receive orders',
+                          : '⚠️ Go online to receive orders',
                       style: TextStyle(
-                        color: _locationTrackingEnabled ? Colors.green[800] : Colors.orange[800],
+                        color: _isOnline ? Colors.green[800] : Colors.orange[800],
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                         fontFamily: 'SFProDisplay',
@@ -524,6 +589,101 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Build the Online/Offline Toggle Widget
+  Widget _buildOnlineToggle() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _isOnline ? Colors.green[50] : Colors.red[50],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _isOnline ? Colors.green : Colors.red,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (_isOnline ? Colors.green : Colors.red).withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _isOnline 
+                      ? Colors.green.withOpacity(0.2)
+                      : Colors.red.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _isOnline ? Icons.power_settings_new : Icons.power_off,
+                  color: _isOnline ? Colors.green[700] : Colors.red[700],
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _isOnline ? "You're Online" : "You're Offline",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _isOnline ? Colors.green[800] : Colors.red[800],
+                      fontFamily: 'SFProDisplay',
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _isOnline 
+                        ? "Waiting for orders..." 
+                        : "Go online to start receiving orders",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _isOnline ? Colors.green[600] : Colors.red[600],
+                      fontFamily: 'SFProDisplay',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          _isLoading
+              ? SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: _isOnline ? Colors.green : Colors.red,
+                    ),
+                  ),
+                )
+              : Transform.scale(
+                  scale: 1.2,
+                  child: Switch(
+                    value: _isOnline,
+                    onChanged: _toggleWorkStatus,
+                    activeColor: Colors.green,
+                    activeTrackColor: Colors.green[200],
+                    inactiveThumbColor: Colors.red,
+                    inactiveTrackColor: Colors.red[200],
+                  ),
+                ),
         ],
       ),
     );

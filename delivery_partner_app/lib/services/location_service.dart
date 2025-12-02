@@ -1,142 +1,125 @@
 // services/location_service.dart - Background Location Tracking for Delivery Partners
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:location/location.dart';
 
 class LocationService {
-  StreamSubscription<Position>? _locationSubscription;
+  final Location _location = Location();
+  StreamSubscription<LocationData>? _locationSubscription;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isTracking = false;
 
   /// Check if location tracking is currently active
   bool get isTracking => _isTracking;
 
-  /// Start tracking and updating Firestore with driver's location
-  Future<bool> startLocationTracking(String driverId) async {
+  // 1. Initialize and Check Permissions
+  Future<bool> initialize() async {
+    bool serviceEnabled = await _location.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await _location.requestService();
+      if (!serviceEnabled) return false;
+    }
+
+    PermissionStatus permissionGranted = await _location.hasPermission();
+    if (permissionGranted == PermissionStatus.denied) {
+      permissionGranted = await _location.requestPermission();
+      if (permissionGranted != PermissionStatus.granted) return false;
+    }
+    
+    // CRITICAL: Enable background mode so it works when app is closed
+    try {
+      await _location.enableBackgroundMode(enable: true);
+      _location.changeNotificationOptions(
+        title: 'You are Online',
+        subtitle: 'Searching for nearby orders...',
+        iconName: 'ic_launcher', // Ensure this icon exists in android/app/src/main/res/mipmap
+      );
+    } catch (e) {
+      print("📍 LocationService: Error enabling background mode: $e");
+    }
+
+    return true;
+  }
+
+  // 2. Start "Work Mode" (Online)
+  Future<void> goOnline(String driverId) async {
     if (_isTracking) {
       print('📍 LocationService: Already tracking location');
-      return true;
+      return;
     }
 
-    try {
-      // 1. Check if location services are enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        print('📍 LocationService: Location services are disabled');
-        // Prompt user to enable location services
-        return false;
+    // Set Database Status to ONLINE
+    await _firestore.collection('delivery').doc(driverId).update({
+      'isOnline': true,
+      'isAvailable': true,
+      'lastSeen': FieldValue.serverTimestamp(),
+    });
+
+    // Configure for battery efficiency + accuracy
+    await _location.changeSettings(
+      accuracy: LocationAccuracy.navigation,
+      interval: 10000, // Update every 10 seconds
+      distanceFilter: 50, // Update every 50 meters
+    );
+
+    // Start Streaming Location to Firestore
+    _locationSubscription = _location.onLocationChanged.listen((LocationData currentLocation) {
+      if (currentLocation.latitude != null && currentLocation.longitude != null) {
+        print("📍 Updating Location: ${currentLocation.latitude}, ${currentLocation.longitude}");
+        
+        _firestore.collection('delivery').doc(driverId).update({
+          'currentLocation': GeoPoint(currentLocation.latitude!, currentLocation.longitude!),
+          'heading': currentLocation.heading,
+          'speed': currentLocation.speed,
+          'lastLocationUpdate': FieldValue.serverTimestamp(),
+        }).catchError((e) => print("📍 LocationService: Error updating location: $e"));
       }
+    });
 
-      // 2. Check and request permissions
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          print('📍 LocationService: Location permission denied');
-          return false;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        print('📍 LocationService: Location permission permanently denied');
-        // User needs to enable permissions from settings
-        return false;
-      }
-
-      // 3. Configure location settings (Battery efficient)
-      const LocationSettings locationSettings = LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 50, // Update every 50 meters
-      );
-
-      // 4. Get initial position and update Firestore
-      try {
-        final Position initialPosition = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-          ),
-        );
-        await _updateLocationInFirestore(driverId, initialPosition);
-        print('📍 LocationService: Initial location updated');
-      } catch (e) {
-        print('📍 LocationService: Error getting initial position: $e');
-      }
-
-      // 5. Listen to location changes and update Firestore
-      _locationSubscription = Geolocator.getPositionStream(
-        locationSettings: locationSettings,
-      ).listen(
-        (Position position) {
-          _updateLocationInFirestore(driverId, position);
-        },
-        onError: (error) {
-          print('📍 LocationService: Error in location stream: $error');
-        },
-      );
-
-      _isTracking = true;
-      print('📍 LocationService: Started tracking for driver: $driverId');
-      return true;
-    } catch (e) {
-      print('📍 LocationService: Error starting location tracking: $e');
-      return false;
-    }
+    _isTracking = true;
+    print('📍 LocationService: Started tracking for driver: $driverId');
   }
 
-  /// Update driver's location in Firestore
-  Future<void> _updateLocationInFirestore(String driverId, Position position) async {
-    try {
-      await _firestore.collection('delivery').doc(driverId).update({
-        'currentLocation': GeoPoint(position.latitude, position.longitude),
-        'lastLocationUpdate': FieldValue.serverTimestamp(),
-        'isOnline': true,
-        'isAvailable': true, // Required for order assignment
-        'locationAccuracy': position.accuracy,
-        'locationSpeed': position.speed,
-        'locationHeading': position.heading,
-      });
-      print('📍 LocationService: Updated location - Lat: ${position.latitude}, Lng: ${position.longitude}');
-    } catch (e) {
-      print('📍 LocationService: Error updating location in Firestore: $e');
-    }
-  }
-
-  /// Stop location tracking
-  void stopLocationTracking() {
+  // 3. Stop "Work Mode" (Offline)
+  Future<void> goOffline(String driverId) async {
     _locationSubscription?.cancel();
     _locationSubscription = null;
     _isTracking = false;
-    print('📍 LocationService: Stopped tracking');
-  }
-
-  /// Mark driver as offline when app closes
-  Future<void> markDriverOffline(String driverId) async {
+    
+    // Disable background mode
     try {
-      await _firestore.collection('delivery').doc(driverId).update({
-        'isOnline': false,
-        'isAvailable': false, // Not available for orders when offline
-        'lastLocationUpdate': FieldValue.serverTimestamp(),
-      });
-      print('📍 LocationService: Marked driver as offline');
+      await _location.enableBackgroundMode(enable: false);
     } catch (e) {
-      print('📍 LocationService: Error marking driver offline: $e');
+      print("📍 LocationService: Error disabling background mode: $e");
     }
+    
+    // Set Database Status to OFFLINE
+    await _firestore.collection('delivery').doc(driverId).update({
+      'isOnline': false,
+      'isAvailable': false,
+      'lastSeen': FieldValue.serverTimestamp(),
+    });
+
+    print('📍 LocationService: Stopped tracking - driver is offline');
   }
 
-  /// Open app settings (for users who permanently denied permission)
-  Future<bool> openAppSettings() async {
-    return await Geolocator.openAppSettings();
-  }
-
-  /// Open location settings (for users who disabled location services)
-  Future<bool> openLocationSettings() async {
-    return await Geolocator.openLocationSettings();
+  /// Check Firebase for current online status
+  Future<bool> checkCurrentStatus(String driverId) async {
+    try {
+      final doc = await _firestore.collection('delivery').doc(driverId).get();
+      if (doc.exists) {
+        return doc.data()?['isOnline'] ?? false;
+      }
+    } catch (e) {
+      print("📍 LocationService: Error checking status: $e");
+    }
+    return false;
   }
 
   /// Dispose of resources
   void dispose() {
-    stopLocationTracking();
+    _locationSubscription?.cancel();
+    _locationSubscription = null;
+    _isTracking = false;
   }
 }
-
-
