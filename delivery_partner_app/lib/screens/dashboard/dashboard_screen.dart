@@ -402,6 +402,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _showOrderOfferDialog(String orderId) {
+    print('🔔 🎯 Dashboard: SHOWING OFFER DIALOG for order: $orderId');
+    print('🔔 🎯 Dashboard: mounted=$mounted, _activeOfferId=$_activeOfferId');
+    
     showDialog(
       context: context,
       barrierDismissible: false,
