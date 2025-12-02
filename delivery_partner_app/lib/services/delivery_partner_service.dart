@@ -304,7 +304,8 @@ class DeliveryPartnerService {
     }
   }
 
-  /// Respond to an order offer using a Firestore transaction
+  /// PHASE 4: Respond to an order offer using a Firestore transaction
+  /// Updated for BROADCAST system - handles offeredDriverIds array
   /// This prevents race conditions when multiple drivers respond simultaneously
   Future<void> respondToOrderOffer({
     required String driverId,
@@ -325,11 +326,25 @@ class DeliveryPartnerService {
       }
 
       final orderData = orderSnapshot.data() as Map<String, dynamic>;
-      final offeredDriver = orderData['currentOfferedDriver'];
+      
+      // PHASE 4: NEW VERIFICATION LOGIC for broadcast system
+      final offeredIds = List<String>.from(orderData['offeredDriverIds'] ?? []);
+      final legacyOfferedDriver = orderData['currentOfferedDriver'];
+      
+      // Check if I am in the allowed list (supports both new and legacy systems)
+      bool isAllowedToRespond = offeredIds.contains(driverId);
+      if (!isAllowedToRespond && legacyOfferedDriver != null) {
+        isAllowedToRespond = legacyOfferedDriver['id'] == driverId;
+      }
+      
+      if (!isAllowedToRespond) {
+        throw Exception('Offer expired or taken by another driver');
+      }
 
-      // Verify the offer is still valid for THIS driver
-      if (offeredDriver == null || offeredDriver['id'] != driverId) {
-        throw Exception('Offer expired or assigned to another driver');
+      // Check if order is already assigned (race condition protection)
+      final currentStatus = orderData['assignmentStatus'];
+      if (currentStatus == 'assigned') {
+        throw Exception('Order already assigned to another driver');
       }
 
       // Get driver name from snapshot if not provided
@@ -340,12 +355,13 @@ class DeliveryPartnerService {
       }
 
       if (accepted) {
-        // ACCEPT FLOW: Assign order to this driver
+        // I WON THE RACE! Assign order to this driver
         transaction.update(orderRef, {
           'status': 'confirmed',
           'assignmentStatus': 'assigned',
           'assignedDeliveryPerson': driverId,
           'assignedDeliveryPersonName': deliveryPersonName,
+          'offeredDriverIds': FieldValue.delete(), // Clear so others can't accept
           'currentOfferedDriver': FieldValue.delete(),
           'assignedAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
@@ -366,13 +382,12 @@ class DeliveryPartnerService {
           'lastOrderAcceptedAt': FieldValue.serverTimestamp(),
         });
 
-        print('✅ Order $orderId accepted by driver $driverId');
+        print('✅ Order $orderId accepted by driver $driverId (won the race!)');
       } else {
-        // REJECT FLOW: Mark rejected and trigger search for next driver
+        // REJECT FLOW: Remove ONLY ME from the list (others can still accept)
         transaction.update(orderRef, {
-          'assignmentStatus': 'searching', // Cloud Function will find next driver
+          'offeredDriverIds': FieldValue.arrayRemove([driverId]),
           'rejectedByDrivers': FieldValue.arrayUnion([driverId]),
-          'currentOfferedDriver': FieldValue.delete(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
 

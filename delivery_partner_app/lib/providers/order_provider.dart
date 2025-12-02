@@ -96,11 +96,12 @@ class OrderProvider extends ChangeNotifier {
   }
   
   // Enhanced pickup tasks with comprehensive debugging
+  // PHASE 1: No more asyncMap - instant loading with customerSnapshot
   Stream<List<OrderModel>> getPickupTasksStream(String deliveryPartnerId) {
     print('🚚 📦 OrderProvider: Getting pickup tasks for delivery partner: $deliveryPartnerId');
     
     return _getAllOrdersForDeliveryPartner(deliveryPartnerId)
-        .asyncMap((orders) async {
+        .map((orders) {
       // Filter for pickup tasks
       final pickupStatuses = ['assigned', 'confirmed', 'ready_for_pickup'];
       final filteredOrders = orders.where((order) {
@@ -109,9 +110,8 @@ class OrderProvider extends ChangeNotifier {
       
       print('🚚 📦 After filtering for pickup statuses: ${filteredOrders.length} orders');
       
-      // Enrich with customer data
-      final enrichedOrders = await _enrichOrdersWithCustomerData(filteredOrders);
-      return enrichedOrders;
+      // PHASE 1: No enrichment needed - customerSnapshot is embedded!
+      return _enrichOrdersWithCustomerData(filteredOrders);
     }).handleError((error) {
       print('🚚 ❌ Error in pickup tasks stream: $error');
       _error = 'Failed to load pickup tasks: $error';
@@ -173,11 +173,12 @@ class OrderProvider extends ChangeNotifier {
   }
   
   // Get delivery tasks for delivery partner
+  // PHASE 1: No more asyncMap - instant loading with customerSnapshot
   Stream<List<OrderModel>> getDeliveryTasksStream(String deliveryPartnerId) {
     print('🚚 🚛 OrderProvider: Getting delivery tasks for: $deliveryPartnerId');
     
     return _getAllOrdersForDeliveryPartner(deliveryPartnerId)
-        .asyncMap((orders) async {
+        .map((orders) {
       // Filter for delivery tasks
       final deliveryStatuses = ['picked_up', 'ready_for_delivery'];
       final filteredOrders = orders.where((order) {
@@ -186,9 +187,8 @@ class OrderProvider extends ChangeNotifier {
       
       print('🚚 🚛 After filtering for delivery statuses: ${filteredOrders.length} orders');
       
-      // Enrich with customer data
-      final enrichedOrders = await _enrichOrdersWithCustomerData(filteredOrders);
-      return enrichedOrders;
+      // PHASE 1: No enrichment needed - customerSnapshot is embedded!
+      return _enrichOrdersWithCustomerData(filteredOrders);
     }).handleError((error) {
       print('🚚 ❌ Error in delivery tasks stream: $error');
       _error = 'Failed to load delivery tasks: $error';
@@ -521,41 +521,71 @@ class OrderProvider extends ChangeNotifier {
     }
   }
 
-  // Enrich orders with customer data
-  Future<List<OrderModel>> _enrichOrdersWithCustomerData(List<OrderModel> orders) async {
-    if (orders.isEmpty) return orders;
+  // PHASE 1 FIX: No more slow enrichment - data is embedded in customerSnapshot
+  // This method now just passes data through since customer data is in the order
+  List<OrderModel> _enrichOrdersWithCustomerData(List<OrderModel> orders) {
+    // Customer data is now inside the order document itself (customerSnapshot)
+    // No extra fetch needed - instant loading!
+    print('🚚 ⚡ OrderProvider: Using embedded customerSnapshot - no extra fetch needed');
+    return orders;
+  }
+
+  // ============= PHASE 3: NEW EFFICIENT STREAMS =============
+
+  /// Stream for NEW OFFERS (Broadcast system)
+  /// Listens for orders where this driver is in the offeredDriverIds array
+  Stream<List<OrderModel>> getNewOffersStream(String deliveryPartnerId) {
+    print('🚚 📢 OrderProvider: Setting up broadcast offers stream for: $deliveryPartnerId');
     
-    print('🚚 👥 OrderProvider: Enriching ${orders.length} orders with customer data');
+    return _firestore
+        .collection('orders')
+        .where('offeredDriverIds', arrayContains: deliveryPartnerId)
+        .where('assignmentStatus', isEqualTo: 'broadcasting')
+        .snapshots()
+        .map((snapshot) {
+      print('🚚 📢 Broadcast offers: ${snapshot.docs.length} orders waiting for response');
+      
+      return snapshot.docs.map((doc) {
+        try {
+          return OrderModel.fromFirestore(doc);
+        } catch (e) {
+          print('🚚 ❌ Error parsing offer ${doc.id}: $e');
+          return null;
+        }
+      }).where((order) => order != null).cast<OrderModel>().toList();
+    }).handleError((error) {
+      print('🚚 ❌ Error in offers stream: $error');
+      return <OrderModel>[];
+    });
+  }
+
+  /// Stream for ACTIVE TASKS (orders assigned to this driver)
+  /// More efficient than downloading everything and filtering
+  Stream<List<OrderModel>> getActiveTasksStream(String deliveryPartnerId) {
+    print('🚚 📋 OrderProvider: Setting up active tasks stream for: $deliveryPartnerId');
     
-    // Get unique customer IDs
-    final customerIds = orders
-        .where((order) => order.customerId != null)
-        .map((order) => order.customerId!)
-        .toSet()
-        .toList();
-    
-    if (customerIds.isEmpty) {
-      print('🚚 ⚠️ OrderProvider: No customer IDs found in orders');
-      return orders;
-    }
-    
-    print('🚚 👥 OrderProvider: Fetching data for ${customerIds.length} unique customers');
-    
-    // Fetch customer data
-    final customersMap = await _customerService.getCustomersByIds(customerIds);
-    
-    // Enrich orders with customer data
-    final enrichedOrders = orders.map((order) {
-      if (order.customerId != null && customersMap.containsKey(order.customerId)) {
-        final customer = customersMap[order.customerId];
-        print('🚚 ✅ OrderProvider: Enriched order ${order.id} with customer ${customer?.name}');
-        return order.copyWith(customerInfo: customer);
-      }
-      return order;
-    }).toList();
-    
-    print('🚚 👥 OrderProvider: Successfully enriched ${enrichedOrders.length} orders');
-    return enrichedOrders;
+    return _firestore
+        .collection('orders')
+        .where('assignedDeliveryPerson', isEqualTo: deliveryPartnerId)
+        .where('status', whereIn: ['confirmed', 'picked_up', 'ready_for_delivery', 'out_for_delivery'])
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      print('🚚 📋 Active tasks: ${snapshot.docs.length} orders assigned');
+      
+      // No enrichment needed - customerSnapshot is embedded!
+      return snapshot.docs.map((doc) {
+        try {
+          return OrderModel.fromFirestore(doc);
+        } catch (e) {
+          print('🚚 ❌ Error parsing task ${doc.id}: $e');
+          return null;
+        }
+      }).where((order) => order != null).cast<OrderModel>().toList();
+    }).handleError((error) {
+      print('🚚 ❌ Error in active tasks stream: $error');
+      return <OrderModel>[];
+    });
   }
 
   // Refresh data

@@ -141,6 +141,12 @@ class OrderModel {
   // Status history
   final List<Map<String, dynamic>> statusHistory;
 
+  // PHASE 1: Customer Snapshot (embedded customer data for instant loading)
+  final Map<String, dynamic>? customerSnapshot;
+
+  // PHASE 2: Broadcast Assignment fields
+  final List<String> offeredDriverIds;
+
   OrderModel({
     required this.id,
     required this.userId,
@@ -183,6 +189,10 @@ class OrderModel {
     this.notificationSentToDeliveryPerson,
     // Status history
     this.statusHistory = const [],
+    // PHASE 1: Customer Snapshot
+    this.customerSnapshot,
+    // PHASE 2: Broadcast Assignment
+    this.offeredDriverIds = const [],
   });
 
   // Get delivery address as string for display
@@ -207,14 +217,30 @@ class OrderModel {
     return latitude != null && longitude != null;
   }
 
-  // Get customer name from customer object or default
+  // Get customer name from customerSnapshot or customer object
   String get customerName {
+    // PHASE 1: First check customerSnapshot (instant load)
+    if (customerSnapshot != null && customerSnapshot!['name'] != null) {
+      return customerSnapshot!['name'].toString();
+    }
     return customer?.name ?? 'Unknown Customer';
   }
 
-  // Get customer phone from customer object or default
+  // Get customer phone from customerSnapshot or customer object
   String get customerPhone {
+    // PHASE 1: First check customerSnapshot (instant load)
+    if (customerSnapshot != null && customerSnapshot!['phoneNumber'] != null) {
+      return customerSnapshot!['phoneNumber'].toString();
+    }
     return customer?.phoneNumber ?? 'No phone';
+  }
+
+  // PHASE 1: Get customer address from snapshot
+  String get customerAddress {
+    if (customerSnapshot != null && customerSnapshot!['addressLine'] != null) {
+      return customerSnapshot!['addressLine'].toString();
+    }
+    return displayDeliveryAddress;
   }
 
   // Get assigned delivery partner ID (supports both field names)
@@ -318,6 +344,12 @@ class OrderModel {
       notificationSentToDeliveryPerson: safeExtract<bool>('notificationSentToDeliveryPerson', null),
       // Status history
       statusHistory: parseStatusHistory(data['statusHistory']),
+      // PHASE 1: Customer Snapshot (embedded customer data)
+      customerSnapshot: data['customerSnapshot'] != null ?
+        Map<String, dynamic>.from(data['customerSnapshot']) : null,
+      // PHASE 2: Broadcast Assignment (offered driver IDs)
+      offeredDriverIds: data['offeredDriverIds'] is List ?
+        List<String>.from(data['offeredDriverIds']) : <String>[],
     );
   }
 
@@ -404,6 +436,10 @@ class OrderModel {
       notificationSentToDeliveryPerson: notificationSentToDeliveryPerson,
       // Status history
       statusHistory: statusHistory,
+      // PHASE 1: Customer Snapshot
+      customerSnapshot: customerSnapshot,
+      // PHASE 2: Broadcast Assignment
+      offeredDriverIds: offeredDriverIds,
     );
   }
 

@@ -74,51 +74,79 @@ exports.retryDriverSearch = onDocumentUpdated(
     },
 );
 
+/**
+ * PHASE 2: Updated for broadcast system
+ * Checks for expired broadcast offers (20 second timeout)
+ * If all drivers ignored, marks all as rejected and retries search
+ */
 exports.checkExpiredOffers = onSchedule("every 1 minutes", async () => {
   const db = getFirestore();
   const now = Timestamp.now();
 
-  const staleOrders = await db.collection("orders")
+  // Check for expired BROADCAST offers
+  const broadcastOrders = await db.collection("orders")
+      .where("assignmentStatus", "==", "broadcasting")
+      .get();
+
+  // Also check legacy "offered" status for backward compatibility
+  const legacyOrders = await db.collection("orders")
       .where("assignmentStatus", "==", "offered")
       .get();
 
-  if (staleOrders.empty) return null;
+  const allStaleOrders = [...broadcastOrders.docs, ...legacyOrders.docs];
+
+  if (allStaleOrders.length === 0) return null;
 
   const batch = db.batch();
 
-  staleOrders.forEach((doc) => {
+  allStaleOrders.forEach((doc) => {
     const data = doc.data();
-    const offeredAt = data.currentOfferedDriver?.offeredAt;
+    const timeout = data.assignmentTimeout;
 
-    if (!offeredAt || typeof offeredAt.toMillis !== "function") return;
+    if (!timeout || typeof timeout.toMillis !== "function") return;
 
-    const diffSeconds = (now.toMillis() - offeredAt.toMillis()) / 1000;
-    if (diffSeconds <= 60) return;
+    // Check if offer has expired
+    if (now.toMillis() < timeout.toMillis()) return;
 
-    const driverId = data.currentOfferedDriver?.id;
-    if (!driverId) return;
+    // BROADCAST: Mark all offered drivers as rejected
+    const offeredIds = data.offeredDriverIds || [];
+    const legacyDriverId = data.currentOfferedDriver?.id;
+
+    const allRejectedIds = [...offeredIds];
+    if (legacyDriverId && !allRejectedIds.includes(legacyDriverId)) {
+      allRejectedIds.push(legacyDriverId);
+    }
+
+    if (allRejectedIds.length === 0) return;
+
+    console.log(`Order ${doc.id} expired - marking ${allRejectedIds.length} drivers as rejected`);
 
     batch.update(doc.ref, {
-      assignmentStatus: "searching",
-      rejectedByDrivers: FieldValue.arrayUnion(driverId),
+      assignmentStatus: "searching", // Retry with next batch of drivers
+      rejectedByDrivers: FieldValue.arrayUnion(...allRejectedIds),
+      offeredDriverIds: FieldValue.delete(),
       currentOfferedDriver: FieldValue.delete(),
-    });
-
-    const driverRef = db.collection("delivery").doc(driverId);
-    batch.update(driverRef, {
-      currentOffer: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
   });
 
   return batch.commit();
 });
 
+/**
+ * PHASE 2: BROADCAST ASSIGNMENT SYSTEM
+ * Instead of offering to 1 driver and waiting 45s, we now:
+ * 1. Select TOP 3 nearest drivers
+ * 2. Broadcast the offer to all 3 simultaneously
+ * 3. First driver to accept wins (race condition handled by transaction)
+ * 4. Timeout is now 20 seconds (faster experience)
+ */
 async function assignToNearestDriver(orderId, orderData) {
   const db = getFirestore();
   const rejectedDrivers = Array.isArray(orderData.rejectedByDrivers) ?
     orderData.rejectedByDrivers : [];
 
-  // Fetch online & available drivers
+  // 1. Fetch ALL online & available drivers
   const driversSnap = await db.collection("delivery")
       .where("isOnline", "==", true)
       .where("isAvailable", "==", true)
@@ -129,28 +157,18 @@ async function assignToNearestDriver(orderId, orderData) {
     return null;
   }
 
+  // 2. Filter rejected drivers & build list
   let drivers = [];
   driversSnap.forEach((doc) => {
     if (rejectedDrivers.includes(doc.id)) return;
-    const data = doc.data();
-    drivers.push({
-      id: doc.id,
-      ...data,
-    });
+    const dData = doc.data();
+    drivers.push({id: doc.id, ...dData});
   });
-
-  if (drivers.length === 0) {
-    console.log("All drivers rejected order", orderId);
-    await db.collection("orders").doc(orderId).update({
-      assignmentStatus: "failed_no_drivers",
-      notificationSentToAdmin: false,
-    });
-    return null;
-  }
 
   const pickupLat = orderData.latitude || orderData.pickupLatitude;
   const pickupLng = orderData.longitude || orderData.pickupLongitude;
 
+  // Sort by distance (existing logic)
   drivers = drivers.map((driver) => {
     const dist = getDistance(
         pickupLat,
@@ -161,45 +179,38 @@ async function assignToNearestDriver(orderId, orderData) {
     return {...driver, distance: dist};
   }).sort((a, b) => a.distance - b.distance);
 
-  const bestDriver = drivers[0];
-  const orderRef = db.collection("orders").doc(orderId);
-  const driverRef = db.collection("delivery").doc(bestDriver.id);
+  // 3. SELECT TOP 3 DRIVERS (Broadcast Batch)
+  const selectedDrivers = drivers.slice(0, 3);
 
-  await db.runTransaction(async (transaction) => {
-    const orderSnap = await transaction.get(orderRef);
-    if (!orderSnap.exists) {
-      throw new Error("Order no longer exists");
-    }
-
-    const current = orderSnap.data() || {};
-    const currentStatus = current.assignmentStatus;
-
-    // Only assign if still searching/pending
-    if (currentStatus && currentStatus !== "searching") {
-      console.log("Order already locked/assigned", orderId, currentStatus);
-      return;
-    }
-
-    transaction.update(orderRef, {
-      status: current.status ?? "Searching",
-      assignmentStatus: "offered",
-      currentOfferedDriver: {
-        id: bestDriver.id,
-        name: bestDriver.name,
-        offeredAt: FieldValue.serverTimestamp(),
-      },
-      assignmentTimeout: Timestamp.fromMillis(Date.now() + 45000),
+  if (selectedDrivers.length === 0) {
+    console.log("All drivers rejected or none available for order", orderId);
+    await db.collection("orders").doc(orderId).update({
+      assignmentStatus: "failed_no_drivers",
+      notificationSentToAdmin: false,
     });
+    return null;
+  }
 
-    transaction.update(driverRef, {
-      currentOffer: {
-        orderId: orderId,
-        expiresAt: Timestamp.fromMillis(Date.now() + 45000),
-      },
-    });
+  // 4. Update Order with BROADCAST Offer
+  const selectedDriverIds = selectedDrivers.map((d) => d.id);
+
+  console.log(`Broadcasting order ${orderId} to ${selectedDriverIds.length} drivers:`,
+      selectedDriverIds);
+
+  await db.collection("orders").doc(orderId).update({
+    status: "Searching",
+    assignmentStatus: "broadcasting", // New status for broadcast offers
+    offeredDriverIds: selectedDriverIds, // Array of IDs allowed to accept
+    assignmentTimeout: Timestamp.fromMillis(Date.now() + 20000), // 20 seconds
+    updatedAt: FieldValue.serverTimestamp(),
   });
 
-  return sendDriverAssignmentNotification(orderId, bestDriver.id);
+  // 5. Send FCM to ALL selected drivers simultaneously
+  const notificationPromises = selectedDrivers.map((driver) =>
+    sendDriverAssignmentNotification(orderId, driver.id),
+  );
+
+  return Promise.all(notificationPromises);
 }
 
 function getDistance(lat1, lon1, lat2, lon2) {

@@ -28,8 +28,8 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedTabIndex = 0; // 0 for Pickups, 1 for Deliveries
   Map<String, dynamic> _stats = {};
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-      _offerSubscription;
+  // PHASE 3: Updated for broadcast offers stream
+  StreamSubscription<List<OrderModel>>? _offerSubscription;
   String? _activeOfferId;
   
   // Location tracking service & Online/Offline state
@@ -158,28 +158,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  /// PHASE 3: Updated for BROADCAST system
+  /// Listens to orders where this driver is in offeredDriverIds array
+  /// Much more efficient than listening to individual driver document
   void _listenForOffers() {
     _offerSubscription?.cancel();
-    _offerSubscription = FirebaseFirestore.instance
-        .collection('delivery')
-        .doc(widget.deliveryPartner.id)
-        .snapshots()
-        .listen((snapshot) {
-      if (!mounted || !snapshot.exists) return;
-      final data = snapshot.data();
-      if (data == null) return;
-
-      final offer = data['currentOffer'];
-      final orderId = offer != null ? offer['orderId']?.toString() : null;
-
-      if (orderId != null && orderId.isNotEmpty) {
-        if (_activeOfferId == orderId) return;
-        _activeOfferId = orderId;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showOrderOfferDialog(orderId);
-        });
+    
+    final orderProvider = context.read<OrderProvider>();
+    
+    // Listen to the broadcast offers stream
+    _offerSubscription = orderProvider
+        .getNewOffersStream(widget.deliveryPartner.id)
+        .listen((orders) {
+      
+      if (orders.isNotEmpty) {
+        // Show the freshest/closest offer (first in list)
+        final newestOffer = orders.first;
+        
+        // Prevent showing the same dialog repeatedly if already open
+        if (_activeOfferId != newestOffer.id) {
+          _activeOfferId = newestOffer.id;
+          
+          print('🚚 📢 Dashboard: New broadcast offer received: ${newestOffer.id}');
+          
+          if (mounted) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _showOrderOfferDialog(newestOffer.id!);
+            });
+          }
+        }
       } else {
-        _activeOfferId = null;
+        // Close dialog if the order was taken by another driver
+        if (_activeOfferId != null && mounted) {
+          // Check if dialog is currently showing
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
+          }
+          
+          _activeOfferId = null;
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Order was accepted by another driver.'),
+                ],
+              ),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.all(16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          );
+        }
       }
     });
   }
@@ -231,7 +264,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Column(
                   children: [
                     // Online/Offline Toggle Button
-                    _buildOnlineToggle(),
+                   // _buildOnlineToggle(),
                     
                     // Today's stats cards
                     _buildTodayStats(),
@@ -572,6 +605,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         fontFamily: 'SFProDisplay',
                       ),
                     ),
+                   
+                  //  _buildOnlineToggle(),
                     SizedBox(height: 4),
                     Text(
                       _isOnline 
@@ -586,7 +621,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
-              ),
+              ), _isLoading
+              ? SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: _isOnline ? Colors.green : Colors.red,
+                    ),
+                  ),
+                )
+              : Transform.scale(
+                  scale: 1.2,
+                  child: Switch(
+                    value: _isOnline,
+                    onChanged: _toggleWorkStatus,
+                    activeColor: Colors.green,
+                    activeTrackColor: Colors.green[200],
+                    inactiveThumbColor: Colors.red,
+                    inactiveTrackColor: Colors.red[200],
+                  ),
+                ),
             ],
           ),
         ],

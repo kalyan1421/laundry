@@ -1190,6 +1190,21 @@ class _SchedulePickupDeliveryScreenState
       print('🔥 ORDER PLACEMENT: 📍 Pickup address longitude: $pickupLongitude');
       print('🔥 ORDER PLACEMENT: 📍 Address data keys: ${pickupAddressData.keys.toList()}');
 
+      // PHASE 1 FIX: Create customerSnapshot to avoid double-hop fetching
+      // This embeds customer data directly in the order for instant loading
+      final customerSnapshot = {
+        'name': userModel.name ?? 'Customer',
+        'phoneNumber': userModel.phoneNumber ?? '',
+        'addressLine': _formatAddress(pickupAddressData),
+        'area': pickupAddressData['addressLine2'] ?? pickupAddressData['area'] ?? '',
+        'city': pickupAddressData['city'] ?? '',
+        'pincode': pickupAddressData['pincode'] ?? '',
+        'coordinates': {
+          'latitude': pickupLatitude,
+          'longitude': pickupLongitude,
+        }
+      };
+
       Map<String, dynamic> orderData = {
         'customerId': userId,
         'orderNumber': orderNumber,
@@ -1230,6 +1245,8 @@ class _SchedulePickupDeliveryScreenState
             'description': 'Your order has been placed successfully',
           }
         ],
+        // PHASE 1: Embedded customer data for instant loading in Delivery App
+        'customerSnapshot': customerSnapshot,
         // Automation fields for driver assignment (Cloud Function)
         'assignmentStatus': 'searching', // Triggers Cloud Function to find nearby driver
         'rejectedByDrivers': [], // Tracks drivers who rejected this order
