@@ -8,9 +8,17 @@
  */
 
 const {onRequest} = require("firebase-functions/v2/https");
-const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const {
+  onDocumentCreated,
+  onDocumentUpdated,
+} = require("firebase-functions/v2/firestore");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {initializeApp} = require("firebase-admin/app");
-const {getFirestore} = require("firebase-admin/firestore");
+const {
+  FieldValue,
+  getFirestore,
+  Timestamp,
+} = require("firebase-admin/firestore");
 const {getMessaging} = require("firebase-admin/messaging");
 
 // Create and deploy your first functions
@@ -22,6 +30,217 @@ const {getMessaging} = require("firebase-admin/messaging");
 // });
 
 initializeApp();
+
+/**
+ * Driver search and assignment logic
+ * ---------------------------------
+ * startDriverSearch      -> trigger when a new order is created
+ * retryDriverSearch      -> trigger when assignmentStatus is reset to searching
+ * checkExpiredOffers     -> scheduled cleanup for ignored offers
+ */
+exports.startDriverSearch = onDocumentCreated(
+    "orders/{orderId}",
+    async (event) => {
+      const orderId = event.params.orderId;
+      const orderData = event.data.data();
+
+      if (!orderData) return null;
+
+      // Only start search for brand new orders
+      const status = orderData.status?.toString().toLowerCase();
+      if (status !== "pending" && status !== "new") return null;
+
+      return assignToNearestDriver(orderId, {
+        ...orderData,
+        assignmentStatus: orderData.assignmentStatus ?? "searching",
+      });
+    },
+);
+
+exports.retryDriverSearch = onDocumentUpdated(
+    "orders/{orderId}",
+    async (event) => {
+      const newData = event.data.after.data();
+      const oldData = event.data.before.data();
+
+      if (!newData || !oldData) return null;
+
+      const becameSearching = newData.assignmentStatus === "searching" &&
+        oldData.assignmentStatus !== "searching";
+
+      if (!becameSearching) return null;
+
+      return assignToNearestDriver(event.params.orderId, newData);
+    },
+);
+
+exports.checkExpiredOffers = onSchedule("every 1 minutes", async () => {
+  const db = getFirestore();
+  const now = Timestamp.now();
+
+  const staleOrders = await db.collection("orders")
+      .where("assignmentStatus", "==", "offered")
+      .get();
+
+  if (staleOrders.empty) return null;
+
+  const batch = db.batch();
+
+  staleOrders.forEach((doc) => {
+    const data = doc.data();
+    const offeredAt = data.currentOfferedDriver?.offeredAt;
+
+    if (!offeredAt || typeof offeredAt.toMillis !== "function") return;
+
+    const diffSeconds = (now.toMillis() - offeredAt.toMillis()) / 1000;
+    if (diffSeconds <= 60) return;
+
+    const driverId = data.currentOfferedDriver?.id;
+    if (!driverId) return;
+
+    batch.update(doc.ref, {
+      assignmentStatus: "searching",
+      rejectedByDrivers: FieldValue.arrayUnion(driverId),
+      currentOfferedDriver: FieldValue.delete(),
+    });
+
+    const driverRef = db.collection("delivery").doc(driverId);
+    batch.update(driverRef, {
+      currentOffer: FieldValue.delete(),
+    });
+  });
+
+  return batch.commit();
+});
+
+async function assignToNearestDriver(orderId, orderData) {
+  const db = getFirestore();
+  const rejectedDrivers = Array.isArray(orderData.rejectedByDrivers) ?
+    orderData.rejectedByDrivers : [];
+
+  // Fetch online & available drivers
+  const driversSnap = await db.collection("delivery")
+      .where("isOnline", "==", true)
+      .where("isAvailable", "==", true)
+      .get();
+
+  if (driversSnap.empty) {
+    console.log("No drivers online for order", orderId);
+    return null;
+  }
+
+  let drivers = [];
+  driversSnap.forEach((doc) => {
+    if (rejectedDrivers.includes(doc.id)) return;
+    const data = doc.data();
+    drivers.push({
+      id: doc.id,
+      ...data,
+    });
+  });
+
+  if (drivers.length === 0) {
+    console.log("All drivers rejected order", orderId);
+    await db.collection("orders").doc(orderId).update({
+      assignmentStatus: "failed_no_drivers",
+      notificationSentToAdmin: false,
+    });
+    return null;
+  }
+
+  const pickupLat = orderData.latitude || orderData.pickupLatitude;
+  const pickupLng = orderData.longitude || orderData.pickupLongitude;
+
+  drivers = drivers.map((driver) => {
+    const dist = getDistance(
+        pickupLat,
+        pickupLng,
+        driver.currentLocation?.latitude,
+        driver.currentLocation?.longitude,
+    );
+    return {...driver, distance: dist};
+  }).sort((a, b) => a.distance - b.distance);
+
+  const bestDriver = drivers[0];
+  const orderRef = db.collection("orders").doc(orderId);
+  const driverRef = db.collection("delivery").doc(bestDriver.id);
+
+  await db.runTransaction(async (transaction) => {
+    const orderSnap = await transaction.get(orderRef);
+    if (!orderSnap.exists) {
+      throw new Error("Order no longer exists");
+    }
+
+    const current = orderSnap.data() || {};
+    const currentStatus = current.assignmentStatus;
+
+    // Only assign if still searching/pending
+    if (currentStatus && currentStatus !== "searching") {
+      console.log("Order already locked/assigned", orderId, currentStatus);
+      return;
+    }
+
+    transaction.update(orderRef, {
+      status: current.status ?? "Searching",
+      assignmentStatus: "offered",
+      currentOfferedDriver: {
+        id: bestDriver.id,
+        name: bestDriver.name,
+        offeredAt: FieldValue.serverTimestamp(),
+      },
+      assignmentTimeout: Timestamp.fromMillis(Date.now() + 45000),
+    });
+
+    transaction.update(driverRef, {
+      currentOffer: {
+        orderId: orderId,
+        expiresAt: Timestamp.fromMillis(Date.now() + 45000),
+      },
+    });
+  });
+
+  return sendDriverAssignmentNotification(orderId, bestDriver.id);
+}
+
+function getDistance(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 99999;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+async function sendDriverAssignmentNotification(orderId, driverId) {
+  try {
+    const deliveryDoc = await getFirestore()
+        .collection("delivery")
+        .doc(driverId)
+        .get();
+
+    if (!deliveryDoc.exists) return null;
+
+    const token = deliveryDoc.data().fcmToken;
+    if (!token) return null;
+
+    await getMessaging().send({
+      token,
+      notification: {
+        title: "New Order Request",
+        body: `Order #${orderId} is available near you.`,
+      },
+      data: {
+        type: "order_assignment",
+        orderId,
+      },
+    });
+  } catch (error) {
+    console.error("Error sending driver assignment notification", error);
+  }
+}
 
 // Cloud Function to process FCM notifications
 exports.processFcmNotifications = onDocumentCreated(

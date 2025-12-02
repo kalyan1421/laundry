@@ -1,4 +1,6 @@
 // screens/dashboard/dashboard_screen.dart - Delivery Partner Dashboard
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../tasks/task_detail_screen.dart';
 import '../../widgets/custom_bottom_navigation.dart';
+import '../../services/delivery_partner_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   final DeliveryPartnerModel deliveryPartner;
@@ -24,6 +27,9 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedTabIndex = 0; // 0 for Pickups, 1 for Deliveries
   Map<String, dynamic> _stats = {};
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _offerSubscription;
+  String? _activeOfferId;
 
   @override
   void initState() {
@@ -31,6 +37,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     print('🚚 🎯 Dashboard: Initializing for delivery partner ID: ${widget.deliveryPartner.id}');
     print('🚚 🎯 Dashboard: Delivery partner name: ${widget.deliveryPartner.name}');
     _loadStats();
+    _listenForOffers();
   }
 
   Future<void> _loadStats() async {
@@ -44,6 +51,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _stats = stats;
       });
     }
+  }
+
+  void _listenForOffers() {
+    _offerSubscription?.cancel();
+    _offerSubscription = FirebaseFirestore.instance
+        .collection('delivery')
+        .doc(widget.deliveryPartner.id)
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted || !snapshot.exists) return;
+      final data = snapshot.data();
+      if (data == null) return;
+
+      final offer = data['currentOffer'];
+      final orderId = offer != null ? offer['orderId']?.toString() : null;
+
+      if (orderId != null && orderId.isNotEmpty) {
+        if (_activeOfferId == orderId) return;
+        _activeOfferId = orderId;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showOrderOfferDialog(orderId);
+        });
+      } else {
+        _activeOfferId = null;
+      }
+    });
   }
 
   @override
@@ -185,6 +218,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ],
     );
+  }
+
+  void _showOrderOfferDialog(String orderId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Order Request'),
+        content: Text('Order #$orderId is available nearby.'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              setState(() {
+                _activeOfferId = null;
+              });
+              try {
+                await DeliveryPartnerService().respondToOrderOffer(
+                  driverId: widget.deliveryPartner.id,
+                  orderId: orderId,
+                  accepted: false,
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to reject offer: $e')),
+                );
+              }
+            },
+            child: const Text('Reject'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              setState(() {
+                _activeOfferId = null;
+              });
+              try {
+                await DeliveryPartnerService().respondToOrderOffer(
+                  driverId: widget.deliveryPartner.id,
+                  orderId: orderId,
+                  accepted: true,
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to accept offer: $e')),
+                );
+              }
+            },
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _offerSubscription?.cancel();
+    super.dispose();
   }
 
   Widget _buildModernHeader() {

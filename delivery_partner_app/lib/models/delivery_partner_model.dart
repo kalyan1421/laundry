@@ -26,6 +26,7 @@ class DeliveryPartnerModel {
   final Map<String, dynamic> documents;
   final Map<String, dynamic> bankDetails;
   final Map<String, dynamic> address;
+  final Map<String, dynamic>? currentOffer;
   final Timestamp createdAt;
   final Timestamp updatedAt;
   final String? createdBy;
@@ -57,6 +58,7 @@ class DeliveryPartnerModel {
     this.documents = const {},
     this.bankDetails = const {},
     this.address = const {},
+    this.currentOffer,
     required this.createdAt,
     required this.updatedAt,
     this.createdBy,
@@ -90,6 +92,8 @@ class DeliveryPartnerModel {
       documents: Map<String, dynamic>.from(map['documents'] ?? {}),
       bankDetails: Map<String, dynamic>.from(map['bankDetails'] ?? {}),
       address: Map<String, dynamic>.from(map['address'] ?? {}),
+      currentOffer: map['currentOffer'] != null ?
+        Map<String, dynamic>.from(map['currentOffer']) : null,
       createdAt: map['createdAt'] ?? Timestamp.now(),
       updatedAt: map['updatedAt'] ?? Timestamp.now(),
       createdBy: map['createdBy'],
@@ -124,6 +128,7 @@ class DeliveryPartnerModel {
       'documents': documents,
       'bankDetails': bankDetails,
       'address': address,
+      if (currentOffer != null) 'currentOffer': currentOffer,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
       'createdBy': createdBy,

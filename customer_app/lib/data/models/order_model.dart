@@ -35,6 +35,10 @@ class OrderModel {
   final bool isAcceptedByDeliveryPerson;
   final Timestamp? acceptedAt;
   final String? rejectionReason;
+  final String? assignmentStatus;
+  final Map<String, dynamic>? currentOfferedDriver;
+  final List<String> rejectedByDrivers;
+  final Timestamp? assignmentTimeout;
   final bool notificationSentToAdmin;
   final bool notificationSentToDeliveryPerson;
   final List<String> notificationTokens; // FCM tokens for notifications
@@ -72,6 +76,10 @@ class OrderModel {
     this.isAcceptedByDeliveryPerson = false,
     this.acceptedAt,
     this.rejectionReason,
+    this.assignmentStatus,
+    this.currentOfferedDriver,
+    this.rejectedByDrivers = const [],
+    this.assignmentTimeout,
     this.notificationSentToAdmin = false,
     this.notificationSentToDeliveryPerson = false,
     this.notificationTokens = const [],
@@ -244,6 +252,12 @@ class OrderModel {
         isAcceptedByDeliveryPerson: data['isAcceptedByDeliveryPerson'] ?? false,
         acceptedAt: data['acceptedAt'],
         rejectionReason: data['rejectionReason']?.toString(),
+        assignmentStatus: data['assignmentStatus']?.toString(),
+        currentOfferedDriver: data['currentOfferedDriver'] != null ?
+          Map<String, dynamic>.from(data['currentOfferedDriver']) : null,
+        rejectedByDrivers: data['rejectedByDrivers'] is List ?
+          List<String>.from(data['rejectedByDrivers']) : <String>[],
+        assignmentTimeout: data['assignmentTimeout'],
         notificationSentToAdmin: data['notificationSentToAdmin'] ?? false,
         notificationSentToDeliveryPerson: data['notificationSentToDeliveryPerson'] ?? false,
         notificationTokens: tokens,
@@ -307,6 +321,10 @@ class OrderModel {
       'isAcceptedByDeliveryPerson': isAcceptedByDeliveryPerson,
       'acceptedAt': acceptedAt,
       'rejectionReason': rejectionReason,
+      'assignmentStatus': assignmentStatus,
+      'currentOfferedDriver': currentOfferedDriver,
+      'rejectedByDrivers': rejectedByDrivers,
+      'assignmentTimeout': assignmentTimeout,
       'notificationSentToAdmin': notificationSentToAdmin,
       'notificationSentToDeliveryPerson': notificationSentToDeliveryPerson,
       'notificationTokens': notificationTokens,

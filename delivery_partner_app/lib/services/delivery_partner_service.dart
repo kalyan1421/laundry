@@ -303,4 +303,55 @@ class DeliveryPartnerService {
       return false;
     }
   }
+
+  /// Respond to an order offer using a Firestore transaction
+  Future<void> respondToOrderOffer({
+    required String driverId,
+    required String orderId,
+    required bool accepted,
+  }) async {
+    final orderRef = _firestore.collection('orders').doc(orderId);
+    final driverRef = _firestore.collection('delivery').doc(driverId);
+
+    return _firestore.runTransaction((transaction) async {
+      final orderSnapshot = await transaction.get(orderRef);
+
+      if (!orderSnapshot.exists) {
+        throw Exception('Order no longer exists');
+      }
+
+      final orderData = orderSnapshot.data() as Map<String, dynamic>;
+      final offeredDriver = orderData['currentOfferedDriver'];
+
+      // Ensure the offer is still valid for this driver
+      if (offeredDriver == null || offeredDriver['id'] != driverId) {
+        throw Exception('Offer expired or assigned to another driver');
+      }
+
+      if (accepted) {
+        transaction.update(orderRef, {
+          'status': 'Confirmed',
+          'assignmentStatus': 'assigned',
+          'assignedDeliveryPerson': driverId,
+          'currentOfferedDriver': FieldValue.delete(),
+        });
+
+        transaction.update(driverRef, {
+          'currentOrders': FieldValue.arrayUnion([orderId]),
+          'isAvailable': false,
+          'currentOffer': FieldValue.delete(),
+        });
+      } else {
+        transaction.update(orderRef, {
+          'assignmentStatus': 'searching',
+          'rejectedByDrivers': FieldValue.arrayUnion([driverId]),
+          'currentOfferedDriver': FieldValue.delete(),
+        });
+
+        transaction.update(driverRef, {
+          'currentOffer': FieldValue.delete(),
+        });
+      }
+    });
+  }
 }

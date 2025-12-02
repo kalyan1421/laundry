@@ -120,6 +120,10 @@ class OrderModel {
   final String? assignedDeliveryPersonName;
   final Timestamp? assignedAt;
   final bool isAcceptedByDeliveryPerson;
+  final String? assignmentStatus;
+  final Map<String, dynamic>? currentOfferedDriver;
+  final List<String> rejectedByDrivers;
+  final Timestamp? assignmentTimeout;
 
   // Scheduling fields
   final Timestamp? pickupDate;
@@ -163,6 +167,10 @@ class OrderModel {
     this.assignedDeliveryPersonName,
     this.assignedAt,
     this.isAcceptedByDeliveryPerson = false,
+    this.assignmentStatus,
+    this.currentOfferedDriver,
+    this.rejectedByDrivers = const [],
+    this.assignmentTimeout,
     // Scheduling fields
     this.pickupDate,
     this.pickupTimeSlot,
@@ -291,6 +299,13 @@ class OrderModel {
       assignedDeliveryPersonName: safeExtract<String>('assignedDeliveryPersonName', null),
       assignedAt: data['assignedAt'] != null ? _parseTimestamp(data['assignedAt']) : null,
       isAcceptedByDeliveryPerson: safeExtract<bool>('isAcceptedByDeliveryPerson', false) ?? false,
+      assignmentStatus: safeExtract<String>('assignmentStatus', null),
+      currentOfferedDriver: data['currentOfferedDriver'] != null ?
+        Map<String, dynamic>.from(data['currentOfferedDriver']) : null,
+      rejectedByDrivers: data['rejectedByDrivers'] is List ?
+        List<String>.from(data['rejectedByDrivers']) : <String>[],
+      assignmentTimeout: data['assignmentTimeout'] != null ?
+        _parseTimestamp(data['assignmentTimeout']) : null,
       // Scheduling fields
       pickupDate: data['pickupDate'] != null ? _parseTimestamp(data['pickupDate']) : null,
       pickupTimeSlot: safeExtract<String>('pickupTimeSlot', null),
@@ -373,6 +388,10 @@ class OrderModel {
       assignedDeliveryPersonName: assignedDeliveryPersonName,
       assignedAt: assignedAt,
       isAcceptedByDeliveryPerson: isAcceptedByDeliveryPerson,
+      assignmentStatus: assignmentStatus,
+      currentOfferedDriver: currentOfferedDriver,
+      rejectedByDrivers: rejectedByDrivers,
+      assignmentTimeout: assignmentTimeout,
       // Scheduling fields
       pickupDate: pickupDate,
       pickupTimeSlot: pickupTimeSlot,
@@ -411,6 +430,10 @@ class OrderModel {
       if (assignedDeliveryPersonName != null) 'assignedDeliveryPersonName': assignedDeliveryPersonName,
       if (assignedAt != null) 'assignedAt': assignedAt,
       'isAcceptedByDeliveryPerson': isAcceptedByDeliveryPerson,
+      if (assignmentStatus != null) 'assignmentStatus': assignmentStatus,
+      if (currentOfferedDriver != null) 'currentOfferedDriver': currentOfferedDriver,
+      if (rejectedByDrivers.isNotEmpty) 'rejectedByDrivers': rejectedByDrivers,
+      if (assignmentTimeout != null) 'assignmentTimeout': assignmentTimeout,
       // Scheduling fields
       if (pickupDate != null) 'pickupDate': pickupDate,
       if (pickupTimeSlot != null) 'pickupTimeSlot': pickupTimeSlot,
