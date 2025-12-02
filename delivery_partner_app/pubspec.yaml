@@ -39,6 +39,7 @@ dependencies:
   firebase_core: ^3.13.1
   cloud_firestore: ^5.6.8
   firebase_messaging: ^15.2.6
+  flutter_local_notifications: ^18.0.1
 
   
   # UI & Navigation

@@ -1,6 +1,7 @@
 // screens/dashboard/dashboard_screen.dart - Delivery Partner Dashboard
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -45,6 +46,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadStats();
     _listenForOffers();
     _loadCurrentStatus();
+    _setupFcmNotificationListener(); // ZOMATO-STYLE: Instant dialog trigger
+  }
+
+  /// ZOMATO-STYLE: Setup FCM listener for instant order offer dialogs
+  /// This triggers the dialog IMMEDIATELY when notification arrives
+  void _setupFcmNotificationListener() {
+    // Listen for foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      if (message.data['type'] == 'order_offer') {
+        final orderId = message.data['orderId'];
+        print('🔔 📢 FCM: Instant offer notification for Order: $orderId');
+        
+        // Show the offer dialog immediately
+        if (mounted && _activeOfferId != orderId && orderId != null) {
+          setState(() {
+            _activeOfferId = orderId;
+          });
+          _showOrderOfferDialog(orderId);
+        }
+      }
+    });
+
+    // Handle when app is opened from background via notification tap
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      if (message.data['type'] == 'order_offer') {
+        final orderId = message.data['orderId'];
+        print('🔔 📢 FCM: App opened from background for Order: $orderId');
+        
+        if (mounted && _activeOfferId != orderId && orderId != null) {
+          setState(() {
+            _activeOfferId = orderId;
+          });
+          _showOrderOfferDialog(orderId);
+        }
+      }
+    });
+
+    print('🔔 Dashboard: FCM notification listener setup complete');
   }
 
   /// Check Firebase for current status on load

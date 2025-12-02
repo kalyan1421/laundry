@@ -119,7 +119,8 @@ exports.checkExpiredOffers = onSchedule("every 1 minutes", async () => {
 
     if (allRejectedIds.length === 0) return;
 
-    console.log(`Order ${doc.id} expired - marking ${allRejectedIds.length} drivers as rejected`);
+    console.log(`Order ${doc.id} expired`,
+        `marking ${allRejectedIds.length} drivers as rejected`);
 
     batch.update(doc.ref, {
       assignmentStatus: "searching", // Retry with next batch of drivers
@@ -194,8 +195,8 @@ async function assignToNearestDriver(orderId, orderData) {
   // 4. Update Order with BROADCAST Offer
   const selectedDriverIds = selectedDrivers.map((d) => d.id);
 
-  console.log(`Broadcasting order ${orderId} to ${selectedDriverIds.length} drivers:`,
-      selectedDriverIds);
+  console.log(`Broadcasting order ${orderId} to`,
+      `${selectedDriverIds.length} drivers:`, selectedDriverIds);
 
   await db.collection("orders").doc(orderId).update({
     status: "Searching",
@@ -225,31 +226,89 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+/**
+ * ZOMATO-STYLE HIGH PRIORITY NOTIFICATION
+ * - Wakes up device immediately (high priority)
+ * - Plays notification sound
+ * - Shows heads-up notification
+ * - Triggers instant dialog in app
+ */
 async function sendDriverAssignmentNotification(orderId, driverId) {
   try {
-    const deliveryDoc = await getFirestore()
-        .collection("delivery")
-        .doc(driverId)
-        .get();
+    const db = getFirestore();
+    const deliveryDoc = await db.collection("delivery").doc(driverId).get();
 
     if (!deliveryDoc.exists) return null;
 
-    const token = deliveryDoc.data().fcmToken;
-    if (!token) return null;
+    const driverData = deliveryDoc.data();
+    const token = driverData.fcmToken;
+    if (!token) {
+      console.log("No FCM token for driver:", driverId);
+      return null;
+    }
 
-    await getMessaging().send({
-      token,
-      notification: {
-        title: "New Order Request",
-        body: `Order #${orderId} is available near you.`,
-      },
+    // Get order details for rich notification
+    const orderDoc = await db.collection("orders").doc(orderId).get();
+    const orderData = orderDoc.exists ? orderDoc.data() : {};
+    const customerName = orderData.customerSnapshot?.name || "Customer";
+    const amount = orderData.totalAmount || 0;
+
+    // Construct High Priority "Offer" Notification
+    const message = {
+      token: token,
+      // 1. Data payload for app to handle logic in background
       data: {
-        type: "order_assignment",
-        orderId,
+        type: "order_offer", // Distinct type for instant dialog
+        orderId: orderId,
+        orderNumber: orderData.orderNumber || orderId,
+        customerName: customerName,
+        amount: amount.toString(),
+        timestamp: Date.now().toString(),
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
       },
-    });
+      // 2. Notification payload for system tray
+      notification: {
+        title: "📢 New Order Offer!",
+        body: `${customerName} - ₹${amount.toFixed(0)}. Tap to accept!`,
+      },
+      // 3. Android High Priority Config (Wakes up device)
+      android: {
+        priority: "high",
+        ttl: 0, // Deliver immediately or fail
+        notification: {
+          channelId: "order_offer_channel",
+          priority: "max",
+          visibility: "public",
+          sound: "default",
+          defaultSound: true,
+          defaultVibrateTimings: true,
+        },
+      },
+      // 4. iOS High Priority Config
+      apns: {
+        headers: {
+          "apns-priority": "10", // Immediate delivery
+        },
+        payload: {
+          aps: {
+            "alert": {
+              "title": "📢 New Order Offer!",
+              "body": `${customerName} - ₹${amount.toFixed(0)}. Tap to accept!`,
+            },
+            "sound": "default",
+            "badge": 1,
+            "content-available": 1, // Wakes up app in background
+          },
+        },
+      },
+    };
+
+    const response = await getMessaging().send(message);
+    console.log("High-priority offer sent to driver:", driverId, response);
+    return response;
   } catch (error) {
-    console.error("Error sending driver assignment notification", error);
+    console.error("Error sending driver assignment notification:", error);
+    return null;
   }
 }
 

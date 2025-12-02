@@ -1,15 +1,23 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:provider/provider.dart';
 import '../providers/order_provider.dart';
 import '../providers/auth_provider.dart';
 
 class FcmService {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance; 
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  
+  // Callback for when an order offer is received (to trigger instant dialog)
+  Function(Map<String, dynamic>)? _onOfferReceived;
 
-  Future<void> initialize(BuildContext? context) async {
+  /// Initialize FCM with optional callback for order offers
+  Future<void> initialize(BuildContext? context, {Function(Map<String, dynamic>)? onOfferReceived}) async {
+    _onOfferReceived = onOfferReceived;
+    
     // Request permission (iOS and web)
     NotificationSettings settings = await _firebaseMessaging.requestPermission(
       alert: true,
@@ -20,11 +28,14 @@ class FcmService {
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
       print('FCM: User granted permission');
-      _saveTokenToFirestore(context); // Save token once permission is granted
+      _saveTokenToFirestore(context);
     } else {
       print('FCM: User declined or has not accepted permission');
       return;
     }
+
+    // Create HIGH IMPORTANCE notification channel for Android (Zomato-style)
+    await _createOrderOfferChannel();
 
     // Listen for token refresh
     _firebaseMessaging.onTokenRefresh.listen((token) {
@@ -35,18 +46,30 @@ class FcmService {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print('FCM: Got a message whilst in the foreground!');
       print('FCM: Message data: ${message.data}');
-      RemoteNotification? notification = message.notification;
-
-      if (notification != null && context != null) {
-        // Enhanced notification handling for delivery partners
-        String notificationType = message.data['type'] ?? 'general';
+      
+      String notificationType = message.data['type'] ?? 'general';
+      
+      // ZOMATO-STYLE: Instant dialog for order_offer type
+      if (notificationType == 'order_offer') {
+        print('🔔 📢 ORDER OFFER NOTIFICATION RECEIVED!');
+        print('🔔 Order ID: ${message.data['orderId']}');
+        print('🔔 Customer: ${message.data['customerName']}');
+        print('🔔 Amount: ₹${message.data['amount']}');
         
+        // Trigger the instant dialog callback
+        if (_onOfferReceived != null) {
+          _onOfferReceived!(message.data);
+        }
+        
+        // Don't show snackbar - the dialog will handle this
+        return;
+      }
+      
+      // Handle legacy order_assignment type
+      RemoteNotification? notification = message.notification;
+      if (notification != null && context != null) {
         if (notificationType == 'order_assignment') {
-          // Special handling for order assignment notifications
           print('🚚 📦 NEW ORDER ASSIGNMENT RECEIVED!');
-          print('🚚 Order Number: ${message.data['orderNumber']}');
-          print('🚚 Customer: ${message.data['customerName']}');
-          print('🚚 Amount: ₹${message.data['totalAmount']}');
           
           final snackBar = SnackBar(
             content: Container(
@@ -98,7 +121,6 @@ class FcmService {
           );
           ScaffoldMessenger.of(context).showSnackBar(snackBar);
           
-          // Trigger OrderProvider notification handling
           try {
             final orderProvider = Provider.of<OrderProvider>(context, listen: false);
             orderProvider.handleOrderAssignmentNotification(message.data);
@@ -123,7 +145,13 @@ class FcmService {
     // Handle notification tap when app is in background (but not terminated)
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print('FCM: Message opened from background: ${message.data}');
-      _handleNotificationTap(message.data);
+      
+      // Check if it's an order offer - trigger dialog
+      if (message.data['type'] == 'order_offer' && _onOfferReceived != null) {
+        _onOfferReceived!(message.data);
+      } else {
+        _handleNotificationTap(message.data);
+      }
     });
 
     // Handle notification tap when app is terminated
@@ -131,9 +159,37 @@ class FcmService {
     if (initialMessage != null) {
       print('FCM: Message opened from terminated state: ${initialMessage.data}');
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _handleNotificationTap(initialMessage.data);
+        if (initialMessage.data['type'] == 'order_offer' && _onOfferReceived != null) {
+          _onOfferReceived!(initialMessage.data);
+        } else {
+          _handleNotificationTap(initialMessage.data);
+        }
       });
     }
+  }
+
+  /// Create high-importance notification channel for order offers (Android)
+  Future<void> _createOrderOfferChannel() async {
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'order_offer_channel', // Must match Cloud Function channelId
+      'Order Offers',
+      description: 'High priority notifications for new order offers',
+      importance: Importance.max, // MAX importance = heads-up display
+      playSound: true,
+      enableVibration: true,
+      showBadge: true,
+    );
+
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+    
+    print('FCM: Created order_offer_channel with MAX importance');
+  }
+
+  /// Set the callback for when an order offer notification is received
+  void setOfferCallback(Function(Map<String, dynamic>) callback) {
+    _onOfferReceived = callback;
   }
 
   void _handleNotificationTap(Map<String, dynamic> data) {
