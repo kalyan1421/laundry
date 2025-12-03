@@ -44,12 +44,23 @@ exports.startDriverSearch = onDocumentCreated(
       const orderId = event.params.orderId;
       const orderData = event.data.data();
 
-      if (!orderData) return null;
+      console.log(`🚀 NEW ORDER CREATED: ${orderId}`);
+      console.log(`📋 Order status: ${orderData?.status}`);
+      console.log(`📋 Assignment status: ${orderData?.assignmentStatus}`);
+
+      if (!orderData) {
+        console.log("❌ No order data found");
+        return null;
+      }
 
       // Only start search for brand new orders
       const status = orderData.status?.toString().toLowerCase();
-      if (status !== "pending" && status !== "new") return null;
+      if (status !== "pending" && status !== "new") {
+        console.log(`⏭️ Skipping - status is ${status}, not pending/new`);
+        return null;
+      }
 
+      console.log("✅ Starting driver search for order:", orderId);
       return assignToNearestDriver(orderId, {
         ...orderData,
         assignmentStatus: orderData.assignmentStatus ?? "searching",
@@ -147,14 +158,28 @@ async function assignToNearestDriver(orderId, orderData) {
   const rejectedDrivers = Array.isArray(orderData.rejectedByDrivers) ?
     orderData.rejectedByDrivers : [];
 
+  console.log(`🔍 Searching drivers for order: ${orderId}`);
+
+  // DEBUG: First check ALL drivers to see their status
+  const allDriversSnap = await db.collection("delivery").get();
+  console.log(`📊 Total drivers in system: ${allDriversSnap.size}`);
+
+  allDriversSnap.forEach((doc) => {
+    const d = doc.data();
+    console.log(`👤 Driver ${doc.id}: isOnline=${d.isOnline},`,
+        `isAvailable=${d.isAvailable}, hasFCM=${!!d.fcmToken}`);
+  });
+
   // 1. Fetch ALL online & available drivers
   const driversSnap = await db.collection("delivery")
       .where("isOnline", "==", true)
       .where("isAvailable", "==", true)
       .get();
 
+  console.log(`✅ Online & Available drivers: ${driversSnap.size}`);
+
   if (driversSnap.empty) {
-    console.log("No drivers online for order", orderId);
+    console.log("❌ No drivers online for order", orderId);
     return null;
   }
 
@@ -165,6 +190,8 @@ async function assignToNearestDriver(orderId, orderData) {
     const dData = doc.data();
     drivers.push({id: doc.id, ...dData});
   });
+
+  console.log(`📝 Eligible drivers after filtering: ${drivers.length}`);
 
   const pickupLat = orderData.latitude || orderData.pickupLatitude;
   const pickupLng = orderData.longitude || orderData.pickupLongitude;
@@ -235,15 +262,25 @@ function getDistance(lat1, lon1, lat2, lon2) {
  */
 async function sendDriverAssignmentNotification(orderId, driverId) {
   try {
+    console.log(`📱 Sending notification to driver: ${driverId}`);
+
     const db = getFirestore();
     const deliveryDoc = await db.collection("delivery").doc(driverId).get();
 
-    if (!deliveryDoc.exists) return null;
+    if (!deliveryDoc.exists) {
+      console.log(`❌ Driver document not found: ${driverId}`);
+      return null;
+    }
 
     const driverData = deliveryDoc.data();
     const token = driverData.fcmToken;
+    console.log(`🔑 FCM Token exists: ${!!token}`);
+    if (token) {
+      console.log(`🔑 Token preview: ${token.substring(0, 30)}...`);
+    }
+
     if (!token) {
-      console.log("No FCM token for driver:", driverId);
+      console.log(`❌ No FCM token for driver: ${driverId}`);
       return null;
     }
 

@@ -116,6 +116,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         bool hasPermission = await _locationService.initialize();
         if (hasPermission) {
           await _locationService.goOnline(widget.deliveryPartner.id);
+          
+          // IMPORTANT: Also save FCM token when going online
+          try {
+            final fcmToken = await FirebaseMessaging.instance.getToken();
+            if (fcmToken != null) {
+              await FirebaseFirestore.instance
+                  .collection('delivery')
+                  .doc(widget.deliveryPartner.id)
+                  .update({'fcmToken': fcmToken});
+              print('🔔 FCM Token saved: ${fcmToken.substring(0, 30)}...');
+            }
+          } catch (e) {
+            print('🔔 Error saving FCM token: $e');
+          }
+          
           setState(() => _isOnline = true);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
