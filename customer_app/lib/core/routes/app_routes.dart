@@ -13,9 +13,11 @@ import 'package:customer_app/presentation/screens/profile/ironing_preferences_sc
 import 'package:customer_app/presentation/screens/profile/help_screen.dart';
 import 'package:customer_app/presentation/screens/profile/settings_screen.dart';
 import 'package:customer_app/presentation/screens/profile/saved_items_screen.dart';
+import 'package:customer_app/presentation/screens/profile/legal_content_screen.dart';
 import 'package:customer_app/presentation/screens/splash/splash_screen.dart';
 import 'package:customer_app/presentation/screens/profile/add_address_screen.dart';
 import 'package:customer_app/presentation/screens/home/allied_services_screen.dart';
+import 'package:customer_app/core/constants/legal_constants.dart';
 import 'package:customer_app/data/models/address_model.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -23,6 +25,9 @@ import 'package:provider/provider.dart';
 
 
 class AppRoutes {
+  static const String terms = '/terms';
+  static const String privacy = '/privacy';
+  static const String cancellation = '/cancellation';
   static const String splash = '/';
   static const String login = '/login';
   static const String otpVerification = '/otp-verification';
@@ -128,10 +133,31 @@ class AppRoutes {
       case savedItems:
         return MaterialPageRoute(builder: (_) => const SavedItemsScreen());
 
+      case terms:
+        return MaterialPageRoute(
+          builder: (_) => LegalContentScreen(
+            content: LegalContent.termsAndConditions,
+          ),
+        );
+      
+      case privacy:
+        return MaterialPageRoute(
+          builder: (_) => LegalContentScreen(
+            content: LegalContent.privacyPolicy,
+          ),
+        );
+      
+      case cancellation:
+        return MaterialPageRoute(
+          builder: (_) => LegalContentScreen(
+            content: LegalContent.cancellationPolicy,
+          ),
+        );
+
       default:
         print("Unhandled route: ${settings.name}");
         return MaterialPageRoute(
-          builder: (_) => Scaffold(
+          builder: (context) => Scaffold(
             appBar: AppBar(title: const Text("Error")),
             body: Center(
               child: Text('No route defined for ${settings.name}'),
@@ -168,8 +194,6 @@ class AppRoutes {
   static void navigateToAddAddress(BuildContext context) {
     Navigator.pushReplacementNamed(context, addAddress);
   }
-
-
 }
 
 // Profile Completion Check Widget

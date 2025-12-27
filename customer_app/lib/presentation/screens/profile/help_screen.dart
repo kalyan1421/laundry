@@ -199,20 +199,33 @@ class HelpScreen extends StatelessWidget {
                     'Found an issue? Let us know',
                     () => _reportBug(context),
                   ),
-                  _buildMoreOption(
-                    context,
-                    Icons.description,
-                    'Terms & Conditions',
-                    'Read our terms and conditions',
-                    () => _openTerms(),
-                  ),
-                  _buildMoreOption(
-                    context,
-                    Icons.privacy_tip,
-                    'Privacy Policy',
-                    'Read our privacy policy',
-                    () => _openPrivacyPolicy(),
-                  ),
+                  const Divider(),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              "Legal",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+          ),
+          
+          _buildLegalTile(
+            context,
+            icon: Icons.description_outlined,
+            title: "Terms & Conditions",
+            onTap: () => Navigator.pushNamed(context, '/terms'),
+          ),
+          _buildLegalTile(
+            context,
+            icon: Icons.privacy_tip_outlined,
+            title: "Privacy Policy",
+            onTap: () => Navigator.pushNamed(context, '/privacy'),
+          ),
+          _buildLegalTile(
+            context,
+            icon: Icons.policy_outlined,
+            title: "Cancellation & Refund",
+            onTap: () => Navigator.pushNamed(context, '/cancellation'),
+          ),
                 ],
               ),
             ),
@@ -501,5 +514,33 @@ $playStoreUrl
   void _openPrivacyPolicy() {
     // Implement privacy policy
     print('Privacy policy tapped');
+  }
+
+  Widget _buildLegalTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: Colors.grey[700],
+        size: 24,
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      trailing: const Icon(
+        Icons.arrow_forward_ios,
+        size: 16,
+        color: Colors.grey,
+      ),
+      onTap: onTap,
+    );
   }
 }

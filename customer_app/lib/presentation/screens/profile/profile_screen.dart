@@ -311,20 +311,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 _buildMenuItem(
                   context,
-                  Icons.shield_outlined, // Or Icons.privacy_tip_outlined
-                  'Privacy & Terms',
-                  () {
-                    /* TODO: Navigate to Privacy & Terms Screen */
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Privacy & Terms: TBD')));
-                  },
+                  Icons.description_outlined,
+                  'Terms & Conditions',
+                  () => Navigator.pushNamed(context, AppRoutes.terms),
                 ),
-                // _buildMenuItem(
-                //   context,
-                //   Icons.settings_outlined,
-                //   'App Settings',
-                //   () => Navigator.pushNamed(context, AppRoutes.appSettings),
-                // ),
+                _buildMenuItem(
+                  context,
+                  Icons.privacy_tip_outlined,
+                  'Privacy Policy',
+                  () => Navigator.pushNamed(context, AppRoutes.privacy),
+                ),
+                _buildMenuItem(
+                  context,
+                  Icons.policy_outlined,
+                  'Cancellation & Refund',
+                  () => Navigator.pushNamed(context, AppRoutes.cancellation),
+                ),
               ],
             ),
             _buildSignOutButton(context, authProvider),
