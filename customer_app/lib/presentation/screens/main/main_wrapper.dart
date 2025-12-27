@@ -49,6 +49,7 @@ class _MainWrapperState extends State<MainWrapper> with AuthValidationMixin {
   void initState() {
     super.initState();
     _checkUserProfile();
+    _loadUserAddresses();
   }
 
   void _checkUserProfile() {
@@ -63,6 +64,19 @@ class _MainWrapperState extends State<MainWrapper> with AuthValidationMixin {
     } else {
       _logger.d('User profile is complete. No navigation needed.');
     }
+  }
+
+  // Load user addresses on app launch to fix address not showing issue
+  void _loadUserAddresses() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.userModel != null) {
+        // Refresh user data to ensure addresses are loaded on app launch
+        _logger.d('Refreshing user data to load addresses...');
+        await authProvider.refreshUserData();
+        _logger.d('User data refreshed. Addresses count: ${authProvider.userModel?.addresses.length ?? 0}');
+      }
+    });
   }
 
   @override

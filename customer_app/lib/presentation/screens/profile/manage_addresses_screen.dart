@@ -8,6 +8,8 @@ import 'package:customer_app/core/theme/app_colors.dart';
 import 'package:customer_app/core/theme/app_text_theme.dart';
 import 'package:customer_app/core/theme/theme_extensions.dart';
 import 'package:customer_app/core/utils/address_formatter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'dart:math' as math;
 
 class ManageAddressesScreen extends StatefulWidget {
   const ManageAddressesScreen({super.key});
@@ -18,12 +20,14 @@ class ManageAddressesScreen extends StatefulWidget {
 
 class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
   late final AddressProvider _addressProvider;
+  Position? _currentPosition;
 
   @override
   void initState() {
     super.initState();
     _addressProvider = Provider.of<AddressProvider>(context, listen: false);
     _startListeningToAddresses();
+    _getCurrentLocation();
   }
 
   void _startListeningToAddresses() {
@@ -35,6 +39,17 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
     }
   }
 
+  Future<void> _getCurrentLocation() async {
+    try {
+      _currentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
+      setState(() {});
+    } catch (e) {
+      print('Error getting current location: $e');
+    }
+  }
+
   @override
   void dispose() {
     // Stop listening when screen is disposed
@@ -42,430 +57,552 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
     super.dispose();
   }
 
-  Future<void> _testCoordinateSaving() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.userModel == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User not authenticated')),
-      );
-      return;
+  // Calculate distance between two points
+  String _calculateDistance(AddressModel address) {
+    if (_currentPosition == null || address.latitude == null || address.longitude == null) {
+      return '';
     }
 
-    try {
-      // Test coordinates - San Francisco coordinates
-      const double testLat = 37.7749;
-      const double testLng = -122.4194;
+    double distanceInMeters = Geolocator.distanceBetween(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+      address.latitude!,
+      address.longitude!,
+    );
 
-      print('🧪 TEST: Saving test coordinates...');
-      print('🧪 TEST: Latitude: $testLat (Type: ${testLat.runtimeType})');
-      print('🧪 TEST: Longitude: $testLng (Type: ${testLng.runtimeType})');
-
-      final testAddressData = {
-        'type': 'test',
-        'addressLine1': 'Test Address Line 1',
-        'addressLine2': 'Test Address Line 2',
-        'city': 'Test City',
-        'state': 'Test State',
-        'pincode': '123456',
-        'landmark': 'Test Landmark',
-        'latitude': testLat,
-        'longitude': testLng,
-        'isPrimary': false,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'isTestData': true, // Flag to identify test data
-      };
-
-      print('🧪 TEST: Saving to Firestore...');
-      final docRef = await FirebaseFirestore.instance
-          .collection('customer')
-          .doc(authProvider.userModel!.uid)
-          .collection('addresses')
-          .add(testAddressData);
-
-      print('🧪 TEST: Document saved with ID: ${docRef.id}');
-
-      // Verify the saved data
-      final savedDoc = await docRef.get();
-      if (savedDoc.exists) {
-        final savedData = savedDoc.data() as Map<String, dynamic>;
-        print(
-            '🧪 TEST: Verification - Saved latitude: ${savedData['latitude']} (Type: ${savedData['latitude'].runtimeType})');
-        print(
-            '🧪 TEST: Verification - Saved longitude: ${savedData['longitude']} (Type: ${savedData['longitude'].runtimeType})');
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Test coordinates saved successfully!\nLat: ${savedData['latitude']}\nLng: ${savedData['longitude']}'),
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      } else {
-        print('🧪 TEST: ERROR - Document not found after saving');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Error: Document not found after saving')),
-        );
-      }
-
-      // Refresh the address list
-      _startListeningToAddresses();
-    } catch (e) {
-      print('🧪 TEST: ERROR - Exception: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving test coordinates: $e')),
-      );
+    if (distanceInMeters < 1000) {
+      return '${distanceInMeters.round()} m';
+    } else {
+      return '${(distanceInMeters / 1000).toStringAsFixed(1)} km';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Addresses'),
-        // AppBar theme is handled by the theme system
-        actions: [
-          // IconButton(
-          //   icon: const Icon(Icons.bug_report,),
-          //   onPressed: _testCoordinateSaving,
-          // ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _startListeningToAddresses,
-          ),
-        ],
-      ),
-      body: Consumer<AddressProvider>(
-        builder: (context, addressProvider, child) {
-          if (addressProvider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (addressProvider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error, size: 64, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error: ${addressProvider.error}',
-                    style: const TextStyle(fontSize: 16, color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _startListeningToAddresses,
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (addressProvider.addresses.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.location_off,
-                      size: 64, color: context.onSurfaceVariant),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No addresses found',
-                    style: context.titleLarge
-                        ?.copyWith(color: context.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add your first address to get started',
-                    style: context.bodyMedium
-                        ?.copyWith(color: context.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/add-address-screen');
-                    },
-                    icon: const Icon(Icons.add_location, color: Colors.white),
-                    label: const Text('Add Address'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
+      backgroundColor: context.backgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Custom header
+            _buildHeader(),
+            
+            // Search bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: context.surfaceColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.outlineVariant),
+                ),
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search for area, street name...',
+                    hintStyle: TextStyle(
+                      color: context.onSurfaceColor.withOpacity(0.5),
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: context.primaryColor,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
                     ),
                   ),
-                ],
+                ),
               ),
-            );
-          }
+            ),
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: addressProvider.addresses.length,
-            itemBuilder: (context, index) {
-              final address = addressProvider.addresses[index];
-              return _buildAddressCard(address);
-            },
-          );
-        },
+            // Use current location option
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: context.surfaceColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.outlineVariant),
+                ),
+                child: Consumer<AuthProvider>(
+                  builder: (context, authProvider, child) {
+                    final currentAddress = authProvider.userModel?.primaryAddress;
+                    return ListTile(
+                      leading: Icon(
+                        Icons.my_location,
+                        color: context.primaryColor,
+                      ),
+                      title: Text(
+                        'Use current location',
+                        style: TextStyle(
+                          color: context.primaryColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: currentAddress != null
+                          ? Text(
+                              '${currentAddress.addressLine1}, ${currentAddress.city}',
+                              style: TextStyle(
+                                color: context.onSurfaceColor.withOpacity(0.6),
+                                fontSize: 12,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : null,
+                      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                      onTap: () {
+                        // Navigate to add address with current location
+                        Navigator.pushNamed(context, '/add-address-screen');
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // Add Address option
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: context.surfaceColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.outlineVariant),
+                ),
+                child: ListTile(
+                  leading: Icon(
+                    Icons.add,
+                    color: context.primaryColor,
+                  ),
+                  title: Text(
+                    'Add Address',
+                    style: TextStyle(
+                      color: context.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                  onTap: () {
+                    Navigator.pushNamed(context, '/add-address-screen');
+                  },
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Saved addresses section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'SAVED ADDRESSES',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: context.onSurfaceColor.withOpacity(0.5),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Address list
+            Expanded(
+              child: Consumer<AddressProvider>(
+                builder: (context, addressProvider, child) {
+                  if (addressProvider.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (addressProvider.error != null) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error, size: 64, color: Colors.red),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error: ${addressProvider.error}',
+                            style: const TextStyle(fontSize: 16, color: Colors.red),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _startListeningToAddresses,
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  if (addressProvider.addresses.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.location_off,
+                              size: 64, color: context.onSurfaceVariant),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No addresses found',
+                            style: context.titleLarge
+                                ?.copyWith(color: context.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Add your first address to get started',
+                            style: context.bodyMedium
+                                ?.copyWith(color: context.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: addressProvider.addresses.length,
+                    itemBuilder: (context, index) {
+                      final address = addressProvider.addresses[index];
+                      return _buildAddressCard(address);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(context, '/add-address-screen');
-        },
-        // FAB theme is handled by the theme system
-        child: const Icon(Icons.add, color: Colors.white),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Icon(
+              Icons.expand_more,
+              size: 28,
+              color: context.onBackgroundColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Select a location',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: context.onBackgroundColor,
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildAddressCard(AddressModel address) {
-    final hasCoordinates =
-        address.latitude != null && address.longitude != null;
+    final hasCoordinates = address.latitude != null && address.longitude != null;
+    final distance = _calculateDistance(address);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    return Card(
-        margin: const EdgeInsets.only(bottom: 18),
-        elevation: address.isPrimary ? 4 : 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16), // Consistent with theme
-          side: BorderSide(
+    return GestureDetector(
+      onTap: () async {
+        // Tap to set as primary and go back
+        await _setPrimaryAddress(address.id);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: address.isPrimary
+              ? context.primaryColor.withOpacity(0.05)
+              : context.surfaceColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
             color: address.isPrimary
-                ? context.secondaryColor
+                ? context.primaryColor.withOpacity(0.3)
                 : context.outlineVariant,
             width: address.isPrimary ? 1.5 : 1.0,
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            // mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Address Type and Primary Status
-              Row(
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: context.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      address.type.toUpperCase(),
-                      style: context.bodySmall?.copyWith(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? context.secondaryColor
-                            : context.primaryColor,
-                        fontWeight: FontWeight.bold,
-                      ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icon and distance column
+            Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: context.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    _getAddressTypeIcon(address.type),
+                    color: context.primaryColor,
+                    size: 20,
+                  ),
+                ),
+                if (distance.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    distance,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: context.onSurfaceColor.withOpacity(0.5),
                     ),
                   ),
-                  if (address.isPrimary) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: context.successColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'PRIMARY',
-                        style: context.bodySmall?.copyWith(
-                          color: context.successColor,
-                          fontWeight: FontWeight.bold,
+                ],
+              ],
+            ),
+            const SizedBox(width: 12),
+
+            // Address content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        address.typeDisplayName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: context.onSurfaceColor,
                         ),
                       ),
-                    ),
-                  ],
-                  // Remove test data check since it's not in AddressModel
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Formatted Address Display (Door Number, Floor Number, Full Address)
-              Text(
-                address.fullAddress,
-                style: context.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  height: 1.4,
-                ),
-              ),
-
-              // Coordinates Debug Info
-              // const SizedBox(height: 12),
-              // Container(
-              //   padding: const EdgeInsets.all(12),
-              //   decoration: BoxDecoration(
-              //     color: hasCoordinates ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-              //     borderRadius: BorderRadius.circular(8),
-              //     border: Border.all(
-              //       color: hasCoordinates ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
-              //     ),
-              //   ),
-              //   child: Column(
-              //     crossAxisAlignment: CrossAxisAlignment.start,
-              //     children: [
-              //       Row(
-              //         children: [
-              //           Icon(
-              //             hasCoordinates ? Icons.location_on : Icons.location_off,
-              //             size: 16,
-              //             color: hasCoordinates ? Colors.green : Colors.red,
-              //           ),
-              //           const SizedBox(width: 4),
-              //           Text(
-              //             'GPS Coordinates',
-              //             style: AppTextTheme.bodySmall.copyWith(
-              //               fontWeight: FontWeight.bold,
-              //               color: hasCoordinates ? Colors.green : Colors.red,
-              //             ),
-              //           ),
-              //         ],
-              //       ),
-              //       const SizedBox(height: 4),
-              //       if (hasCoordinates) ...[
-              //         Text(
-              //           'Lat: ${latitude.toString()}',
-              //           style: AppTextTheme.bodySmall.copyWith(fontFamily: 'monospace'),
-              //         ),
-              //         Text(
-              //           'Lng: ${longitude.toString()}',
-              //           style: AppTextTheme.bodySmall.copyWith(fontFamily: 'monospace'),
-              //         ),
-              //         Text(
-              //           'Type: ${latitude.runtimeType} / ${longitude.runtimeType}',
-              //           style: AppTextTheme.bodySmall.copyWith(
-              //             fontFamily: 'monospace',
-              //             color: Colors.grey[600],
-              //           ),
-              //         ),
-              //       ] else
-              //         Text(
-              //           'No coordinates saved',
-              //           style: AppTextTheme.bodySmall.copyWith(color: Colors.red),
-              //         ),
-              //     ],
-              //   ),
-              // ),
-
-              // Action buttons replaced with PopupMenuButton
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Primary badge (if applicable)
-                  if (address.isPrimary)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: context.successColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: context.successColor),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.star,
-                              size: 12, color: context.successColor),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Primary',
+                      if (address.isPrimary) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: context.successColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'PRIMARY',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                               color: context.successColor,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    address.fullAddress,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.onSurfaceColor.withOpacity(0.7),
+                      height: 1.4,
                     ),
-                  const Spacer(),
-                  // Three-dot menu
-                  PopupMenuButton<String>(
-                    onSelected: (value) {
-                      switch (value) {
-                        case 'set_primary':
-                          _setPrimaryAddress(address.id);
-                          break;
-                        case 'edit':
-                          _editAddress(address);
-                          break;
-                        case 'delete':
-                          _deleteAddress(address.id);
-                          break;
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      if (!address.isPrimary)
-                        PopupMenuItem<String>(
-                          value: 'set_primary',
-                          child: Row(
-                            children: [
-                              Icon(Icons.star_outline,
-                                  size: 20, color: context.warningColor),
-                              const SizedBox(width: 12),
-                              const Text('Set as Primary'),
-                            ],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Phone number: +91-${authProvider.userModel?.phoneNumber.replaceAll('+91', '') ?? ''}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.onSurfaceColor.withOpacity(0.5),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Action buttons row
+                  Row(
+                    children: [
+                      // Options button (three dots)
+                      GestureDetector(
+                        onTap: () => _showAddressOptions(address),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: context.surfaceVariant,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.more_horiz,
+                            size: 18,
+                            color: context.onSurfaceColor.withOpacity(0.6),
                           ),
                         ),
-                      PopupMenuItem<String>(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit,
-                                size: 20, color: context.primaryColor),
-                            SizedBox(width: 12),
-                            Text('Edit'),
-                          ],
-                        ),
                       ),
-                      PopupMenuItem<String>(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete,
-                                size: 20, color: context.errorColor),
-                            SizedBox(width: 12),
-                            Text('Delete'),
-                          ],
+                      const SizedBox(width: 8),
+                      // Share button
+                      GestureDetector(
+                        onTap: () {
+                          // Share functionality
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Share feature coming soon')),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: context.surfaceVariant,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.share_outlined,
+                            size: 18,
+                            color: context.onSurfaceColor.withOpacity(0.6),
+                          ),
                         ),
                       ),
                     ],
-                    icon: const Icon(Icons.more_vert, color: Colors.grey),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getAddressTypeIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'home':
+        return Icons.home_outlined;
+      case 'work':
+        return Icons.work_outline;
+      default:
+        return Icons.location_on_outlined;
+    }
+  }
+
+  void _showAddressOptions(AddressModel address) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: context.surfaceColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              
+              // Close button
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[600],
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
               ),
 
-              // Timestamps
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Icon(Icons.access_time,
-                      size: 14, color: context.onSurfaceVariant),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Created: ${_formatTimestamp(address.createdAt)}',
-                    style: context.bodySmall
-                        ?.copyWith(color: context.onSurfaceVariant),
+              // Title
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Address options',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: context.onSurfaceColor,
+                    ),
                   ),
-                ],
-                // ),
+                ),
               ),
+
+              // Edit option
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: context.surfaceVariant,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.edit_outlined,
+                    color: context.onSurfaceColor,
+                  ),
+                ),
+                title: const Text('Edit Address'),
+                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editAddress(address);
+                },
+              ),
+
+              // Delete option
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: context.surfaceVariant,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.delete_outline,
+                    color: context.onSurfaceColor,
+                  ),
+                ),
+                title: const Text('Delete Address'),
+                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteAddress(address.id);
+                },
+              ),
+
+              const SizedBox(height: 30),
             ],
           ),
-        )
-        // ),
         );
+      },
+    );
   }
 
   Future<void> _setPrimaryAddress(String addressId) async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final addressProvider =
-          Provider.of<AddressProvider>(context, listen: false);
+      final addressProvider = Provider.of<AddressProvider>(context, listen: false);
 
       if (authProvider.userModel == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -493,12 +630,18 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
 
       await batch.commit();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Primary address updated successfully')),
-      );
-
       // Refresh user data in AuthProvider to reflect the change globally
       await authProvider.refreshUserData();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Address set as primary'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Go back to previous screen
+      Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error updating primary address: $e')),
@@ -557,6 +700,9 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
             authProvider.userModel!.uid, addressId);
 
         if (success) {
+          // Refresh user data
+          await authProvider.refreshUserData();
+          
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Address deleted successfully')),
           );
@@ -572,25 +718,6 @@ class _ManageAddressesScreenState extends State<ManageAddressesScreen> {
           SnackBar(content: Text('Error deleting address: $e')),
         );
       }
-    }
-  }
-
-  String _formatTimestamp(dynamic timestamp) {
-    if (timestamp == null) return 'Unknown';
-
-    try {
-      DateTime date;
-      if (timestamp is Timestamp) {
-        date = timestamp.toDate();
-      } else if (timestamp is DateTime) {
-        date = timestamp;
-      } else {
-        return timestamp.toString();
-      }
-
-      return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return 'Invalid date';
     }
   }
 }

@@ -43,6 +43,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     'out_for_delivery',
     'delivered',
     'completed',
+    'cancelled',
   ];
 
   @override
@@ -482,10 +483,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _order!.status,
-                    decoration: const InputDecoration(
+                    value: _orderStatuses.contains(_order!.status) ? _order!.status : null,
+                    decoration: InputDecoration(
                       labelText: 'Current Status',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      hintText: !_orderStatuses.contains(_order!.status) 
+                          ? 'Unknown: ${_order!.status}' 
+                          : null,
                     ),
                     items:
                         _orderStatuses.map((status) {

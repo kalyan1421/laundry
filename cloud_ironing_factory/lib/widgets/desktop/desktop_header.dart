@@ -461,8 +461,49 @@ class _ResponsiveHeaderState extends State<ResponsiveHeader> {
           ),
           _buildDivider(),
           _buildMobileNavLink('Contact Us', 300.0, Icons.headset_mic_outlined),
+          _buildDivider(),
+          _buildTermsNavLink(),
           const SizedBox(height: 16),
         ],
+      ),
+    );
+  }
+
+  // Terms & Conditions Navigation Link
+  Widget _buildTermsNavLink() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _isMenuOpen = false;
+          });
+          Navigator.of(context).pushNamed('/terms');
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: double.infinity,
+          padding: ResponsiveHelper.getResponsivePadding(
+            context,
+            mobile: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            tablet: const EdgeInsets.symmetric(vertical: 18, horizontal: 30),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.description_outlined, color: const Color(0xFF1E3A8A), size: 20),
+              const SizedBox(width: 16),
+              ResponsiveText(
+                'Terms & Conditions',
+                mobileSize: 16,
+                tabletSize: 17,
+                desktopSize: 18,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF1E3A8A),
+                fontFamily: AppTheme.primaryFont,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

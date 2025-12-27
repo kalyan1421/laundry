@@ -5,8 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/allied_service_provider.dart';
 import '../../models/allied_service_model.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/custom_text_field.dart';
 
 class ManageAlliedServices extends StatefulWidget {
   const ManageAlliedServices({super.key});
@@ -17,6 +15,8 @@ class ManageAlliedServices extends StatefulWidget {
 
 class _ManageAlliedServicesState extends State<ManageAlliedServices> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
   
   final List<String> _subCategories = [
     'Allied Services',
@@ -28,10 +28,19 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
   void initState() {
     super.initState();
     _tabController = TabController(length: _subCategories.length, vsync: this);
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase().trim();
+    });
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -42,87 +51,136 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
-     
-      
-      body: StreamBuilder<List<AlliedServiceModel>>(
-        stream: alliedServiceProvider.alliedServicesStream(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0F3057)),
-                  ),
-                  SizedBox(height: 16),
-                  Text('Loading services...'),
-                ],
-              ),
-            );
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
+      body: Column(
+        children: [
+          // Search Bar - Outside StreamBuilder to prevent rebuild on stream update
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'Search services...',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.clear, color: Colors.grey[500]),
+                        onPressed: () {
+                          _searchController.clear();
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: Colors.grey[100],
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  borderSide: BorderSide.none,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Error loading services',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${snapshot.error}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton.icon(
-                      onPressed: () => alliedServiceProvider.loadAlliedServices(),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F3057),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      ),
-                    ),
-                  ],
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF0F3057), width: 1.5),
                 ),
               ),
-            );
-          }
+            ),
+          ),
+          // StreamBuilder for the rest of the content
+          Expanded(
+            child: StreamBuilder<List<AlliedServiceModel>>(
+              stream: alliedServiceProvider.alliedServicesStream(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0F3057)),
+                        ),
+                        SizedBox(height: 16),
+                        Text('Loading services...'),
+                      ],
+                    ),
+                  );
+                }
 
-          final alliedServices = snapshot.data ?? [];
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.1),
+                            spreadRadius: 1,
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error loading services',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[800],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${snapshot.error}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            onPressed: () => alliedServiceProvider.loadAlliedServices(),
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F3057),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
 
-          return Column(
-            children: [
-              // Enhanced Tab Bar
+                final alliedServices = snapshot.data ?? [];
+
+                return Column(
+                  children: [
+                    // Enhanced Tab Bar
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -238,9 +296,18 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
                 child: TabBarView(
                   controller: _tabController,
                   children: _subCategories.map((subCategory) {
-                    final servicesInCategory = alliedServices
+                    var servicesInCategory = alliedServices
                         .where((service) => service.subCategory == subCategory)
                         .toList();
+                    
+                    // Apply search filter
+                    if (_searchQuery.isNotEmpty) {
+                      servicesInCategory = servicesInCategory.where((service) {
+                        return service.name.toLowerCase().contains(_searchQuery) ||
+                               service.description.toLowerCase().contains(_searchQuery) ||
+                               service.subCategory.toLowerCase().contains(_searchQuery);
+                      }).toList();
+                    }
                     
                     // Sort services by sortOrder, then by name
                     servicesInCategory.sort((a, b) {
@@ -256,9 +323,13 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
               ),
             ],
           );
-        },
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'add_allied_service_fab',
         onPressed: () {
           if (mounted) {
             Navigator.push(
@@ -290,6 +361,9 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
 
   Widget _buildTabContent(String subCategory, List<AlliedServiceModel> services, AlliedServiceProvider provider) {
     if (services.isEmpty) {
+      // Check if it's empty due to search or no services at all
+      final isSearchResult = _searchQuery.isNotEmpty;
+      
       return Container(
         padding: const EdgeInsets.all(24),
         child: Center(
@@ -299,18 +373,24 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
               Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: _getSubCategoryColor(subCategory).withOpacity(0.1),
+                  color: isSearchResult 
+                      ? Colors.grey.withOpacity(0.1)
+                      : _getSubCategoryColor(subCategory).withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  _getSubCategoryIcon(subCategory),
+                  isSearchResult ? Icons.search_off : _getSubCategoryIcon(subCategory),
                   size: 64,
-                  color: _getSubCategoryColor(subCategory),
+                  color: isSearchResult 
+                      ? Colors.grey[400]
+                      : _getSubCategoryColor(subCategory),
                 ),
               ),
               const SizedBox(height: 24),
               Text(
-                'No $subCategory Found',
+                isSearchResult 
+                    ? 'No Results Found'
+                    : 'No $subCategory Found',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -319,7 +399,9 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
               ),
               const SizedBox(height: 8),
               Text(
-                'Add your first $subCategory service to get started',
+                isSearchResult
+                    ? 'No services match "$_searchQuery" in $subCategory'
+                    : 'Add your first $subCategory service to get started',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[600],
@@ -327,27 +409,45 @@ class _ManageAlliedServicesState extends State<ManageAlliedServices> with Single
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AddAlliedServiceScreen(),
+              if (isSearchResult)
+                OutlinedButton.icon(
+                  onPressed: () {
+                    _searchController.clear();
+                  },
+                  icon: const Icon(Icons.clear),
+                  label: const Text('Clear Search'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0F3057),
+                    side: const BorderSide(color: Color(0xFF0F3057)),
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
-                  );
-                },
-                icon: const Icon(Icons.add),
-                label: Text('Add $subCategory Service'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _getSubCategoryColor(subCategory),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  textStyle: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              else
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddAlliedServiceScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.add),
+                  label: Text('Add $subCategory Service'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _getSubCategoryColor(subCategory),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

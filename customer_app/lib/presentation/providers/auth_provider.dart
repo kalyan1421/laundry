@@ -494,6 +494,7 @@ class AuthProvider extends ChangeNotifier {
     String? doorNumber,
     String? floorNumber,
     String? apartmentName,
+    String addressType = 'home', // Added addressType parameter
   }) async {
     if (_userModel == null) return false;
 
@@ -569,6 +570,7 @@ class AuthProvider extends ChangeNotifier {
       _logger.i('City: $city');
       _logger.i('State: $state');
       _logger.i('Pincode: $pincode');
+      _logger.i('Address Type: $addressType');
       _logger.i('Latitude: $latitude (Type: ${latitude.runtimeType})');
       _logger.i('Longitude: $longitude (Type: ${longitude.runtimeType})');
 
@@ -585,7 +587,7 @@ class AuthProvider extends ChangeNotifier {
         pincode: pincode,
         addressLine2: addressLine2,
         apartmentName: extractedApartmentName,
-        addressType: 'home',
+        addressType: addressType, // Use the passed addressType parameter
         latitude: latitude,
         longitude: longitude,
         isPrimary: true, // First address is always primary

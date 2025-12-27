@@ -1,5 +1,5 @@
 // providers/banner_provider.dart
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -30,19 +30,26 @@ class BannerProvider with ChangeNotifier {
             .toList());
   }
   
-  Future<File?> pickImage() async {
+  /// Picks an image and returns XFile for cross-platform compatibility (web + mobile)
+  Future<XFile?> pickImage() async {
     final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      return File(pickedFile.path);
-    } 
-    return null;
+    return pickedFile;
   }
   
-  Future<String?> _uploadImage(File imageFile, String bannerId) async {
+  /// Uploads image using bytes (works on both web and mobile)
+  Future<String?> _uploadImage(XFile imageFile, String bannerId) async {
     try {
       String fileName = 'banner_${bannerId}_${DateTime.now().millisecondsSinceEpoch}.png';
       Reference storageRef = _storage.ref().child('banner_images/$fileName');
-      UploadTask uploadTask = storageRef.putFile(imageFile);
+      
+      // Read as bytes for cross-platform compatibility (web + mobile)
+      Uint8List imageBytes = await imageFile.readAsBytes();
+      
+      // Use putData instead of putFile for web compatibility
+      UploadTask uploadTask = storageRef.putData(
+        imageBytes,
+        SettableMetadata(contentType: 'image/png'),
+      );
       TaskSnapshot taskSnapshot = await uploadTask;
       return await taskSnapshot.ref.getDownloadURL();
     } catch (e) {
@@ -52,7 +59,7 @@ class BannerProvider with ChangeNotifier {
   }
   
   Future<void> addBanner({
-    required File imageFile,
+    required XFile imageFile,
   }) async {
     try {
       DocumentReference docRef = _firestore.collection(_bannersCollection).doc();

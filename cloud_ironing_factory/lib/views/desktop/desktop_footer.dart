@@ -5,6 +5,11 @@ import '../../theme/app_theme.dart';
 class DesktopFooter extends StatelessWidget {
   const DesktopFooter({Key? key}) : super(key: key);
 
+  void _scrollToTop(BuildContext context) {
+    // Navigate to home and scroll to top
+    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -78,7 +83,7 @@ class DesktopFooter extends StatelessWidget {
                   ],
                 ),
               ),
-
+              const SizedBox(width: 20),
               // Quick Links
               Expanded(
                 flex: 2,
@@ -94,10 +99,11 @@ class DesktopFooter extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    _buildFooterLink('Home'),
-                    _buildFooterLink('About'),
-                    _buildFooterLink('Services'),
-                    _buildFooterLink('Contact Us'),
+                    // Home - scrolls to top
+                    _buildHomeLink(context),
+                    _buildLegalLink(context, 'Terms & Conditions', '/terms'),
+                    _buildLegalLink(context, 'Cancellation & Refund', '/cancellation'),
+                    _buildLegalLink(context, 'Privacy Policy', '/privacy'),
                   ],
                 ),
               ),
@@ -152,7 +158,6 @@ class DesktopFooter extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        // color: AppTheme.white,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Image.asset(
@@ -183,19 +188,16 @@ class DesktopFooter extends StatelessWidget {
           const Divider(color: Colors.white30),
           const SizedBox(height: 20),
 
-          // Bottom Bar - Made responsive with Wrap
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            runSpacing: 20.0, // Spacing between rows in the wrap
+          // Bottom Bar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                '© 2024 Cloud Ironing Factory. All rights reserved.',
+                '© 2024 Cloud Ironing Factory Pvt Ltd. All rights reserved.',
                 style: TextStyle(color: Colors.white70, fontSize: 14),
               ),
-              const SizedBox(width: 20), // Provide some spacing
               Row(
-                mainAxisSize: MainAxisSize.min, // Row takes minimum space
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildSocialIcon(Icons.facebook, () {}),
                   const SizedBox(width: 16),
@@ -211,12 +213,29 @@ class DesktopFooter extends StatelessWidget {
     );
   }
 
-  Widget _buildFooterLink(String text) {
+  Widget _buildHomeLink(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: InkWell(
+        onTap: () => _scrollToTop(context),
+        hoverColor: Colors.transparent,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: const Text(
+            'Home',
+            style: TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegalLink(BuildContext context, String text, String route) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: InkWell(
         onTap: () {
-          // Handle navigation
+          Navigator.of(context).pushNamed(route);
         },
         hoverColor: Colors.transparent,
         child: MouseRegion(

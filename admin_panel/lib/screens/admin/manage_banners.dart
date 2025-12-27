@@ -1,8 +1,7 @@
 // screens/admin/manage_banners.dart
-import 'dart:io';
-import 'package:admin_panel/widgets/custom_button.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../providers/banner_provider.dart';
 import '../../models/banner_model.dart';
@@ -15,14 +14,17 @@ class ManageBanners extends StatefulWidget {
 }
 
 class _ManageBannersState extends State<ManageBanners> {
-  File? _selectedImage;
+  XFile? _selectedImage;
+  Uint8List? _selectedImageBytes; // For displaying image preview on web
 
   Future<void> _pickImage() async {
     final bannerProvider = Provider.of<BannerProvider>(context, listen: false);
-    final File? pickedImage = await bannerProvider.pickImage();
+    final XFile? pickedImage = await bannerProvider.pickImage();
     if (pickedImage != null) {
+      final bytes = await pickedImage.readAsBytes();
       setState(() {
         _selectedImage = pickedImage;
+        _selectedImageBytes = bytes;
       });
     }
   }
@@ -30,6 +32,7 @@ class _ManageBannersState extends State<ManageBanners> {
   void _clearSelectedImage() {
     setState(() {
       _selectedImage = null;
+      _selectedImageBytes = null;
     });
   }
 
@@ -50,7 +53,7 @@ class _ManageBannersState extends State<ManageBanners> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    _selectedImage != null
+                    _selectedImageBytes != null
                         ? Column(
                             children: [
                               Container(
@@ -62,7 +65,7 @@ class _ManageBannersState extends State<ManageBanners> {
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                                  child: Image.memory(_selectedImageBytes!, fit: BoxFit.cover),
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -72,6 +75,7 @@ class _ManageBannersState extends State<ManageBanners> {
                                 onPressed: () {
                                   setDialogState(() {
                                     _selectedImage = null;
+                                    _selectedImageBytes = null;
                                   });
                                 },
                               ),
@@ -87,10 +91,12 @@ class _ManageBannersState extends State<ManageBanners> {
                             ),
                             child: InkWell(
                               onTap: () async {
-                                final File? pickedImage = await bannerProvider.pickImage();
+                                final XFile? pickedImage = await bannerProvider.pickImage();
                                 if (pickedImage != null) {
+                                  final bytes = await pickedImage.readAsBytes();
                                   setDialogState(() {
                                     _selectedImage = pickedImage;
+                                    _selectedImageBytes = bytes;
                                   });
                                 }
                               },
@@ -182,13 +188,14 @@ class _ManageBannersState extends State<ManageBanners> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl: banner.imageUrl,
+                      child: Image.network(
+                        banner.imageUrl,
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                        errorWidget: (context, url, error) => const Icon(
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(child: CircularProgressIndicator());
+                        },
+                        errorBuilder: (context, error, stackTrace) => const Icon(
                           Icons.error, 
                           color: Colors.red, 
                           size: 40
@@ -283,18 +290,21 @@ class _ManageBannersState extends State<ManageBanners> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8.0),
-                        child: CachedNetworkImage(
-                          imageUrl: banner.imageUrl,
+                        child: Image.network(
+                          banner.imageUrl,
                           width: 120,
                           height: 80,
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            width: 120,
-                            height: 80,
-                            color: Colors.grey[200],
-                            child: const Center(child: CircularProgressIndicator()),
-                          ),
-                          errorWidget: (context, url, error) => Container(
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              width: 120,
+                              height: 80,
+                              color: Colors.grey[200],
+                              child: const Center(child: CircularProgressIndicator()),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) => Container(
                             width: 120,
                             height: 80,
                             color: Colors.grey[200],

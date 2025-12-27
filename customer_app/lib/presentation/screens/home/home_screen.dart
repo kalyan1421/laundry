@@ -66,6 +66,13 @@ class _HomeScreenState extends State<HomeScreen> with AuthValidationMixin {
       if (authProvider.userModel != null) {
         Provider.of<HomeProvider>(context, listen: false)
             .fetchLastActiveOrder(authProvider.userModel!.uid);
+        
+        // Refresh user data to ensure addresses are loaded
+        // This fixes the issue where addresses don't show on first launch
+        if (authProvider.userModel!.addresses.isEmpty) {
+          _logger.d('No addresses loaded, refreshing user data...');
+          await authProvider.refreshUserData();
+        }
       }
 
       Provider.of<BannerProvider>(context, listen: false).fetchBanners();

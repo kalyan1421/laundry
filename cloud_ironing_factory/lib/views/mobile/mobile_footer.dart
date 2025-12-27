@@ -5,6 +5,11 @@ import '../../theme/app_theme.dart';
 class MobileFooter extends StatelessWidget {
   const MobileFooter({Key? key}) : super(key: key);
 
+  void _scrollToTop(BuildContext context) {
+    // Navigate to home and scroll to top
+    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -84,16 +89,31 @@ class MobileFooter extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // Navigation Links
+                // Quick Links - Home + Legal Pages
                 Center(
                   child: Wrap(
                     spacing: 16,
-                    runSpacing: 8,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.center,
                     children: [
-                      _buildFooterLink('Home'),
-                      _buildFooterLink('About'),
-                      _buildFooterLink('Services'),
-                      _buildFooterLink('Contact Us'),
+                      // Home - scrolls to top
+                      GestureDetector(
+                        onTap: () => _scrollToTop(context),
+                        child: Text(
+                          'Home',
+                          style: TextStyle(
+                            color: AppTheme.white,
+                            fontSize: 12,
+                            fontFamily: AppTheme.primaryFont,
+                            decoration: TextDecoration.underline,
+                            decorationColor: AppTheme.white,
+                          ),
+                        ),
+                      ),
+                      // Legal Pages
+                      _buildLegalLink(context, 'Terms & Conditions', '/terms'),
+                      _buildLegalLink(context, 'Cancellation & Refund', '/cancellation'),
+                      _buildLegalLink(context, 'Privacy Policy', '/privacy'),
                     ],
                   ),
                 ),
@@ -170,16 +190,29 @@ class MobileFooter extends StatelessWidget {
                 ),
               ],
             ),
+
+            const SizedBox(height: 20),
+
+            // Copyright
+            Text(
+              '© 2024 Cloud Ironing Factory Pvt Ltd. All rights reserved.',
+              style: TextStyle(
+                color: AppTheme.white.withOpacity(0.7),
+                fontSize: 10,
+                fontFamily: AppTheme.primaryFont,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFooterLink(String text) {
+  Widget _buildLegalLink(BuildContext context, String text, String route) {
     return GestureDetector(
       onTap: () {
-        // Handle navigation
+        Navigator.of(context).pushNamed(route);
       },
       child: Text(
         text,

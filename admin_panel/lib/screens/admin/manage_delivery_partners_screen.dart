@@ -23,6 +23,7 @@ class _ManageDeliveryPartnersScreenState
     return Scaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: FloatingActionButton(
+        heroTag: 'add_delivery_partner_fab',
         isExtended: true,
         onPressed: () {
           Navigator.push(

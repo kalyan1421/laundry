@@ -286,6 +286,7 @@ class _ManageAdminsScreenState extends State<ManageAdminsScreen> {
         elevation: 0,
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'add_admin_fab',
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(
